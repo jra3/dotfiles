@@ -92,7 +92,7 @@ else
     /opt/interana/third_party/bin/pip install pysaml2
 
     cd $PROJ/deploy && DEV=$dev COVERAGE=1 ./setup_cluster_backend.sh  && sleep 3
-    ./create_customer.py -t --import_key local test interana.com
+    ./create_customer.py -u -t --import_key local test interana.com
 
 fi
 
