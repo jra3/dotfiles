@@ -5,7 +5,7 @@ autoload compinit && compinit
 export DEVTOOLSDIR=/home/john/interana/devtools
 source $DEVTOOLSDIR/devrc
 
-eval "$(register-python-argcomplete ia)"
+# eval "$(register-python-argcomplete ia)"
 
 ZSH=$HOME/.oh-my-zsh
 
