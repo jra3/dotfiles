@@ -82,7 +82,7 @@ alias monit="sudo -u interana /home/john/interana/backend/scripts/mon_me.sh"
 alias t="nosetests --with-timer --with-coverage --cover-erase --cover-branches --cover-package=."
 
 # Customize to your needs...
-export PATH=~/bin:/opt/interana/third_party/bin:$PATH
+export PATH=~/bin:~/.local/bin:/opt/interana/third_party/bin:$PATH
 export PATH=/usr/local/bin:/usr/local/sbin:$PATH
 
 PYTHONPATH=$PYTHONPATH:~/interana/backend:~/.local/lib/python2.7/site-packages/
