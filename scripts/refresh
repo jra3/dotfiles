@@ -83,7 +83,11 @@ else
     echo SETUP
 
     if [[ $skip_frontend = 0 ]] ;then
+<<<<<<< Updated upstream
         cd $PROJ/www && gulp dev
+=======
+	cd $PROJ/www && node_modules/.bin/gulp dev
+>>>>>>> Stashed changes
     fi
 
     rm -f $PROJ/config.yml
