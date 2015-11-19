@@ -1,0 +1,11 @@
+#!/bin/bash
+
+SANDBOX="/home/john/interana/backend"
+ENVFILE="$SANDBOX/deploy/ia_env.sh"
+source $ENVFILE
+
+$SANDBOX/scripts/mon_me.sh stop all
+$SANDBOX/deploy/cleanse_data.py
+cd $SANDBOX/deploy && ./setup_config_db.py
+sudo -u interana rm -rf /data/interana/*
+$SANDBOX/scripts/mon_me.sh start all

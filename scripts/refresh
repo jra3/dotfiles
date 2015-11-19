@@ -1,0 +1,110 @@
+#!/usr/bin/zsh
+
+PROJ=$HOME/interana/backend
+
+# A POSIX variable
+OPTIND=1
+
+# Initialize our own variables:
+build=0
+test=0
+install=0
+dev=''
+skip_frontend=0
+upgrade=0
+
+while getopts "bBtiouUd" opt; do
+    case "$opt" in
+    b)  do_build=1
+        ;;
+    B)  do_build=2
+        ;;
+    t)  test=1
+        ;;
+    i)  install=1
+        ;;
+    o)  skip_frontend=1
+        ;;
+    d)  dev='1'
+	;;
+    u)  upgrade=1
+        ;;
+    U)  upgrade=2
+        ;;
+    esac
+done
+
+if [[ $install > 0 ]] ;then
+    echo DEPS
+    cd $PROJ/deploy && (./install_build_deps.sh)
+fi
+
+if [[ $do_build == 1 ]] ;then
+    echo BUILD
+    cd $PROJ && make clean && make release
+elif [[ $do_build == 2 ]] ;then
+    cd $PROJ/csv2json && make release    
+    cd $PROJ/data-server && make release
+    cd $PROJ/string_server && make release
+    cd $PROJ/interana_tailer && make release    
+    cd $PROJ/import_server && make release    
+    cd $PROJ/import_server/purifier && make release
+    cd $PROJ/import_server/jsonfilters && make release
+    cd $PROJ && (
+	echo "$(git symbolic-ref HEAD 2> /dev/null | cut -b 12-)-$(git log --pretty=format:\"%h\" -1)" > VERSION.txt
+	git status >> VERSION.txt
+	echo "Compiled on $(date), hostname=$(hostname), from $(pwd)" >> VERSION.txt
+	echo "Tag is $(git describe --always --tag)" >> VERSION.txt
+	echo "Full SHA and landing time=$(git log -1 --format=\"%H%n%aD\")" >> VERSION.txt
+    )
+fi
+    
+if [[ $upgrade == 2 ]] ;then
+    # upgrade a dev cluster
+    $PROJ/scripts/mon_me.sh restart all
+    
+elif [[ $upgrade == 1 ]] ;then
+    cd $PROJ/deploy && DEV=$dev COVERAGE=1 ./upgrade_cluster.py --skip-frontend
+
+else;
+    echo UNINSTALL
+
+    cd $PROJ/deploy && ./stop_backend.sh && ./stop_frontend.sh
+
+    # extreme predjudice
+    sudo pkill -u interana
+    sudo pkill -u interana-www
+    sudo pkill -u iasql
+
+    sudo rm -rf /tmp/interana /var/run/interana /var/log/interana/*
+    sudo rm -rf /data/interana/*
+    sudo rm -rf /opt/interana/{backend,frontend,data,nginx,workarounds}
+    
+    echo SETUP
+
+    if [[ $skip_frontend = 0 ]] ;then
+	cd $PROJ/www && gulp dev
+    fi
+
+    rm -f $PROJ/config.yml
+
+    # if I want a dev 3rd party sript install it here
+    /opt/interana/third_party/bin/pip install pysaml2
+
+    cd $PROJ/deploy && DEV=$dev COVERAGE=1 ./setup_cluster_backend.sh  && sleep 3
+    ./create_customer.py -t --import_key local test interana.com
+
+fi
+
+curl http://localhost:8400/login > /dev/null 2>&1
+curl httP://localhost:8000 > /dev/null 2>&1
+
+/opt/interana/third_party/bin/pip install --user --upgrade importmagic jedi rope 
+
+if [[ $test > 0 ]] ;then
+    echo TEST
+    cd $PROJ && rm -f **/*.pyc && scripts/cover_me.sh #  tests  # integration_tests/import_tests/test_delete_shard_key.py
+    # aws s3 sync ./htmlcov 's3://dev-stash/john/latest' > /dev/null 2>&1
+fi
+
+notif cluster ready
