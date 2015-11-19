@@ -36,7 +36,7 @@ done
 
 if [[ $install > 0 ]] ;then
     echo DEPS
-    cd $PROJ/deploy && (source ./install_build_deps.sh)
+    cd $PROJ/deploy && . ./install_build_deps.sh
 fi
 
 if [[ $do_build == 1 ]] ;then
