@@ -2,7 +2,7 @@ autoload bashcompinit && bashcompinit
 autoload compinit && compinit
 
 # Interana Dev First!
-export DEVTOOLSDIR=/home/john/interana/devtools
+export DEVTOOLSDIR=$HOME/interana/devtools
 source $DEVTOOLSDIR/devrc
 
 # eval "$(register-python-argcomplete ia)"
