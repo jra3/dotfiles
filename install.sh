@@ -13,3 +13,4 @@ for script in $SCRIPTPATH/scripts/*; do
 done
 
 ln -fs $SCRIPTPATH/upgrade.sh ~/bin/up
+ln -fs $SCRIPTPATH/pub.sh ~/bin/pub
