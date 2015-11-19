@@ -88,8 +88,8 @@ else
 
     rm -f $PROJ/config.yml
 
-    # if I want a dev 3rd party sript install it here
-    /opt/interana/third_party/bin/pip install pysaml2
+    # # if I want a dev 3rd party sript install it here
+    # /opt/interana/third_party/bin/pip install pysaml2
 
     cd $PROJ/deploy && DEV=$dev COVERAGE=1 ./setup_cluster_backend.sh  && sleep 3
     ./create_customer.py -u -t --import_key local test interana.com
