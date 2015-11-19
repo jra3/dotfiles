@@ -12,4 +12,4 @@ for script in $SCRIPTPATH/scripts/*; do
     ln -fs $script ~/bin
 done
 
-ln -fs $SCRIPT ~/bin/up
+ln -fs $SCRIPTPATH/upgrade.sh ~/bin/up
