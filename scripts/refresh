@@ -92,7 +92,12 @@ else
     # /opt/interana/third_party/bin/pip install pysaml2
 
     cd $PROJ/deploy && DEV=$dev COVERAGE=1 ./setup_cluster_backend.sh  && sleep 3
-    ./create_customer.py -u -t --import_key local test interana.com
+
+    # All the things
+    cd $PROJ && common/py/config.py ADD_SETTING -a query-api -k cookie_secret -v honker
+    cd $PROJ/deploy && ./create_customer.py -u -t --import_key local test interana.com
+    cd $PROJ/integration_tests && ./load_fake_data.py -t test_table local
+    echo "INSERT INTO user_api_tokens VALUES ('fDrRK+MKeJi9NFD1zSpu0000','\$2a\$12\$9swiQdeTupkxPioMpCndUuTxbeJwZ4L.PEfzOVka8Ii24LJ1BQX3q',1,2);" | /opt/interana/third_party/bin/mysql customers --socket=/tmp/iasql.sock  <&0 -u nobody -pti
 
 fi
 
