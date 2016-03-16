@@ -74,7 +74,8 @@ fi
 
 export CLOWNTOWN="ultraclown"
 
-export EDITOR=emacs
+export GIT_EDITOR="emacs -nw"
+export EDITOR="emacs -nw"
 export EMACS_DIR=~/.dot-emacs
 export INPUTRC=~/.inputrc
 
@@ -84,7 +85,8 @@ alias bb="cd ~/interana/buildbot"
 
 alias db="/opt/interana/third_party/bin/mysql --socket=/tmp/iasql.sock $@ <&0 -u nobody -pti"
 alias monit="sudo -u interana /home/john/interana/backend/scripts/mon_me.sh"
-alias t="nosetests --with-timer --with-coverage --cover-erase --cover-branches --cover-package=."
+alias epop="emacsclient -c --no-wait"
+alias et="emacsclient -t"
 
 # Customize to your needs...
 export PATH=~/bin:~/.local/bin:/opt/interana/third_party/bin:$PATH

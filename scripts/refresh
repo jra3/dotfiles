@@ -82,10 +82,6 @@ else
 
     echo SETUP
 
-    if [[ $skip_frontend = 0 ]] ;then
-	cd $PROJ/www && node_modules/.bin/gulp dev
-    fi
-
     rm -f $PROJ/config.yml
 
     # # if I want a dev 3rd party sript install it here
@@ -95,14 +91,33 @@ else
 
     # All the things
     cd $PROJ && common/py/config.py ADD_SETTING -a query-api -k cookie_secret -v honker
-    cd $PROJ/deploy && ./create_customer.py -u -t --import_key local test interana.com
-    cd $PROJ/integration_tests && ./load_fake_data.py -t test_table local
-    echo "INSERT INTO user_api_tokens VALUES ('fDrRK+MKeJi9NFD1zSpu0000','\$2a\$12\$9swiQdeTupkxPioMpCndUuTxbeJwZ4L.PEfzOVka8Ii24LJ1BQX3q',1,2);" | /opt/interana/third_party/bin/mysql customers --socket=/tmp/iasql.sock  <&0 -u nobody -pti
+    cd $PROJ/deploy && ./create_customer.py test -t
+    # cd $PROJ/deploy && ./create_usage_table.py -i local test 
+    cd $PROJ/scripts && ./load_fake_data.py -t test_table local
+
+    # cd $PROJ/deploy && ./create_log_pipeline.py --table_name internal4 --customer_label internal4 --s3_folder internal4 --which_logs all --customer_name test --s3_key AKIAITNPDJ2FOP3KHFNA --s3_secret_key 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 --hourly_bucket
+
+    # "api_token": "Xz27z9wXLhHoLnY4ctukTnBRa/PsCV9vOomM/mNX3e49wJJH7JpC2zaavcU1el11nPalxFCWX=uT9SNB4GhyQnb=T0nk0000"
+    echo "INSERT INTO user_api_tokens VALUES ('X=uT9SNB4GhyQnb=T0nk0000','\$2a\$12\$s/R2z6WgYovtNlGxl6w3EOqmzgFS0t.K4tuVf6j/PvMFDczSGsEsC',1,2);" | /opt/interana/third_party/bin/mysql customers --socket=/tmp/iasql.sock  <&0 -u nobody -pti
+
+    $PROJ/scripts/mon_me.sh stop
+    sudo rm -rf /opt/interana/.auth_token
+    $PROJ/scripts/mon_me.sh start  
+    $PROJ/scripts/mon_me.sh restart all
+
+    sudo rm -rf /opt/interana/frontend/www
+    # if [[ $skip_frontend = 0 ]] ;then
+    #     cd $PROJ/deploy && ./setup_frontend.sh
+    #     cd $PROJ/www && node_modules/.bin/gulp dev
+    # fi
 
 fi
 
+sudo rm -rf /opt/interana/frontend/www
+sudo ln -s $PROJ/www /opt/interana/frontend/www
+
 curl http://localhost:8400/login > /dev/null 2>&1
-curl httP://localhost:8000 > /dev/null 2>&1
+curl http://localhost:8000 > /dev/null 2>&1
 
 /opt/interana/third_party/bin/pip install --user --upgrade importmagic jedi rope
 

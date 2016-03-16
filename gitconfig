@@ -13,7 +13,7 @@
   wm = !git commit --amend -eF $(git config commit.template)
   glom = !git commit -a --amend -C HEAD
   purge = !git branch --merged master | grep -v "master" | xargs -n 1 git branch -d
-	webui = !/home/john/.git-webui/release/libexec/git-core/git-webui
+  webui = !/home/john/.git-webui/release/libexec/git-core/git-webui
 
 [svn]
   followparent = true
@@ -65,7 +65,7 @@
   autosetuprebase = never
 
 [core]
-  editor = emacs
+  editor = emacs -nw
 [help]
   autocorrect = 1
 [webui]
