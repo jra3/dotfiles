@@ -64,10 +64,9 @@
 [branch]
   autosetuprebase = never
 
-[core]
-  editor = emacs -nw
 [help]
   autocorrect = 1
+
 [webui]
   autoupdate = false
   port = 9999

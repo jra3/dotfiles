@@ -64,7 +64,7 @@ if [[ $upgrade == 2 ]] ;then
     $PROJ/scripts/mon_me.sh restart all
 
 elif [[ $upgrade == 1 ]] ; then
-    cd $PROJ/deploy && DEV=$dev COVERAGE=1 ./upgrade_cluster.py --skip-frontend
+    cd $PROJ/deploy && DEV=$dev COVERAGE=1 ./upgrade_cluster.py  #  --skip-backup --skip-frontend
 
 else
     echo UNINSTALL
@@ -92,6 +92,7 @@ else
     # All the things
     cd $PROJ && common/py/config.py ADD_SETTING -a query-api -k cookie_secret -v honker
     cd $PROJ/deploy && ./create_customer.py test -t
+    cd $PROJ/scripts/rbac && ./user_role.py create -r admin -c 1 -u test@interana.com
     # cd $PROJ/deploy && ./create_usage_table.py -i local test 
     cd $PROJ/scripts && ./load_fake_data.py -t test_table local
 
@@ -119,7 +120,7 @@ sudo ln -s $PROJ/www /opt/interana/frontend/www
 curl http://localhost:8400/login > /dev/null 2>&1
 curl http://localhost:8000 > /dev/null 2>&1
 
-/opt/interana/third_party/bin/pip install --user --upgrade importmagic jedi rope
+/opt/interana/third_party/bin/pip install --user --upgrade importmagic jedi rope yapf elpy
 
 if [[ $test > 0 ]] ;then
     echo TEST

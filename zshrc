@@ -1,5 +1,5 @@
-autoload bashcompinit && bashcompinit
-autoload compinit && compinit
+autoload -U compinit && compinit
+autoload -U bashcompinit && bashcompinit
 
 # Interana Dev First!
 export DEVTOOLSDIR=$HOME/interana/devtools
@@ -11,10 +11,13 @@ export PYTHONSTARTUP="$HOME/.pythonrc"
 
 eval "$(register-python-argcomplete ia)"
 
-ZSH=$HOME/.oh-my-zsh
+for file in $(cd ~/interana/backend && git grep -l PYTHON_ARGCOMPLETE_OK);
+do
+    echo $file
+    eval "$( register-python-argcomplete ${file} )"
+done
 
-# export ZSH_TMUX_AUTOSTART=true
-# export ZSH_TMUX_AUTOCONNECT=true
+ZSH=$HOME/.oh-my-zsh
 
 ZSH_THEME="afowler"
 export UPDATE_ZSH_DAYS=30
@@ -35,6 +38,7 @@ plugins=(
     copyfile # copy file to clipboard
     cp       # rsync shortcut "cpv"
     dirhistory
+    emacs
     encode64
     git
     git-prompt
@@ -65,6 +69,7 @@ plugins=(
 )
 
 source $ZSH/oh-my-zsh.sh
+
 # special indicator for sandboxes
 if [[ $(hostname) = *dev* ]]; then
     CARETCOLOR=red
@@ -74,8 +79,7 @@ fi
 
 export CLOWNTOWN="ultraclown"
 
-export GIT_EDITOR="emacs -nw"
-export EDITOR="emacs -nw"
+export EDITOR="emacsclient --alternate-editor '' -t"
 export EMACS_DIR=~/.dot-emacs
 export INPUTRC=~/.inputrc
 
@@ -85,11 +89,22 @@ alias bb="cd ~/interana/buildbot"
 
 alias db="/opt/interana/third_party/bin/mysql --socket=/tmp/iasql.sock $@ <&0 -u nobody -pti"
 alias monit="sudo -u interana /home/john/interana/backend/scripts/mon_me.sh"
-alias epop="emacsclient -c --no-wait"
-alias et="emacsclient -t"
+# alias epop="emacsclient -c --no-wait"
+# alias et="emacsclient -t"
 
 # Customize to your needs...
 export PATH=~/bin:~/.local/bin:/opt/interana/third_party/bin:$PATH
 export PATH=/usr/local/bin:/usr/local/sbin:$PATH
 
 PYTHONPATH=$PYTHONPATH:~/interana/backend:~/.local/lib/python2.7/site-packages/
+
+# workaround for tramp
+if [[ "$TERM" == "dumb" ]]
+then
+  unsetopt zle
+  unsetopt prompt_cr
+  unsetopt prompt_subst
+  unfunction precmd
+  unfunction preexec
+  PS1='$ '
+fi
