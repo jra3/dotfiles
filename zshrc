@@ -1,21 +1,8 @@
 autoload -U compinit && compinit
 autoload -U bashcompinit && bashcompinit
 
-# Interana Dev First!
-export DEVTOOLSDIR=$HOME/interana/devtools
-source $DEVTOOLSDIR/devrc
-
-export VIPASS=olivecohort
 export ASYNC_TEST_TIMEOUT=300
 export PYTHONSTARTUP="$HOME/.pythonrc"
-
-eval "$(register-python-argcomplete ia)"
-
-for file in $(cd ~/interana/backend && git grep -l PYTHON_ARGCOMPLETE_OK);
-do
-    echo $file
-    eval "$( register-python-argcomplete ${file} )"
-done
 
 ZSH=$HOME/.oh-my-zsh
 
@@ -38,7 +25,6 @@ plugins=(
     copyfile # copy file to clipboard
     cp       # rsync shortcut "cpv"
     dirhistory
-    emacs
     encode64
     git
     git-prompt
@@ -77,20 +63,16 @@ fi
 
 # Non oh-my-zsh below here =====================================================
 
-export CLOWNTOWN="ultraclown"
-
-export EDITOR="emacsclient --alternate-editor '' -t"
 export EMACS_DIR=~/.dot-emacs
 export INPUTRC=~/.inputrc
 
-alias g=git
-alias b="cd ~/interana/backend"
-alias bb="cd ~/interana/buildbot"
+export ALTERNATE_EDITOR=""
+export EDITOR="emacsclient -t"                  # $EDITOR should open in terminal
+export VISUAL="emacsclient -c -a emacs"         # $VISUAL opens in GUI with non-daemon as alternate
 
-alias db="/opt/interana/third_party/bin/mysql --socket=/tmp/iasql.sock $@ <&0 -u nobody -pti"
-alias monit="sudo -u interana /home/john/interana/backend/scripts/mon_me.sh"
-# alias epop="emacsclient -c --no-wait"
-# alias et="emacsclient -t"
+alias g=git
+alias e="$VISUAL --no-wait"
+alias t="$EDITOR"
 
 # Customize to your needs...
 export PATH=~/bin:~/.local/bin:/opt/interana/third_party/bin:$PATH

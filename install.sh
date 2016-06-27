@@ -1,7 +1,7 @@
 #!/bin/sh
 
-SCRIPT=$( readlink -e $0 )
-SCRIPTPATH=$( dirname $SCRIPT )
+
+SCRIPTPATH=$HOME/.dotfiles
 
 for file in gitconfig inputrc tmux.conf zshrc; do
     ln -fs $SCRIPTPATH/$file ~/.$file
