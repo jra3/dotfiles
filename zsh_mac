@@ -1,0 +1,52 @@
+#!/usr/local/zsh
+
+export ALTERNATE_EDITOR=""
+export EDITOR="emacsclient -a emacs -t"  # $EDITOR should open in terminal
+export VISUAL="emacsclient -a emacs -c " # $VISUAL opens in GUI with non-daemon as alternate
+
+alias s="cd $HOME/go/src/code.uber.internal/infra/statsdex"
+alias e="$HOME/bin/emacsclient.sh"
+alias t="$EDITOR"
+
+export PATH=~/bin:~/.local/bin:/opt/interana/third_party/bin:$PATH
+export PATH=/usr/local/bin:/usr/local/sbin:$PATH
+
+
+# added by newengsetup
+type "brew" &>/dev/null && export PATH=$(brew --prefix)/sbin:$(brew --prefix)/bin:$PATH
+export PATH=$HOME/bin:$PATH
+
+export UBER_HOME="$HOME/Uber"
+export UBER_OWNER="jra3@uber.com"
+export UBER_LDAP_UID="jra3"
+export VAGRANT_DEFAULT_PROVIDER=aws
+
+[ -s "/usr/local/bin/virtualenvwrapper.sh" ] && . /usr/local/bin/virtualenvwrapper.sh
+[ -s "$HOME/.nvm/nvm.sh" ] && . $HOME/.nvm/nvm.sh
+which rbenv >/dev/null && eval "$(rbenv init -)"
+
+_sync_dir () {
+    cmd=$1
+    shift
+    new_directory=$(boxer sync_dir $@)
+    if [ "$?" -eq "0" ]; then
+        $cmd $new_directory
+    else
+        echo "$new_directory"
+    fi
+}
+cdsync () {
+    _sync_dir cd $@
+}
+editsync () {
+    _sync_dir $EDITOR $@
+}
+opensync () {
+    _sync_dir open @
+}
+# END added by newengsetup
+
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+
+# run ussh!
+ussh

@@ -1,0 +1,8 @@
+#!/usr/local/zsh
+
+export ALTERNATE_EDITOR=""
+export EDITOR="emacs" # $EDITOR should open in terminal
+export VISUAL="emacs" # $VISUAL opens in GUI with non-daemon as alternate
+
+alias e="$EDITOR"
+alias t="$EDITOR"

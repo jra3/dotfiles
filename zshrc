@@ -1,92 +1,79 @@
 autoload -U compinit && compinit
 autoload -U bashcompinit && bashcompinit
 
-export ASYNC_TEST_TIMEOUT=300
 export PYTHONSTARTUP="$HOME/.pythonrc"
 
 ZSH=$HOME/.oh-my-zsh
 
 ZSH_THEME="afowler"
-export UPDATE_ZSH_DAYS=30
+export UPDATE_ZSH_DAYS=300
 
 COMPLETION_WAITING_DOTS="true"
 DISABLE_UNTRACKED_FILES_DIRTY="true"
 
 plugins=(
-    autojump
-    autopep8
-    battery
-    bower
-    brew
-    coffee
-    colorize
-    common-aliases
-    copydir  # copy pwd to clipboard
-    copyfile # copy file to clipboard
-    cp       # rsync shortcut "cpv"
-    dirhistory
-    encode64
-    git
-    git-prompt
-    git-remote-branch
-    gitignore
-    history-substring-search
-    iwhois
-    jsontools
-    mosh
-    node
-    npm
-    nyan
-    osx
-    pep8
-    pip
+    autojump    # a cd that 'learns'. run brew install autojump
+    brew        # autocomplete
+    common-aliases 
+    copydir     # copy pwd to clipboard
+    copyfile    # copy file to clipboard
+    dirhistory  # M-Left, M-Right
+    encode64    # encode64, decode64
+    fabric      # autocomplete
+    gitfast     # faster git prompt et al      
+    jsontools   # pp_json, is_json, urlencode_json, urldecode_json
+    npm         # autocomplete
+    nyan        # NYAN!!!
+    osx         #
     pj
-    pyenv
-    pylint
-    python
-    repo
-    rsync
-    safe-paste
-    sudo
-    tmux
-    torrent
-    zsh_reload
-    catimg
+    pep8        # autocomplete
+    pip         # autocomplete
+    pyenv       # prompt
+    pylint      # autocomplete
+    python      # autocomplete
+    redis-cli   # autocomplete
+    safe-paste  # "safely" allow paste of things with backticks
+    sudo        # ESC-ESC
+    supervisor  # autocomplete
+    tmux        # https://github.com/robbyrussell/oh-my-zsh/wiki/Plugins#tmux
+    urltools    # urlencode, urldecode
+    vagrant     # autocomplete
+    zsh_reload  
+    catimg      # lulz
 )
 
 source $ZSH/oh-my-zsh.sh
 
 # special indicator for sandboxes
-if [[ $(hostname) = *dev* ]]; then
+if [[ $(hostname) = *jra3* ]]; then
     CARETCOLOR=red
 fi
 
 # Non oh-my-zsh below here =====================================================
 
+export GOROOT=/usr/local/opt/go/libexec
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin:$GOROOT/bin
+
 export EMACS_DIR=~/.dot-emacs
 export INPUTRC=~/.inputrc
 
-export ALTERNATE_EDITOR=""
-export EDITOR="emacsclient -t"                  # $EDITOR should open in terminal
-export VISUAL="emacsclient -c -a emacs"         # $VISUAL opens in GUI with non-daemon as alternate
-
 alias g=git
-alias e="$VISUAL --no-wait"
-alias t="$EDITOR"
 
-# Customize to your needs...
-export PATH=~/bin:~/.local/bin:/opt/interana/third_party/bin:$PATH
-export PATH=/usr/local/bin:/usr/local/sbin:$PATH
+case "$(uname -s)" in    
+    Darwin)
+	source $HOME/.zsh_mac
+	;;
+    
+    Linux)
+	source $HOME/.zsh_linux
+	;;
+    
+    *)
+	echo 'Kill yourself'
+	;;
+esac
 
-PYTHONPATH=$PYTHONPATH:~/interana/backend:~/.local/lib/python2.7/site-packages/
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 
-# workaround for tramp
-if [[ "$TERM" == "dumb" ]]
-then
-  unsetopt zle
-  unsetopt prompt_cr
-  unsetopt prompt_subst
-  unfunction precmd
-  unfunction preexec
-  PS1='$ '
-fi
+# So it has come to this...

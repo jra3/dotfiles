@@ -20,7 +20,7 @@
 
 [user]
   name = John Allen
-  email = john@interana.com
+  email = j@porcnick.com
 
 [log]
   date = local
@@ -46,17 +46,15 @@
 [difftool]
   prompt = false
 
-
 [merge]
   tool = ediff
+
 [mergetool "ediff"]
   cmd = emacsclient -c -a \"\"  --eval \"(ediff-merge-files-with-ancestor \\\"$LOCAL\\\" \\\"$REMOTE\\\" \\\"$BASE\\\" nil \\\"$MERGED\\\")\"
 
 [push]
   default = current
 
-# [commit]
-#   template = /Users/jallen/Dropbox/scripts/gittemplate
 [filter "media"]
   clean = git-media-clean %f
   smudge = git-media-smudge %f
@@ -70,3 +68,7 @@
 [webui]
   autoupdate = false
   port = 9999
+
+[core]
+  excludesfile = /Users/jra3/.gitignore_global
+  
