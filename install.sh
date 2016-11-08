@@ -3,7 +3,7 @@
 
 SCRIPTPATH=$HOME/.dotfiles
 
-for file in gitconfig inputrc tmux.conf zsh*; do
+for file in gnus profile gitconfig inputrc tmux.conf zsh*; do
     echo $file
     ln -fs $SCRIPTPATH/$file ~/.$file
 done
