@@ -1,3 +1,8 @@
+# Local variables:
+# coding: utf-8
+# mode: sh
+# End:
+
 autoload -U compinit && compinit
 autoload -U bashcompinit && bashcompinit
 
@@ -13,10 +18,7 @@ DISABLE_UNTRACKED_FILES_DIRTY="true"
 
 plugins=(
     autojump    # a cd that 'learns'. run brew install autojump
-    brew        # autocomplete
     common-aliases 
-    copydir     # copy pwd to clipboard
-    copyfile    # copy file to clipboard
     dirhistory  # M-Left, M-Right
     encode64    # encode64, decode64
     fabric      # autocomplete

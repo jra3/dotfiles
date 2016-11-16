@@ -1,4 +1,7 @@
-#!/usr/local/zsh
+# Local variables:
+# coding: utf-8
+# mode: sh
+# End:
 
 export ALTERNATE_EDITOR=""
 export EDITOR="emacs" # $EDITOR should open in terminal

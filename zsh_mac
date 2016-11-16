@@ -1,4 +1,7 @@
-#!/usr/local/zsh
+# Local variables:
+# coding: utf-8
+# mode: sh
+# End:
 
 export ALTERNATE_EDITOR=""
 export EDITOR="emacsclient -a emacs -t"  # $EDITOR should open in terminal
@@ -10,7 +13,6 @@ alias t="$EDITOR"
 export PATH=~/.local/bin:$PATH
 export PATH=/usr/local/bin:/usr/local/sbin:$PATH
 
-# added by newengsetup
 type "brew" &>/dev/null && export PATH=$(brew --prefix)/sbin:$(brew --prefix)/bin:$PATH
 
 export PATH=$HOME/bin:$PATH
