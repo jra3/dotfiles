@@ -50,32 +50,3 @@ source $ZSH/oh-my-zsh.sh
 if [[ $(hostname) = *jra3* ]]; then
     CARETCOLOR=red
 fi
-
-# Non oh-my-zsh below here =====================================================
-
-export GOROOT=/usr/local/opt/go/libexec
-export GOPATH=$HOME/go
-export PATH=$PATH:$GOPATH/bin:$GOROOT/bin
-
-export EMACS_DIR=~/.dot-emacs
-export INPUTRC=~/.inputrc
-
-alias g=git
-
-case "$(uname -s)" in    
-    Darwin)
-	source $HOME/.zsh_mac
-	;;
-    
-    Linux)
-	source $HOME/.zsh_linux
-	;;
-    
-    *)
-	echo 'Kill yourself'
-	;;
-esac
-
-test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
-
-# So it has come to this...

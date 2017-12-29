@@ -14,13 +14,14 @@
   glom = !git commit -a --amend -C HEAD
   purge = !git branch --merged master | grep -v "master" | xargs -n 1 git branch -d
   webui = !/home/john/.git-webui/release/libexec/git-core/git-webui
+	g = grep --break --heading --line-number
 
 [svn]
   followparent = true
 
 [user]
   name = John Allen
-  email = j@porcnick.com
+  email = jallen@fb.com
 
 [log]
   date = local
@@ -71,4 +72,6 @@
 
 [core]
   excludesfile = /Users/jra3/.gitignore_global
-  
+[grep]
+	extendRegexp = true
+	lineNumber = true
