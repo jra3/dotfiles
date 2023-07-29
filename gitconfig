@@ -4,25 +4,19 @@
   branch = auto
 
 [alias]
+  pi = cherry-pick
   br = branch
   co = checkout
   di = diff
   st = status
   lo = log
-  pi = cherry-pick
   wm = !git commit --amend -eF $(git config commit.template)
   glom = !git commit -a --amend -C HEAD
-  purge = !git branch --merged master | grep -v "master" | xargs -n 1 git branch -d
-  webui = !/home/john/.git-webui/release/libexec/git-core/git-webui
+  purge = !git branch --merged main | grep -v "main" | xargs -n 1 git branch -d
   g = grep --break --heading --line-number
   smartlog = log --graph --pretty=format:'commit: %C(bold red)%h%Creset %C(red)<%H>%Creset %C(bold magenta)%d %Creset%ndate: %C(bold yellow)%cd %Creset%C(yellow)%cr%Creset%nauthor: %C(bold blue)%an%Creset %C(blue)<%ae>%Creset%n%C(cyan)%s%n%Creset'
   sl = !git smartlog
-  pd = !git commit -a -m 'push detritus'
   deploytest = !git push -f origin HEAD:deploy/web/jallen
-
-
-[svn]
-  followparent = true
 
 [user]
   name = John Allen
@@ -71,14 +65,9 @@
 [help]
   autocorrect = 1
 
-[webui]
-  autoupdate = false
-  port = 9999
-
-[core]
-  excludesfile = /Users/jra3/.gitignore_global
 [grep]
   extendRegexp = true
   lineNumber = true
+
 [pull]
   rebase = true
