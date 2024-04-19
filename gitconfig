@@ -8,6 +8,7 @@
   br = branch
   co = checkout
   di = diff
+  dm = !git diff main..HEAD
   st = status
   lo = log
   wm = !git commit --amend -eF $(git config commit.template)
@@ -15,8 +16,9 @@
   purge = !git branch --merged main | grep -v "main" | xargs -n 1 git branch -d
   g = grep --break --heading --line-number
   smartlog = log --graph --pretty=format:'commit: %C(bold red)%h%Creset %C(red)<%H>%Creset %C(bold magenta)%d %Creset%ndate: %C(bold yellow)%cd %Creset%C(yellow)%cr%Creset%nauthor: %C(bold blue)%an%Creset %C(blue)<%ae>%Creset%n%C(cyan)%s%n%Creset'
-  sl = !git smartlog
-  deploytest = !git push -f origin HEAD:deploy/web/jallen
+  sl = smartlog
+  up = !git fetch origin main:main
+  publish = !git push origin HEAD:main
 
 [user]
   name = John Allen
@@ -43,14 +45,18 @@
   changed = yellow
   untracked = red
 
-[difftool]
-  prompt = false
+[diff]
+  tool = vscode
+[difftool "vscode"]
+  cmd = code --wait --diff $LOCAL $REMOTE
+
+[fetch]
+  prune = true
 
 [merge]
-  tool = ediff
-
-[mergetool "ediff"]
-  cmd = emacsclient -c -a \"\"  --eval \"(ediff-merge-files-with-ancestor \\\"$LOCAL\\\" \\\"$REMOTE\\\" \\\"$BASE\\\" nil \\\"$MERGED\\\")\"
+  tool = vscode
+[mergetool "vscode"]
+  cmd = code --wait $MERGED
 
 [push]
 	default = current
@@ -61,13 +67,25 @@
 
 [branch]
   autosetuprebase = never
+  autosetupmerge = always
+	sort = -committerdate
 
 [help]
   autocorrect = 1
 
+[core]
+  excludesfile = /Users/jra3/.gitignore_global
+	editor = code --wait
 [grep]
   extendRegexp = true
   lineNumber = true
 
 [pull]
-  rebase = true
+  rebase = false
+[rerere]
+	enabled = true
+	autoUpdate = true
+[column]
+	ui = auto
+[maintenance]
+	repo = /Users/jallen/braid
