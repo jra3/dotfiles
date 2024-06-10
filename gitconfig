@@ -1,7 +1,6 @@
-[color]
-  diff = auto
-  status = auto
-  branch = auto
+[user]
+  name = John Allen
+  email = jallen@braid.ai
 
 [alias]
   pi = cherry-pick
@@ -20,12 +19,10 @@
   up = !git fetch origin main:main
   publish = !git push origin HEAD:main
 
-[user]
-  name = John Allen
-  email = jallen@dynoprojects.com
-
-[log]
-  date = local
+[color]
+  diff = auto
+  status = auto
+  branch = auto
 
 [color "branch"]
   current = yellow reverse
@@ -47,6 +44,7 @@
 
 [diff]
   tool = vscode
+
 [difftool "vscode"]
   cmd = code --wait --diff $LOCAL $REMOTE
 
@@ -55,8 +53,15 @@
 
 [merge]
   tool = vscode
+
 [mergetool "vscode"]
   cmd = code --wait $MERGED
+
+[log]
+  date = local
+
+[difftool]
+  prompt = false
 
 [push]
 	default = current
@@ -82,10 +87,13 @@
 
 [pull]
   rebase = false
+
+[column]
+	ui = auto
+
+[maintenance]
+	repo = /Users/jallen/braid
+
 [rerere]
 	enabled = true
 	autoUpdate = true
-[column]
-	ui = auto
-[maintenance]
-	repo = /Users/jallen/braid

@@ -1,0 +1,11 @@
+#!/bin/zsh
+
+# I am using emacs-plus, so i can assume that there is always an emacs daemon
+# running. Unfortunately the -r argument does not seem to work as I would expect
+# so I just use this ugly block of code to ensure that there is one frame open
+IS_GRAPHICAL=$( emacsclient -e "(display-graphic-p)" )
+if [[ $IS_GRAPHICAL = "nil" ]]; then
+    emacsclient -c -n
+fi
+
+emacsclient -n $@
