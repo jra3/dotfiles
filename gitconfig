@@ -64,7 +64,7 @@
   prompt = false
 
 [push]
-	default = current
+	default = upstream
 
 [filter "media"]
   clean = git-media-clean %f
