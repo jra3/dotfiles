@@ -3,10 +3,10 @@
   email = jallen@braid.ai
 
 [alias]
+  r = rebase
   pi = cherry-pick
   br = branch
   co = checkout
-  di = diff
   dm = !git diff main..HEAD
   st = status
   lo = log
