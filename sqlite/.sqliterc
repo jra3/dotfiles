@@ -1,0 +1,6 @@
+.headers on
+.mode box
+PRAGMA foreign_keys = ON;
+.width auto
+.timer on
+.prompt "sqlite> " "   ...> "

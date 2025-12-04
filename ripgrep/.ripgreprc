@@ -1,0 +1,16 @@
+# Smart case search
+--smart-case
+
+# Show column numbers
+--column
+
+# Exclude git directories
+--glob=!.git/
+
+# Add custom file types
+--type-add=graphql:*.graphql
+--type-add=graphql:*.gql
+
+# Performance optimizations
+--max-columns=150
+--max-columns-preview
