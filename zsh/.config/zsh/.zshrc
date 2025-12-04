@@ -64,44 +64,15 @@ bindkey '^H' backward-delete-char
 bindkey '^W' backward-kill-word
 
 # ============================================================================
-# Colors and Prompt
+# Prompt (Starship)
 # ============================================================================
-typeset -gA colors
-colors=(
-    'blue' '%F{4}' 'cyan' '%F{6}' 'green' '%F{2}' 'magenta' '%F{5}'
-    'red' '%F{1}' 'white' '%F{7}' 'yellow' '%F{3}' 'black' '%F{0}' 'reset' '%f'
-)
+eval "$(starship init zsh)"
 
-typeset -gA git_symbols
-git_symbols=(
-    'added'      '✚'
-    'ahead'      '⬆'
-    'behind'     '⬇'
-    'deleted'    '✖'
-    'modified'   '✱'
-    'renamed'    '➜'
-    'unmerged'   '═'
-    'untracked'  '✭'
-)
-
-autoload -Uz vcs_info
-setopt PROMPT_SUBST
-zstyle ':vcs_info:*' enable git
-zstyle ':vcs_info:*' check-for-changes true
-zstyle ':vcs_info:*' stagedstr "${colors[green]}${git_symbols[added]}${colors[reset]}"
-zstyle ':vcs_info:*' unstagedstr "${colors[red]}${git_symbols[modified]}${colors[reset]}"
-zstyle ':vcs_info:git:*' formats " ${colors[cyan]}%b%c%u${colors[reset]}"
-zstyle ':vcs_info:git:*' actionformats " ${colors[cyan]}%b${colors[reset]} ${colors[yellow]}(%a)${colors[reset]}%c%u"
-
-precmd_functions+=(vcs_info)
+# Terminal title
 precmd_functions+=(set_terminal_title)
-
 function set_terminal_title {
     print -Pn "\e]0;${PWD/#$HOME/~}\a"
 }
-
-PROMPT='${colors[blue]}%~${colors[reset]} ${colors[red]}❯${colors[yellow]}❯${colors[green]}❯${colors[reset]} '
-RPROMPT='${vcs_info_msg_0_}%(?..'${colors[red]}'✘ %?'${colors[reset]}')'
 
 # ============================================================================
 # fzf Configuration

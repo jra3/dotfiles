@@ -1,0 +1,22 @@
+#!/bin/bash
+# Install packages from package lists
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "Installing official repo packages..."
+sudo pacman -S --needed - < "$SCRIPT_DIR/packages-arch.txt"
+
+if command -v yay &>/dev/null; then
+    echo "Installing AUR packages with yay..."
+    yay -S --needed - < "$SCRIPT_DIR/packages-aur.txt"
+elif command -v paru &>/dev/null; then
+    echo "Installing AUR packages with paru..."
+    paru -S --needed - < "$SCRIPT_DIR/packages-aur.txt"
+else
+    echo "No AUR helper found (yay/paru). Skipping AUR packages:"
+    cat "$SCRIPT_DIR/packages-aur.txt"
+fi
+
+echo "Done!"

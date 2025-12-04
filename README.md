@@ -37,8 +37,10 @@ stow zsh git ghostty
 | `ghostty` | Ghostty terminal emulator configuration |
 | `git` | Git configuration and global ignore patterns |
 | `hypr` | Hyprland compositor (keybindings, monitors, autostart, appearance) |
+| `pacman` | Arch Linux package lists and install script |
 | `ripgrep` | ripgrep configuration |
 | `sqlite` | SQLite configuration |
+| `starship` | Starship prompt configuration |
 | `tmux` | Tmux configuration and session scripts (tn, twt) |
 | `zsh` | Zsh shell configuration with XDG compliance |
 

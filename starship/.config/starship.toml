@@ -1,0 +1,41 @@
+# Starship prompt configuration
+# Matches the sorin-style prompt: blue path, colored chevrons, git status
+
+add_newline = false
+command_timeout = 500
+
+format = """$directory$character"""
+
+right_format = """$git_branch$git_status$status"""
+
+[character]
+success_symbol = "[❯](red)[❯](yellow)[❯](green)"
+error_symbol = "[❯](red)[❯](yellow)[❯](green)"
+
+[directory]
+style = "blue"
+truncation_length = 0
+truncate_to_repo = false
+
+[git_branch]
+format = " [$branch]($style)"
+style = "cyan"
+
+[git_status]
+format = "[$all_status$ahead_behind]($style)"
+style = "cyan"
+staged = "[✚](green)"
+modified = "[✱](red)"
+untracked = "[✭](yellow)"
+deleted = "[✖](red)"
+renamed = "[➜](cyan)"
+conflicted = "[═](red)"
+ahead = "[⬆](cyan)"
+behind = "[⬇](cyan)"
+diverged = "[⬆⬇](cyan)"
+
+[status]
+disabled = false
+format = "[$symbol$status]($style)"
+symbol = "[✘ ](red)"
+style = "red"
