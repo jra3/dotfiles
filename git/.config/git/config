@@ -28,4 +28,7 @@
 	autoupdate = true        # Apply stored conflict resolutions automatically
 [user]
 	name = John Allen
-	email = john@antimetal.com
+	email = git@porcnick.com
+
+[includeIf "gitdir:~/am/"]
+	path = config-work

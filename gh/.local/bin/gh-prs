@@ -1,0 +1,38 @@
+#!/bin/bash
+# gh prs - List PRs with status and CI info (colored)
+# PR colors: grey=draft, green=approved, yellow=pending review, magenta=changes requested, red=conflicts
+gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup | jq -r '.[] | [
+  (.number | tostring),
+  (if .isDraft then "draft"
+   elif .mergeable == "CONFLICTING" then "conflict"
+   elif .reviewDecision == "CHANGES_REQUESTED" then "changes"
+   elif .reviewDecision == "APPROVED" then "approved"
+   else "pending" end),
+  (if .statusCheckRollup == null or .statusCheckRollup == [] then "pending"
+   else (.statusCheckRollup | map(.conclusion // .status) |
+     if all(. == "SUCCESS" or . == "success") then "pass"
+     elif any(. == "FAILURE" or . == "failure") then "fail"
+     else "running" end) end),
+  .title[0:55]
+] | @tsv' | awk -F'\t' '
+BEGIN {
+  printf "%-7s  %-9s  %s\n", "PR", "CI", "TITLE"
+  printf "%-7s  %-9s  %s\n", "------", "---------", "-----"
+}
+{
+  # Color PR number based on status
+  if ($2 == "draft") pr = "\033[90m#" $1 "\033[0m"
+  else if ($2 == "approved") pr = "\033[32m#" $1 "\033[0m"
+  else if ($2 == "pending") pr = "\033[33m#" $1 "\033[0m"
+  else if ($2 == "changes") pr = "\033[35m#" $1 "\033[0m"
+  else if ($2 == "conflict") pr = "\033[31m#" $1 "\033[0m"
+  else pr = "#" $1
+
+  # Color CI status
+  ci = $3
+  if (ci == "pass") ci = "\033[32mpass\033[0m"
+  else if (ci == "fail") ci = "\033[31mfail\033[0m"
+  else ci = "\033[33m" ci "\033[0m"
+
+  printf "%-16s  %-18s  %s\n", pr, ci, $4
+}'

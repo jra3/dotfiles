@@ -33,8 +33,9 @@ stow zsh git ghostty
 
 | Package | Description |
 |---------|-------------|
-| `git` | Git configuration and global ignore patterns |
+| `gh` | GitHub CLI configuration and custom commands |
 | `ghostty` | Ghostty terminal emulator configuration |
+| `git` | Git configuration and global ignore patterns |
 | `hypr` | Hyprland compositor (keybindings, monitors, autostart, appearance) |
 | `ripgrep` | ripgrep configuration |
 | `sqlite` | SQLite configuration |
