@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Check if we're in a git repository
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "Error: Not in a git repository" >&2
+    exit 1
+fi
+
+# Check if branch name argument is provided
+if [ $# -eq 0 ]; then
+    echo "Usage: twt <branch-name>" >&2
+    echo "Creates a new git worktree and tmux session for the specified branch" >&2
+    exit 1
+fi
+
+BRANCH_NAME="$1"
+
+# Get the repository root and main branch
+REPO_ROOT=$(git rev-parse --show-toplevel)
+REPO_NAME=$(basename "$REPO_ROOT")
+
+# Determine the main branch (could be main or master)
+if git show-ref --verify --quiet refs/heads/main; then
+    MAIN_BRANCH="main"
+elif git show-ref --verify --quiet refs/heads/master; then
+    MAIN_BRANCH="master"
+else
+    echo "Error: Could not find main or master branch" >&2
+    exit 1
+fi
+
+# Create a safe directory name from the branch name
+# Replace slashes and other problematic characters with hyphens
+WORKTREE_DIR_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+
+# Set up the worktree path (parallel to the main repo)
+WORKTREE_PATH="$(dirname "$REPO_ROOT")/${REPO_NAME}-${WORKTREE_DIR_NAME}"
+
+# Check if the worktree already exists
+if [ -d "$WORKTREE_PATH" ]; then
+    echo "Worktree already exists at: $WORKTREE_PATH"
+    echo "Switching to existing worktree..."
+else
+    echo "Creating new worktree at: $WORKTREE_PATH"
+    echo "Branch: $BRANCH_NAME (based on $MAIN_BRANCH)"
+
+    # Create the worktree with a new branch based on main
+    if ! git worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" "$MAIN_BRANCH"; then
+        echo "Error: Failed to create worktree" >&2
+        exit 1
+    fi
+fi
+
+# Use the branch name (sanitized) as the tmux session name
+SESSION_NAME="$WORKTREE_DIR_NAME"
+
+# Check if session already exists
+if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+    echo "Session '$SESSION_NAME' already exists. Attaching..."
+    tmux attach-session -t "$SESSION_NAME"
+    exit 0
+fi
+
+# Generate a unique nonce for the Emacs server
+NONCE=$(date +%s%N | sha256sum | head -c 8)
+EMACS_SERVER_NAME="emacs-${NONCE}"
+
+echo "Creating new tmux session: $SESSION_NAME"
+echo "Working directory: $WORKTREE_PATH"
+echo "Emacs server: $EMACS_SERVER_NAME"
+
+# Create new tmux session in the worktree directory
+tmux new-session -d -s "$SESSION_NAME" -c "$WORKTREE_PATH"
+
+# Set the EMACS_SERVER_NAME as a session environment variable
+tmux set-environment -t "$SESSION_NAME" EMACS_SERVER_NAME "$EMACS_SERVER_NAME"
+
+# Start Claude in the first window
+tmux rename-window -t "$SESSION_NAME:0" "claude"
+tmux send-keys -t "$SESSION_NAME:0" "claude" C-m
+
+# Create a second window for general use
+tmux new-window -t "$SESSION_NAME:1" -n "main" -c "$WORKTREE_PATH"
+
+# Start the Emacs daemon in the background
+emacs --daemon="$EMACS_SERVER_NAME" >/dev/null 2>&1 &
+
+# Give a clean message in the main window
+tmux send-keys -t "$SESSION_NAME:1" "# Git worktree: $BRANCH_NAME" C-m
+tmux send-keys -t "$SESSION_NAME:1" "# Directory: $WORKTREE_PATH" C-m
+tmux send-keys -t "$SESSION_NAME:1" "# Emacs server: $EMACS_SERVER_NAME" C-m
+tmux send-keys -t "$SESSION_NAME:1" "# Use 'e <file>' to edit files" C-m
+tmux send-keys -t "$SESSION_NAME:1" "clear" C-m
+
+# Go back to the claude window
+tmux select-window -t "$SESSION_NAME:0"
+
+# Attach to the new session
+tmux attach-session -t "$SESSION_NAME"

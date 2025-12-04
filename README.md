@@ -39,6 +39,7 @@ stow zsh git ghostty
 | `hypr` | Hyprland compositor (keybindings, monitors, autostart, appearance) |
 | `ripgrep` | ripgrep configuration |
 | `sqlite` | SQLite configuration |
+| `tmux` | Tmux configuration and session scripts (tn, twt) |
 | `zsh` | Zsh shell configuration with XDG compliance |
 
 ## Usage

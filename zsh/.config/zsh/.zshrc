@@ -144,6 +144,8 @@ alias g='git'
 alias ag='rg'
 alias ..='cd ..'
 alias ...='cd ../..'
+alias tn='tmux-new-session'
+alias twt='tmux-worktree'
 
 # ============================================================================
 # Tool Completions

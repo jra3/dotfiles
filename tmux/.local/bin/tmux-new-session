@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Arrays for generating random session names
+ADJECTIVES=(
+    "swift" "brave" "silent" "cosmic" "ancient" "bright" "dark" "electric"
+    "frozen" "golden" "hidden" "infinite" "lunar" "mystic" "noble" "quiet"
+    "radiant" "secret" "stellar" "twilight" "vibrant" "wild" "zen" "crystal"
+    "eternal" "fierce" "gentle" "heroic" "iron" "jade" "keen" "lucid"
+    "mighty" "nimble" "ocean" "primal" "quantum" "royal" "serene" "thunder"
+)
+
+NOUNS=(
+    "falcon" "river" "mountain" "dragon" "phoenix" "wolf" "eagle" "bear"
+    "tiger" "lion" "hawk" "raven" "storm" "ocean" "forest" "desert"
+    "glacier" "volcano" "comet" "nebula" "galaxy" "star" "moon" "sun"
+    "blade" "hammer" "shield" "arrow" "sword" "spear" "crown" "throne"
+    "garden" "temple" "fortress" "tower" "bridge" "gate" "path" "journey"
+)
+
+# Function to generate a random session name
+generate_session_name() {
+    local adj_index=$((RANDOM % ${#ADJECTIVES[@]}))
+    local noun_index=$((RANDOM % ${#NOUNS[@]}))
+    echo "${ADJECTIVES[$adj_index]}-${NOUNS[$noun_index]}"
+}
+
+# Get session name from argument or generate one
+SESSION_NAME="${1:-$(generate_session_name)}"
+
+# Check if session already exists
+if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+    echo "Session '$SESSION_NAME' already exists. Attaching..."
+    tmux attach-session -t "$SESSION_NAME"
+    exit 0
+fi
+
+# Generate a unique nonce for the Emacs server
+NONCE=$(date +%s%N | sha256sum | head -c 8)
+EMACS_SERVER_NAME="emacs-${NONCE}"
+
+# Get the current directory (where tmux-new-session was called from)
+STARTING_DIR="$(pwd)"
+
+echo "Creating new tmux session: $SESSION_NAME"
+echo "Emacs server: $EMACS_SERVER_NAME"
+
+# Create new tmux session with the environment variable set
+tmux new-session -d -s "$SESSION_NAME" -c "$STARTING_DIR"
+
+# Set the EMACS_SERVER_NAME as a session environment variable
+tmux set-environment -t "$SESSION_NAME" EMACS_SERVER_NAME "$EMACS_SERVER_NAME"
+
+# Start Claude in the first window
+tmux rename-window -t "$SESSION_NAME:0" "claude"
+tmux send-keys -t "$SESSION_NAME:0" "claude" C-m
+
+# Create a second window for general use
+tmux new-window -t "$SESSION_NAME:1" -n "main" -c "$STARTING_DIR"
+
+# Start the Emacs daemon in the background (without sending it as a command to the window)
+# This runs it directly from the script instead of sending keystrokes
+emacs --daemon="$EMACS_SERVER_NAME" >/dev/null 2>&1 &
+
+# Give a clean message in the main window
+tmux send-keys -t "$SESSION_NAME:1" "# Emacs server started: $EMACS_SERVER_NAME" C-m
+tmux send-keys -t "$SESSION_NAME:1" "# Use 'e <file>' to edit files" C-m
+tmux send-keys -t "$SESSION_NAME:1" "clear" C-m
+
+# Go back to the claude window
+tmux select-window -t "$SESSION_NAME:0"
+
+# Attach to the new session
+tmux attach-session -t "$SESSION_NAME"
