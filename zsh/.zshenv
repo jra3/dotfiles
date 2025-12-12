@@ -9,9 +9,6 @@ export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
 export XDG_CACHE_HOME="$HOME/.cache"
 
-# Set XDG-compliant zsh config directory
-export ZDOTDIR="$HOME/.config/zsh"
-
 # Language
 export LANG='en_US.UTF-8'
 export LC_ALL='en_US.UTF-8'

@@ -37,7 +37,7 @@ stow -R <package>
 
 **XDG compliance** - Configs use XDG Base Directory paths:
 - Config files go in `<package>/.config/<app>/`
-- The `zsh` package is special: `.zshenv` must stay in home to bootstrap `ZDOTDIR`
+- Shell config files (`.zshenv`, `.zshrc`) must remain in home directory per zsh conventions
 
 **Directory mirroring** - Stow creates symlinks by mirroring the package structure into `$HOME`. For example:
 ```

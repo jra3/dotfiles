@@ -9,10 +9,10 @@ gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,
    elif .reviewDecision == "APPROVED" then "approved"
    else "pending" end),
   (if .statusCheckRollup == null or .statusCheckRollup == [] then "pending"
-   else (.statusCheckRollup | map(.conclusion // .status) |
-     if all(. == "SUCCESS" or . == "success") then "pass"
-     elif any(. == "FAILURE" or . == "failure") then "fail"
-     else "running" end) end),
+   else (.statusCheckRollup |
+     if any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
+     elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
+     else "pass" end) end),
   .title[0:55]
 ] | @tsv' | awk -F'\t' '
 BEGIN {

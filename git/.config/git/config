@@ -5,6 +5,7 @@
 	br = branch
 	ci = commit
 	st = status
+	what = log --raw --no-merges
 [init]
 	defaultBranch = master
 [pull]

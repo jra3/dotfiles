@@ -4,7 +4,7 @@
 add_newline = false
 command_timeout = 500
 
-format = """$directory$character"""
+format = """$hostname$directory$character"""
 
 right_format = """$git_branch$git_status$status"""
 
@@ -39,3 +39,8 @@ disabled = false
 format = "[$symbol$status]($style)"
 symbol = "[✘ ](red)"
 style = "red"
+
+[hostname]
+ssh_only = true
+format = "[$hostname](bold yellow) "
+disabled = false

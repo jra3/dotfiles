@@ -117,6 +117,7 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias tn='tmux-new-session'
 alias twt='tmux-worktree'
+alias watch='watch --color'
 
 # ============================================================================
 # Tool Completions
@@ -131,12 +132,19 @@ command -v gh &>/dev/null && eval "$(gh completion -s zsh)"
 path=($HOME/bin $HOME/.local/bin $HOME/go/bin /usr/local/bin $path)
 
 # ============================================================================
+# mise (version manager for Node, etc.)
+# ============================================================================
+if command -v mise &>/dev/null; then
+    eval "$(mise activate zsh)"
+fi
+
+# ============================================================================
 # Platform-Specific Configuration
 # ============================================================================
 if [[ "$OSTYPE" == darwin* ]]; then
-    source "$ZDOTDIR/darwin.zsh"
+    source "$HOME/.config/zsh/darwin.zsh"
 else
-    source "$ZDOTDIR/arch.zsh"
+    source "$HOME/.config/zsh/arch.zsh"
 fi
 
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
