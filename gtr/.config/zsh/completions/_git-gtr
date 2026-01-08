@@ -1,0 +1,13 @@
+#compdef _git-gtr
+
+# Completion for 'git gtr' subcommand
+# Delegates to _gtr completion function
+
+# Ensure _gtr is loaded
+(( $+functions[_gtr] )) || autoload -Uz _gtr
+
+_git-gtr() {
+  _gtr "$@"
+}
+
+_git-gtr "$@"

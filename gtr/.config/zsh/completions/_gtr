@@ -172,9 +172,4 @@ _gtr() {
   esac
 }
 
-# Also handle 'git gtr' subcommand
-_git-gtr() {
-  _gtr "$@"
-}
-
 _gtr "$@"
