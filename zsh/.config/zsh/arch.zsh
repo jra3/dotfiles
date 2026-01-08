@@ -28,10 +28,8 @@ if command -v fzf &>/dev/null; then
     "
 fi
 
-# SSH agent
-if [[ -z "$SSH_AUTH_SOCK" ]]; then
-    eval "$(ssh-agent -s)" > /dev/null
-fi
+# SSH agent (Bitwarden)
+export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
 
 # Unix timestamp (GNU date)
 ut() {

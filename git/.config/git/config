@@ -30,6 +30,8 @@
 [user]
 	name = John Allen
 	email = git@porcnick.com
+[blame]
+	coloring = highlightRecent
 
 [includeIf "gitdir:~/am/"]
 	path = config-work

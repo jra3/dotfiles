@@ -6,7 +6,7 @@ command_timeout = 500
 
 format = """$hostname$directory$character"""
 
-right_format = """$git_branch$git_status$status"""
+right_format = """$git_branch$git_state$git_status$status"""
 
 [character]
 success_symbol = "[❯](red)[❯](yellow)[❯](green)"
@@ -18,25 +18,37 @@ truncation_length = 0
 truncate_to_repo = false
 
 [git_branch]
-format = " [$branch]($style)"
+format = "[$branch]($style)"
 style = "cyan"
 
+[git_state]
+format = " [($state( $progress_current/$progress_total))]($style)"
+style = "yellow"
+rebase = "rebase"
+merge = "merge"
+revert = "revert"
+cherry_pick = "cherry"
+bisect = "bisect"
+am = "am"
+am_or_rebase = "am/rebase"
+
 [git_status]
-format = "[$all_status$ahead_behind]($style)"
+format = "( [$all_status$ahead_behind]($style))"
 style = "cyan"
-staged = "[✚](green)"
-modified = "[✱](red)"
-untracked = "[✭](yellow)"
-deleted = "[✖](red)"
-renamed = "[➜](cyan)"
-conflicted = "[═](red)"
-ahead = "[⬆](cyan)"
-behind = "[⬇](cyan)"
-diverged = "[⬆⬇](cyan)"
+staged = "[A](green)"
+modified = "[M](red)"
+untracked = "[?](yellow)"
+deleted = "[D](red)"
+renamed = "[R](cyan)"
+conflicted = "[U](red)"
+stashed = ""
+ahead = "[↑](cyan)"
+behind = "[↓](cyan)"
+diverged = "[↑↓](cyan)"
 
 [status]
 disabled = false
-format = "[$symbol$status]($style)"
+format = " [$symbol$status]($style)"
 symbol = "[✘ ](red)"
 style = "red"
 

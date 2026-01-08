@@ -25,7 +25,6 @@ setopt PUSHD_IGNORE_DUPS    # Don't push duplicates
 setopt CDABLE_VARS          # Change directory to a path stored in a variable
 setopt MULTIOS              # Write to multiple descriptors
 setopt EXTENDED_GLOB        # Use extended globbing syntax
-unsetopt CLOBBER            # Do not overwrite existing files with > and >>
 
 # ============================================================================
 # Shell Options
@@ -39,10 +38,81 @@ setopt RC_QUOTES
 # ============================================================================
 # Completion System
 # ============================================================================
+# Add custom completions to fpath
+fpath=($XDG_CONFIG_HOME/zsh/completions $fpath)
+
 autoload -Uz compinit && compinit
-zstyle ':completion:*' menu select
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
-setopt COMPLETE_ALIASES
+
+# Options
+setopt COMPLETE_IN_WORD    # Complete from both ends of a word
+setopt ALWAYS_TO_END       # Move cursor to end of completed word
+setopt AUTO_MENU           # Show completion menu on successive tab press
+setopt AUTO_LIST           # Automatically list choices on ambiguous completion
+setopt AUTO_PARAM_SLASH    # Add trailing slash for completed directories
+unsetopt MENU_COMPLETE     # Don't autoselect first completion entry
+
+# Caching
+zstyle ':completion::complete:*' use-cache on
+zstyle ':completion::complete:*' cache-path "$XDG_CACHE_HOME/zsh/zcompcache"
+
+# Case-insensitive, partial-word, and substring completion
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+
+# Group matches and describe
+zstyle ':completion:*:*:*:*:*' menu select
+zstyle ':completion:*:matches' group 'yes'
+zstyle ':completion:*:options' description 'yes'
+zstyle ':completion:*:options' auto-description '%d'
+zstyle ':completion:*:corrections' format ' %F{green}-- %d (errors: %e) --%f'
+zstyle ':completion:*:descriptions' format ' %F{yellow}-- %d --%f'
+zstyle ':completion:*:messages' format ' %F{purple} -- %d --%f'
+zstyle ':completion:*:warnings' format ' %F{red}-- no matches found --%f'
+zstyle ':completion:*:default' list-prompt '%S%M matches%s'
+zstyle ':completion:*' format ' %F{yellow}-- %d --%f'
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' verbose yes
+
+# Fuzzy match mistyped completions
+zstyle ':completion:*' completer _complete _match _approximate
+zstyle ':completion:*:match:*' original only
+zstyle -e ':completion:*:approximate:*' max-errors 'reply=($((($#PREFIX+$#SUFFIX)/3))numeric)'
+
+# Don't complete unavailable commands
+zstyle ':completion:*:functions' ignored-patterns '(_*|pre(cmd|exec))'
+
+# Directories
+zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*:*:cd:*' tag-order local-directories directory-stack path-directories
+zstyle ':completion:*:*:cd:*:directory-stack' menu yes select
+zstyle ':completion:*:-tilde-:*' group-order 'named-directories' 'path-directories' 'users' 'expand'
+zstyle ':completion:*' squeeze-slashes true
+
+# History
+zstyle ':completion:*:history-words' stop yes
+zstyle ':completion:*:history-words' remove-all-dups yes
+zstyle ':completion:*:history-words' list false
+zstyle ':completion:*:history-words' menu yes
+
+# Ignore multiple entries
+zstyle ':completion:*:(rm|kill|diff):*' ignore-line other
+zstyle ':completion:*:rm:*' file-patterns '*:all-files'
+
+# Kill
+zstyle ':completion:*:*:*:*:processes' command 'ps -u $LOGNAME -o pid,user,command -w'
+zstyle ':completion:*:*:kill:*:processes' list-colors '=(#b) #([0-9]#) ([0-9a-z-]#)*=01;36=0=01'
+zstyle ':completion:*:*:kill:*' menu yes select
+zstyle ':completion:*:*:kill:*' force-list always
+zstyle ':completion:*:*:kill:*' insert-ids single
+
+# SSH/SCP/RSYNC
+zstyle ':completion:*:(ssh|scp|rsync):*' tag-order 'hosts:-host:host hosts:-domain:domain hosts:-ipaddr:ip\ address *'
+zstyle ':completion:*:(ssh|scp|rsync):*' group-order users files all-files hosts-domain hosts-host hosts-ipaddr
+zstyle ':completion:*:(ssh|scp|rsync):*:hosts-host' ignored-patterns '*(.|:)*' loopback ip6-loopback localhost ip6-localhost broadcasthost
+zstyle ':completion:*:(ssh|scp|rsync):*:hosts-ipaddr' ignored-patterns '^(<->.<->.<->.<->|(|::)([[:xdigit:].]##:(#c,2))##(|%*))' '127.0.0.<->' '255.255.255.255' '::1' 'fe80::*'
+
+# Git - only complete branches/commits for checkout (not modified files)
+# TEMPORARILY DISABLED for debugging:
+# zstyle ':completion:*:git-checkout:*' tag-order 'tree-ishs' -
 
 # ============================================================================
 # Key Bindings
@@ -112,12 +182,19 @@ extract() {
 # Aliases
 # ============================================================================
 alias g='git'
+compdef _git g
 alias ag='rg'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias tn='tmux-new-session'
 alias twt='tmux-worktree'
 alias watch='watch --color'
+alias gtr='git gtr'
+compdef _gtr gtr
+
+# git-worktree-runner: cd into a worktree
+gcd() { cd "$(git gtr go "$1")" }
+compdef '_gtr_all_targets' gcd
 
 # ============================================================================
 # Tool Completions

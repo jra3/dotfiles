@@ -23,5 +23,22 @@ case "$OMARCHY_THEME" in
   *)              POWERLINE_THEME="dark" ;;         # fallback
 esac
 
-# Pass stdin through to claude-powerline with the mapped theme
-exec npx -y @owloops/claude-powerline@latest --style=minimal --theme="$POWERLINE_THEME"
+# Check if we're in a git worktree
+WORKTREE_INDICATOR=""
+if git rev-parse --git-dir &>/dev/null; then
+  GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+  GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null)
+
+  # If git-dir != git-common-dir, we're in a worktree
+  if [[ "$GIT_DIR" != "$GIT_COMMON_DIR" && -n "$GIT_COMMON_DIR" ]]; then
+    # Get the main repo directory (parent of .git)
+    MAIN_REPO=$(dirname "$GIT_COMMON_DIR")
+    MAIN_REPO_NAME=$(basename "$MAIN_REPO")
+    WORKTREE_INDICATOR=" ⊛ ${MAIN_REPO_NAME}"
+  fi
+fi
+
+# Pass stdin through to claude-powerline, then append worktree indicator
+npx -y @owloops/claude-powerline@latest --style=minimal --theme="$POWERLINE_THEME" | while IFS= read -r line; do
+  echo "${line}${WORKTREE_INDICATOR}"
+done
