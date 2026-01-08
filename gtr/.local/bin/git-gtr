@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Wrapper that delegates to git-worktree-runner
+# Clone it to ~/.local/share/git-worktree-runner first:
+#   git clone https://github.com/coderabbitai/git-worktree-runner.git ~/.local/share/git-worktree-runner
+
+GTR_PATH="$HOME/.local/share/git-worktree-runner/bin/git-gtr"
+
+if [[ ! -x "$GTR_PATH" ]]; then
+    echo "git-worktree-runner not found at $GTR_PATH" >&2
+    echo "Install with: git clone https://github.com/coderabbitai/git-worktree-runner.git ~/.local/share/git-worktree-runner" >&2
+    exit 1
+fi
+
+exec "$GTR_PATH" "$@"

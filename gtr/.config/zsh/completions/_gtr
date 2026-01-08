@@ -1,0 +1,180 @@
+#compdef gtr git-gtr
+
+# Completion for git-worktree-runner (gtr)
+# https://github.com/coderabbitai/git-worktree-runner
+
+_gtr_worktrees() {
+  local -a worktrees
+  # Get worktrees from gtr ls --porcelain (path<tab>branch<tab>status)
+  # Skip first line (main repo), filter out (detached) and non-ok entries
+  worktrees=(${(f)"$(git gtr ls --porcelain 2>/dev/null | tail -n +2 | awk -F'\t' '$3 == "ok" && substr($2,1,1) != "(" { print $2 }')"})
+  (( ${#worktrees} )) && _describe -t worktrees 'worktree' worktrees
+}
+
+_gtr_all_targets() {
+  local -a targets
+  # Worktree branches (status ok, not detached)
+  targets=(${(f)"$(git gtr ls --porcelain 2>/dev/null | tail -n +2 | awk -F'\t' '$3 == "ok" && substr($2,1,1) != "(" { print $2 }')"})
+  (( ${#targets} )) && _describe -t targets 'target' targets
+}
+
+_gtr_editors() {
+  local -a editors
+  editors=(
+    'cursor:Cursor editor'
+    'vscode:Visual Studio Code'
+    'zed:Zed editor'
+    'idea:IntelliJ IDEA'
+    'pycharm:PyCharm'
+    'webstorm:WebStorm'
+    'vim:Vim'
+    'nvim:Neovim'
+    'emacs:Emacs'
+    'sublime:Sublime Text'
+    'nano:Nano'
+    'none:No editor (file browser)'
+  )
+  _describe -t editors 'editor' editors
+}
+
+_gtr_ai_tools() {
+  local -a tools
+  tools=(
+    'aider:Aider AI coding assistant'
+    'claude:Claude Code'
+    'codex:OpenAI Codex'
+    'continue:Continue'
+    'cursor:Cursor AI'
+    'gemini:Google Gemini'
+    'opencode:OpenCode'
+    'none:No AI tool'
+  )
+  _describe -t tools 'ai tool' tools
+}
+
+_gtr_config_keys() {
+  local -a keys
+  keys=(
+    'gtr.worktrees.dir:Worktrees base directory'
+    'gtr.worktrees.prefix:Worktree folder prefix'
+    'gtr.defaultBranch:Default branch'
+    'gtr.editor.default:Default editor'
+    'gtr.ai.default:Default AI tool'
+    'gtr.copy.include:Files to copy (multi-valued)'
+    'gtr.copy.exclude:Files to exclude (multi-valued)'
+    'gtr.copy.includeDirs:Directories to copy'
+    'gtr.copy.excludeDirs:Directories to exclude'
+    'gtr.hook.postCreate:Post-create hooks'
+    'gtr.hook.postRemove:Post-remove hooks'
+  )
+  _describe -t keys 'config key' keys
+}
+
+_gtr() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+
+  local -a commands
+  commands=(
+    'new:Create a new worktree'
+    'rm:Remove worktree(s)'
+    'go:Navigate to worktree (prints path)'
+    'run:Execute command in worktree'
+    'editor:Open worktree in editor'
+    'ai:Start AI tool in worktree'
+    'copy:Copy files between worktrees'
+    'ls:List all worktrees'
+    'list:List all worktrees'
+    'clean:Remove stale worktrees'
+    'doctor:Health check'
+    'adapter:List available adapters'
+    'adapters:List available adapters'
+    'config:Manage configuration'
+    'version:Show version'
+    'help:Show help'
+  )
+
+  _arguments -C \
+    '1: :->command' \
+    '*:: :->args'
+
+  case $state in
+    command)
+      _describe -t commands 'gtr command' commands
+      ;;
+    args)
+      case $words[1] in
+        new)
+          _arguments \
+            '--from[Create from specific ref]:ref:__git_references' \
+            '--from-current[Create from current branch]' \
+            '--track[Tracking mode]:mode:(auto remote local none)' \
+            '--no-copy[Skip file copying]' \
+            '--no-fetch[Skip git fetch]' \
+            '--yes[Non-interactive mode]' \
+            '--force[Allow same branch in multiple worktrees]' \
+            '--name[Custom folder name suffix]:suffix:' \
+            '*:branch name:__git_branch_names'
+          ;;
+        rm)
+          _arguments \
+            '--delete-branch[Also delete the branch]' \
+            '--force[Force removal]' \
+            '--yes[Skip confirmation]' \
+            '*:worktree:_gtr_all_targets'
+          ;;
+        go)
+          _arguments \
+            '1:target:_gtr_all_targets'
+          ;;
+        run)
+          _arguments \
+            '1:target:_gtr_all_targets' \
+            '*:command:_command_names -e'
+          ;;
+        editor)
+          _arguments \
+            '--editor[Override editor]:editor:_gtr_editors' \
+            '1:target:_gtr_all_targets'
+          ;;
+        ai)
+          _arguments \
+            '--ai[Override AI tool]:tool:_gtr_ai_tools' \
+            '1:target:_gtr_all_targets' \
+            '(-)--[Pass remaining args to AI tool]'
+          ;;
+        copy)
+          _arguments \
+            '--from[Copy from different worktree]:source:_gtr_all_targets' \
+            '-n[Dry-run preview]' \
+            '--dry-run[Dry-run preview]' \
+            '-a[Copy to all worktrees]' \
+            '--all[Copy to all worktrees]' \
+            '(-)--[File patterns to copy]' \
+            '*:target:_gtr_worktrees'
+          ;;
+        ls|list)
+          _arguments \
+            '--porcelain[Machine-readable output]'
+          ;;
+        config)
+          _arguments \
+            '1:action:(get set add unset)' \
+            '2:key:_gtr_config_keys' \
+            '3:value:' \
+            '--global[Use global config]'
+          ;;
+        doctor|clean|adapter|adapters|version|help)
+          # No additional arguments
+          ;;
+      esac
+      ;;
+  esac
+}
+
+# Also handle 'git gtr' subcommand
+_git-gtr() {
+  _gtr "$@"
+}
+
+_gtr "$@"
