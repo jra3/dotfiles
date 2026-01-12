@@ -1,2 +1,2 @@
-google-chrome
+helium
 grpcurl-bin
