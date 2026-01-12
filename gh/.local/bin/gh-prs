@@ -1,38 +1,95 @@
 #!/bin/bash
-# gh prs - List PRs with status and CI info (colored)
+# gh prs - List PRs with status and CI info (colored, clickable)
 # PR colors: grey=draft, green=approved, yellow=pending review, magenta=changes requested, red=conflicts
-gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup | jq -r '.[] | [
-  (.number | tostring),
-  (if .isDraft then "draft"
-   elif .mergeable == "CONFLICTING" then "conflict"
-   elif .reviewDecision == "CHANGES_REQUESTED" then "changes"
-   elif .reviewDecision == "APPROVED" then "approved"
-   else "pending" end),
-  (if .statusCheckRollup == null or .statusCheckRollup == [] then "pending"
-   else (.statusCheckRollup |
-     if any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
-     elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
-     else "pass" end) end),
-  .title[0:55]
-] | @tsv' | awk -F'\t' '
-BEGIN {
-  printf "%-7s  %-9s  %s\n", "PR", "CI", "TITLE"
-  printf "%-7s  %-9s  %s\n", "------", "---------", "-----"
+# PR numbers are clickable (OSC 8 hyperlinks) - Ctrl+click to open in browser
+#
+# Usage: gh prs [--watch [SECONDS]]
+#   --watch         Refresh every 15 seconds (default)
+#   --watch N       Refresh every N seconds
+
+WATCH=0
+INTERVAL=15
+
+# Debug: uncomment to see args
+# echo "DEBUG: args=[$*] count=$#" >&2
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --watch|-w)
+      WATCH=1
+      if [[ $2 =~ ^[0-9]+$ ]]; then
+        INTERVAL=$2
+        shift
+      fi
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+fetch_prs() {
+  local REPO_URL
+  REPO_URL=$(gh repo view --json url -q .url)
+
+  gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup | \
+    jq -r '.[] | [
+      (.number | tostring),
+      (if .isDraft then "draft"
+       elif .mergeable == "CONFLICTING" then "conflict"
+       elif .reviewDecision == "CHANGES_REQUESTED" then "changes"
+       elif .reviewDecision == "APPROVED" then "approved"
+       else "pending" end),
+      (if .statusCheckRollup == null or .statusCheckRollup == [] then "pending"
+       else (.statusCheckRollup |
+         if any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
+         elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
+         else "pass" end) end),
+      .title[0:55]
+    ] | @tsv' | \
+    awk -F'\t' -v repo="$REPO_URL" '
+      BEGIN {
+        printf "%-7s  %-9s  %s\n", "PR", "CI", "TITLE"
+        printf "%-7s  %-9s  %s\n", "------", "---------", "-----"
+      }
+      {
+        # OSC 8 hyperlink: \033]8;;URL\033\\TEXT\033]8;;\033\\
+        url = repo "/pull/" $1
+        link_start = "\033]8;;" url "\033\\"
+        link_end = "\033]8;;\033\\"
+
+        # Color PR number based on status (with clickable link)
+        if ($2 == "draft") pr = link_start "\033[90m#" $1 "\033[0m" link_end
+        else if ($2 == "approved") pr = link_start "\033[32m#" $1 "\033[0m" link_end
+        else if ($2 == "pending") pr = link_start "\033[33m#" $1 "\033[0m" link_end
+        else if ($2 == "changes") pr = link_start "\033[35m#" $1 "\033[0m" link_end
+        else if ($2 == "conflict") pr = link_start "\033[31m#" $1 "\033[0m" link_end
+        else pr = link_start "#" $1 link_end
+
+        # Color CI status
+        ci = $3
+        if (ci == "pass") ci = "\033[32mpass\033[0m"
+        else if (ci == "fail") ci = "\033[31mfail\033[0m"
+        else ci = "\033[33m" ci "\033[0m"
+
+        printf "%-16s  %-18s  %s\n", pr, ci, $4
+      }'
 }
-{
-  # Color PR number based on status
-  if ($2 == "draft") pr = "\033[90m#" $1 "\033[0m"
-  else if ($2 == "approved") pr = "\033[32m#" $1 "\033[0m"
-  else if ($2 == "pending") pr = "\033[33m#" $1 "\033[0m"
-  else if ($2 == "changes") pr = "\033[35m#" $1 "\033[0m"
-  else if ($2 == "conflict") pr = "\033[31m#" $1 "\033[0m"
-  else pr = "#" $1
 
-  # Color CI status
-  ci = $3
-  if (ci == "pass") ci = "\033[32mpass\033[0m"
-  else if (ci == "fail") ci = "\033[31mfail\033[0m"
-  else ci = "\033[33m" ci "\033[0m"
-
-  printf "%-16s  %-18s  %s\n", pr, ci, $4
-}'
+if [[ $WATCH -eq 1 ]]; then
+  trap 'exit 0' INT
+  tput civis  # hide cursor
+  trap 'tput cnorm; exit 0' INT  # restore cursor on exit
+  while true; do
+    output=$(fetch_prs)
+    # Move to home position (no clear), overwrite in place
+    echo -e "\033[H\033[90m[$(date +%H:%M:%S)] Refreshing every ${INTERVAL}s - Ctrl+C to stop\033[0m"
+    echo
+    echo "$output"
+    echo -e "\033[J"  # clear from cursor to end of screen (removes stale lines)
+    sleep "$INTERVAL"
+  done
+else
+  fetch_prs
+fi
