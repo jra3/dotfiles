@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# fzf-powered git worktree manager with gtr integration
+# Outputs: path to cd to, or "EDITOR:<branch>" / "AI:<branch>" for those actions
+
+set -euo pipefail
+
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "Not in a git repository" >&2; exit 1; }
+
+while true; do
+  result=$(git worktree list | fzf \
+    --multi \
+    --ansi \
+    --expect=ctrl-n,ctrl-e,ctrl-a,ctrl-l \
+    --header $'ENTER:cd  TAB:select  ^X:delete  ^N:new  ^L:linear  ^E:editor  ^A:ai' \
+    --preview 'git -C {1} log --oneline --graph --color=always -20' \
+    --preview-window 'right:50%:wrap' \
+    --bind "ctrl-x:execute-silent(echo {+3} | sed \"s/[][']//g\" | xargs -n1 git gtr rm --yes --force)+reload(git worktree list)" || true)
+
+  [[ -z "$result" ]] && exit 0
+
+  key=$(head -1 <<< "$result")
+  selection=$(tail -n +2 <<< "$result")
+
+  case "$key" in
+    ctrl-n)
+      echo -n "New worktree name: " >&2
+      read -r name
+      [[ -n "$name" ]] && git gtr new "$name" >&2
+      ;;  # loops back to show fzf again
+    ctrl-l)
+      # Show Linear issues picker (my assigned issues, newest first by updatedAt)
+      issue=$( (ls -t /mnt/linear/my/assigned/ | while read -r id; do
+        title=$(grep '^title:' "/mnt/linear/my/assigned/$id/issue.md" 2>/dev/null | sed 's/^title: *//' | tr -d '"')
+        printf "%s\t%s\n" "$id" "$title"
+      done) | fzf --header "Select Linear issue to create worktree" \
+        --delimiter='\t' --with-nth=1,2 \
+        --preview 'cat /mnt/linear/teams/{1%%-*}/issues/{1}/issue.md 2>/dev/null | head -40' )
+
+      if [[ -n "$issue" ]]; then
+        issue_id=$(awk -F'\t' '{print $1}' <<< "$issue")
+        # worktree-from-issue creates worktree and outputs path as last line
+        path=$(~/.claude/skills/git-worktree/scripts/worktree-from-issue "$issue_id" | tail -1)
+        [[ -n "$path" ]] && echo "$path"
+        exit 0
+      fi
+      ;;  # loops back if cancelled
+    ctrl-e)
+      branch=$(awk '{print $3}' <<< "$selection" | tr -d '[]')
+      echo "EDITOR:$branch"
+      exit 0
+      ;;
+    ctrl-a)
+      branch=$(awk '{print $3}' <<< "$selection" | tr -d '[]')
+      echo "AI:$branch"
+      exit 0
+      ;;
+    *)
+      path=$(awk '{print $1}' <<< "$selection")
+      [[ -n "$path" ]] && echo "$path"
+      exit 0
+      ;;
+  esac
+done

@@ -167,6 +167,19 @@ fcd() { local d; d=$(fd --type d . ${1:-.} | fzf +m) && cd "$d"; }
 fbr() { git branch -vv | fzf +m --ansi | awk '{print $1}' | xargs git checkout; }
 fwt() { cd "$(git worktree list | fzf +m | awk '{print $1}')"; }
 
+# fzf-powered git worktree manager with gtr integration
+# Main logic in ~/.local/bin/fgtr script; this wrapper handles cd/editor/ai
+fgtr() {
+  local result
+  result=$(command fgtr) || return $?
+  case "$result" in
+    EDITOR:*) git gtr editor "${result#EDITOR:}" ;;
+    AI:*)     git gtr ai "${result#AI:}" ;;
+    "")       ;;
+    *)        builtin cd "$result" ;;
+  esac
+}
+
 extract() {
     [[ -f "$1" ]] || { echo "'$1' is not a valid file"; return 1; }
     case "$1" in
@@ -208,12 +221,12 @@ command -v gh &>/dev/null && eval "$(gh completion -s zsh)"
 # ============================================================================
 path=($HOME/bin $HOME/.local/bin $HOME/go/bin /usr/local/bin $path)
 
-# ============================================================================
-# mise (version manager for Node, etc.)
-# ============================================================================
-if command -v mise &>/dev/null; then
-    eval "$(mise activate zsh)"
-fi
+# # ============================================================================
+# # mise (version manager for Node, etc.)
+# # ============================================================================
+# if command -v mise &>/dev/null; then
+#    eval "$(mise activate zsh)"
+# fi
 
 # ============================================================================
 # Platform-Specific Configuration
