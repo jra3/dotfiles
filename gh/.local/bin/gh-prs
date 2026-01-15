@@ -1,7 +1,7 @@
 #!/bin/bash
 # gh prs - List PRs with status and CI info (colored, clickable)
 # PR colors: grey=draft, green=approved, yellow=pending review, magenta=changes requested, red=conflicts
-# PR numbers are clickable (OSC 8 hyperlinks) - Ctrl+click to open in browser
+# PR numbers and Linear issue IDs are clickable (OSC 8 hyperlinks) - Ctrl+click to open in browser
 #
 # Usage: gh prs [--watch [SECONDS]]
 #   --watch         Refresh every 15 seconds (default)
@@ -33,7 +33,7 @@ fetch_prs() {
   local REPO_URL
   REPO_URL=$(gh repo view --json url -q .url)
 
-  gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup | \
+  gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName | \
     jq -r '.[] | [
       (.number | tostring),
       (if .isDraft then "draft"
@@ -46,34 +46,48 @@ fetch_prs() {
          if any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
          elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
          else "pass" end) end),
-      .title[0:55]
+      # Extract Linear issue ID from branch name (e.g., "john/eng-123-foo" -> "ENG-123")
+      (.headRefName | capture("(?<team>[a-zA-Z]+)-(?<num>[0-9]+)") | "\(.team | ascii_upcase)-\(.num)" // ""),
+      .title[0:50]
     ] | @tsv' | \
     awk -F'\t' -v repo="$REPO_URL" '
       BEGIN {
-        printf "%-7s  %-9s  %s\n", "PR", "CI", "TITLE"
-        printf "%-7s  %-9s  %s\n", "------", "---------", "-----"
+        printf "%-6s  %-9s  %-8s  %s\n", "PR", "LINEAR", "CI", "TITLE"
+        printf "%-6s  %-9s  %-8s  %s\n", "------", "---------", "--------", "-----"
       }
       {
+        # Pad visible text BEFORE adding escape codes (printf counts escapes as chars)
+        pr_text = sprintf("%-6s", "#" $1)
+        linear_text = sprintf("%-9s", $4 != "" ? $4 : "-")
+        ci_text = sprintf("%-8s", $3)
+
         # OSC 8 hyperlink: \033]8;;URL\033\\TEXT\033]8;;\033\\
         url = repo "/pull/" $1
         link_start = "\033]8;;" url "\033\\"
         link_end = "\033]8;;\033\\"
 
         # Color PR number based on status (with clickable link)
-        if ($2 == "draft") pr = link_start "\033[90m#" $1 "\033[0m" link_end
-        else if ($2 == "approved") pr = link_start "\033[32m#" $1 "\033[0m" link_end
-        else if ($2 == "pending") pr = link_start "\033[33m#" $1 "\033[0m" link_end
-        else if ($2 == "changes") pr = link_start "\033[35m#" $1 "\033[0m" link_end
-        else if ($2 == "conflict") pr = link_start "\033[31m#" $1 "\033[0m" link_end
-        else pr = link_start "#" $1 link_end
+        if ($2 == "draft") pr = link_start "\033[90m" pr_text "\033[0m" link_end
+        else if ($2 == "approved") pr = link_start "\033[32m" pr_text "\033[0m" link_end
+        else if ($2 == "pending") pr = link_start "\033[33m" pr_text "\033[0m" link_end
+        else if ($2 == "changes") pr = link_start "\033[35m" pr_text "\033[0m" link_end
+        else if ($2 == "conflict") pr = link_start "\033[31m" pr_text "\033[0m" link_end
+        else pr = link_start pr_text link_end
 
         # Color CI status
-        ci = $3
-        if (ci == "pass") ci = "\033[32mpass\033[0m"
-        else if (ci == "fail") ci = "\033[31mfail\033[0m"
-        else ci = "\033[33m" ci "\033[0m"
+        if (ci_text ~ /pass/) ci = "\033[32m" ci_text "\033[0m"
+        else if (ci_text ~ /fail/) ci = "\033[31m" ci_text "\033[0m"
+        else ci = "\033[33m" ci_text "\033[0m"
 
-        printf "%-16s  %-18s  %s\n", pr, ci, $4
+        # Linear issue as clickable hyperlink
+        if ($4 != "") {
+          linear_url = "https://linear.app/antimetal/issue/" $4
+          linear = "\033]8;;" linear_url "\033\\\033[36m" linear_text "\033[0m\033]8;;\033\\"
+        } else {
+          linear = "\033[90m" linear_text "\033[0m"
+        }
+
+        printf "%s  %s  %s  %s\n", pr, linear, ci, $5
       }'
 }
 
