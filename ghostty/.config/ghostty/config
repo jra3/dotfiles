@@ -38,5 +38,20 @@ keybind = alt+right=text:\x1bf
 keybind = ctrl+left=text:\x1bb
 keybind = ctrl+right=text:\x1bf
 
+# Tab management (Chromium-style)
+keybind = ctrl+t=new_tab
+keybind = ctrl+w=close_tab
+keybind = ctrl+tab=next_tab
+keybind = ctrl+shift+tab=previous_tab
+keybind = ctrl+one=goto_tab:1
+keybind = ctrl+two=goto_tab:2
+keybind = ctrl+three=goto_tab:3
+keybind = ctrl+four=goto_tab:4
+keybind = ctrl+five=goto_tab:5
+keybind = ctrl+six=goto_tab:6
+keybind = ctrl+seven=goto_tab:7
+keybind = ctrl+eight=goto_tab:8
+keybind = ctrl+nine=last_tab
+
 # Slowdown mouse scrolling
 mouse-scroll-multiplier = 0.95
