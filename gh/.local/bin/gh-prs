@@ -30,8 +30,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 fetch_prs() {
-  local REPO_URL
+  local REPO_URL TERM_WIDTH TITLE_WIDTH
   REPO_URL=$(gh repo view --json url -q .url)
+  TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
+  # Fixed columns: PR(6) + sep(2) + LINEAR(9) + sep(2) + CI(8) + sep(2) = 29
+  TITLE_WIDTH=$((TERM_WIDTH - 29))
+  [[ $TITLE_WIDTH -lt 20 ]] && TITLE_WIDTH=20
 
   gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName | \
     jq -r '.[] | [
@@ -48,9 +52,9 @@ fetch_prs() {
          else "pass" end) end),
       # Extract Linear issue ID from branch name (e.g., "john/eng-123-foo" -> "ENG-123")
       (.headRefName | capture("(?<team>[a-zA-Z]+)-(?<num>[0-9]+)") | "\(.team | ascii_upcase)-\(.num)" // ""),
-      .title[0:50]
+      .title
     ] | @tsv' | \
-    awk -F'\t' -v repo="$REPO_URL" '
+    awk -F'\t' -v repo="$REPO_URL" -v title_width="$TITLE_WIDTH" '
       BEGIN {
         printf "%-6s  %-9s  %-8s  %s\n", "PR", "LINEAR", "CI", "TITLE"
         printf "%-6s  %-9s  %-8s  %s\n", "------", "---------", "--------", "-----"
@@ -60,6 +64,9 @@ fetch_prs() {
         pr_text = sprintf("%-6s", "#" $1)
         linear_text = sprintf("%-9s", $4 != "" ? $4 : "-")
         ci_text = sprintf("%-8s", $3)
+
+        # Truncate title to available width
+        title = substr($5, 1, title_width)
 
         # OSC 8 hyperlink: \033]8;;URL\033\\TEXT\033]8;;\033\\
         url = repo "/pull/" $1
@@ -87,7 +94,7 @@ fetch_prs() {
           linear = "\033[90m" linear_text "\033[0m"
         }
 
-        printf "%s  %s  %s  %s\n", pr, linear, ci, $5
+        printf "%s  %s  %s  %s\n", pr, linear, ci, title
       }'
 }
 
