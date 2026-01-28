@@ -1,0 +1,29 @@
+#!/bin/bash
+# Post-install system configuration
+# Safe to re-run (idempotent). Requires sudo for some operations.
+
+set -euo pipefail
+
+echo "Configuring system..."
+
+# --- Tailscale ---
+if command -v tailscale &>/dev/null; then
+    echo "Configuring Tailscale..."
+    sudo systemctl enable --now tailscaled
+    sudo tailscale set --operator="$USER"
+    echo "  Tailscale operator set to $USER"
+    echo "  Run 'tailscale up' if not yet authenticated."
+else
+    echo "  Tailscale not installed, skipping."
+fi
+
+# --- Emacs ---
+if command -v emacs &>/dev/null; then
+    echo "Configuring Emacs daemon..."
+    systemctl --user enable --now emacs
+    echo "  Emacs daemon enabled."
+else
+    echo "  Emacs not installed, skipping."
+fi
+
+echo "Done!"

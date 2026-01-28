@@ -62,7 +62,7 @@ This documents the default software stack configured in Omarchy:
 - `gh/` - GitHub CLI config and `gh-prs` script
 - `gtr/` - Git worktree runner wrapper
 - `claude/` - Claude Code settings and custom commands
-- `pacman/` - Arch package lists for reproducibility
+- `pacman/` - Arch package lists and `configure-system` for post-install setup
 
 **XDG compliance** - Configs use XDG Base Directory paths:
 - Config files go in `<package>/.config/<app>/`
@@ -83,9 +83,4 @@ This documents the default software stack configured in Omarchy:
 
 ## Post-Install Setup
 
-Some software requires additional setup after stowing:
-
-```bash
-# Enable Emacs daemon (runs emacs --fg-daemon at login)
-systemctl --user enable --now emacs
-```
+Run `pacman/configure-system` to configure system services (Tailscale operator, Emacs daemon, etc.). The script is idempotent and safe to re-run.

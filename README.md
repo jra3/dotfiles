@@ -17,6 +17,18 @@ git clone <repo-url> ~/.dotfiles
 cd ~/.dotfiles
 ```
 
+Install packages:
+
+```bash
+pacman/install-packages
+```
+
+Configure system services:
+
+```bash
+pacman/configure-system
+```
+
 Deploy all packages:
 
 ```bash
@@ -37,7 +49,7 @@ stow zsh git ghostty
 | `ghostty` | Ghostty terminal emulator configuration |
 | `git` | Git configuration and global ignore patterns |
 | `hypr` | Hyprland compositor (keybindings, monitors, autostart, appearance) |
-| `pacman` | Arch Linux package lists and install script |
+| `pacman` | Arch Linux package lists, install script, and system configuration |
 | `ripgrep` | ripgrep configuration |
 | `sqlite` | SQLite configuration |
 | `starship` | Starship prompt configuration |
