@@ -46,6 +46,7 @@ This documents the default software stack configured in Omarchy:
 | Search | **ripgrep** | Fast recursive grep |
 | Worktrees | **gtr** | Git worktree runner for parallel development |
 | Database | **SQLite** | Database with custom config |
+| Passwords | **Bitwarden** | Password manager with CLI (`bw`) |
 | Packages | **pacman/yay** | Arch package manager (package lists tracked) |
 
 ## Architecture
@@ -62,6 +63,7 @@ This documents the default software stack configured in Omarchy:
 - `gh/` - GitHub CLI config and `gh-prs` script
 - `gtr/` - Git worktree runner wrapper
 - `claude/` - Claude Code settings and custom commands
+- `bitwarden/` - Bitwarden CLI helper script (`get-signature`) for extracting attachments
 - `pacman/` - Arch package lists and `configure-system` for post-install setup
 
 **XDG compliance** - Configs use XDG Base Directory paths:

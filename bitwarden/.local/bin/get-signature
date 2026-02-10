@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ITEM_ID="8da1ebe6-d12a-4760-9182-b3e101403836"
+OUTPUT="/tmp/signature.png"
+
+# Ensure session is active
+if ! bw status 2>/dev/null | grep -q '"unlocked"'; then
+  echo "Bitwarden vault is locked. Unlocking..."
+  export BW_SESSION=$(bw unlock --raw)
+fi
+
+bw get attachment signature-clean.png --itemid "$ITEM_ID" --output "$OUTPUT" --quiet
+echo "$OUTPUT"
