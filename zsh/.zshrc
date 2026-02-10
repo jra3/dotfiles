@@ -238,3 +238,6 @@ else
 fi
 
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+
+# Add ~/.local/bin to PATH for user binaries
+export PATH="$HOME/.local/bin:$PATH"
