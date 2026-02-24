@@ -6,15 +6,18 @@ set -euo pipefail
 
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "Not in a git repository" >&2; exit 1; }
 
+_layout="${FGTR_LAYOUT:-down:5:wrap}"
+
 while true; do
   result=$(git worktree list | fzf \
+    --height 80% \
     --multi \
     --ansi \
-    --expect=ctrl-n,ctrl-e,ctrl-a,ctrl-l \
-    --header $'ENTER:cd  TAB:select  ^X:delete  ^N:new  ^L:linear  ^E:editor  ^A:ai' \
+    --expect=ctrl-n,ctrl-e,ctrl-a,ctrl-l,ctrl-x \
+    --header $'ENTER:cd  TAB:select  ^X:delete  ^N:new  ^L:linear  ^E:editor  ^A:ai  |:layout' \
     --preview 'git -C {1} log --oneline --graph --color=always -20' \
-    --preview-window 'right:50%:wrap' \
-    --bind "ctrl-x:execute-silent(echo {+3} | sed \"s/[][']//g\" | xargs -n1 git gtr rm --yes --force)+reload(git worktree list)" || true)
+    --preview-window "$_layout" \
+    --bind "|:change-preview-window(${_layout}|down:40%:wrap|hidden)" || true)
 
   [[ -z "$result" ]] && exit 0
 
@@ -22,6 +25,27 @@ while true; do
   selection=$(tail -n +2 <<< "$result")
 
   case "$key" in
+    ctrl-x)
+      display=$(awk '{print $3}' <<< "$selection" | tr -d '[]' | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
+      echo "Deleting $display..." >&2
+      failed=0
+      while IFS= read -r path; do
+        [[ -z "$path" ]] && continue
+        if ! err=$(git worktree remove --force "$path" 2>&1); then
+          branch=$(awk -v p="$path" '$1==p{print $3}' <<< "$selection" | tr -d '[]')
+          echo >&2
+          echo "Error deleting ${branch:-$path}:" >&2
+          echo "$err" >&2
+          failed=1
+        fi
+      done <<< "$(awk '{print $1}' <<< "$selection")"
+      if [[ "$failed" -eq 1 ]]; then
+        echo >&2
+        printf "Press Enter to continue..." >&2
+        read -r < /dev/tty
+      fi
+      exit 0
+      ;;
     ctrl-n)
       echo -n "New worktree name: " >&2
       read -r name
@@ -29,12 +53,33 @@ while true; do
       ;;  # loops back to show fzf again
     ctrl-l)
       # Show Linear issues picker (my assigned issues, newest first by updatedAt)
-      issue=$( (ls -t /mnt/linear/my/assigned/ | while read -r id; do
-        title=$(grep '^title:' "/mnt/linear/my/assigned/$id/issue.md" 2>/dev/null | sed 's/^title: *//' | tr -d '"')
-        printf "%s\t%s\n" "$id" "$title"
-      done) | fzf --header "Select Linear issue to create worktree" \
+      _linear="${LINEARFS_MOUNT:-/mnt/linear}"
+      _linear_layout="down:50%:wrap"
+      issue=$( {
+        declare -A _t _p
+        declare -a _order
+        while IFS= read -r id; do
+          f="$_linear/my/assigned/$id/issue.md"
+          status=$(grep '^status:' "$f" 2>/dev/null | sed 's/^status: *//' | tr -d '"')
+          [[ "$status" == "Done" || "$status" == "Cancelled" ]] && continue
+          _t[$id]=$(grep '^title:' "$f" 2>/dev/null | sed 's/^title: *//' | tr -d '"')
+          _p[$id]=$(grep '^parent:' "$f" 2>/dev/null | awk '{print $2}')
+          _order+=("$id")
+        done < <(ls -t "$_linear/my/assigned/")
+        for id in "${_order[@]}"; do
+          parent="${_p[$id]:-}"
+          [[ -n "$parent" && -v "_t[$parent]" ]] && continue
+          printf "%s\t%s\n" "$id" "${_t[$id]}"
+          for child in "${_order[@]}"; do
+            [[ "${_p[$child]:-}" == "$id" ]] && printf "%s\t  ↳ %s\n" "$child" "${_t[$child]}"
+          done
+        done
+      } | fzf --header "Select Linear issue  TAB:select  |:layout" \
+        --height 100% \
         --delimiter='\t' --with-nth=1,2 \
-        --preview 'cat /mnt/linear/teams/{1%%-*}/issues/{1}/issue.md 2>/dev/null | head -40' )
+        --preview-window "$_linear_layout" \
+        --bind "|:change-preview-window(${_linear_layout}|down:20%:wrap|hidden)" \
+        --preview "cat ${_linear}/teams/\$(echo {1} | cut -d- -f1)/issues/{1}/issue.md 2>/dev/null | head -40" )
 
       if [[ -n "$issue" ]]; then
         issue_id=$(awk -F'\t' '{print $1}' <<< "$issue")

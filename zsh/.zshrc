@@ -41,7 +41,13 @@ setopt RC_QUOTES
 # Add custom completions to fpath
 fpath=($XDG_CONFIG_HOME/zsh/completions $fpath)
 
-autoload -Uz compinit && compinit
+autoload -Uz compinit
+# Only regenerate dump file if it's older than 24 hours; -C skips security check
+if [[ -n ~/.zcompdump(#qN.mh+24) ]]; then
+  compinit
+else
+  compinit -C
+fi
 
 # Options
 setopt COMPLETE_IN_WORD    # Complete from both ends of a word
@@ -134,9 +140,22 @@ bindkey '^H' backward-delete-char
 bindkey '^W' backward-kill-word
 
 # ============================================================================
+# Cached eval helper: regenerates only when binary is newer than cache
+# ============================================================================
+_zsh_cached_source() {
+  local cmd="$1" name="$2"; shift 2
+  local cache="$HOME/.cache/zsh/${name}.zsh"
+  if [[ ! -f "$cache" || "$(command -v "$cmd")" -nt "$cache" ]]; then
+    mkdir -p "${cache:h}"
+    "$cmd" "$@" >"$cache" 2>/dev/null
+  fi
+  source "$cache"
+}
+
+# ============================================================================
 # Prompt (Starship)
 # ============================================================================
-eval "$(starship init zsh)"
+_zsh_cached_source starship starship-init init zsh
 
 # Terminal title
 precmd_functions+=(set_terminal_title)
@@ -156,7 +175,14 @@ export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --inline-info'
 # zoxide
 # ============================================================================
 if command -v zoxide &>/dev/null; then
-    eval "$(zoxide init zsh)"
+    _zsh_cached_source zoxide zoxide-init init zsh
+fi
+
+# ============================================================================
+# direnv
+# ============================================================================
+if command -v direnv &>/dev/null; then
+    _zsh_cached_source direnv direnv-hook hook zsh
 fi
 
 # ============================================================================
@@ -164,7 +190,14 @@ fi
 # ============================================================================
 fe()  { local f; IFS=$'\n' f=($(fzf --query="$1" --multi)); [[ -n "$f" ]] && ${EDITOR:-vim} "${f[@]}"; }
 fcd() { local d; d=$(fd --type d . ${1:-.} | fzf +m) && cd "$d"; }
-fbr() { git branch -vv | fzf +m --ansi | awk '{print $1}' | xargs git checkout; }
+fbr() {
+  git branch -vv | fzf +m --ansi \
+    --height 80% \
+    --preview 'git log --oneline --graph --color=always -20 $(echo {} | awk '"'"'{print $1}'"'"')' \
+    --preview-window 'down:50%:wrap' \
+    --bind '|:change-preview-window(down:50%:wrap|down:20%:wrap|hidden)' \
+  | awk '{print $1}' | xargs git checkout
+}
 fwt() { cd "$(git worktree list | fzf +m | awk '{print $1}')"; }
 
 # fzf-powered git worktree manager with gtr integration
@@ -191,9 +224,22 @@ extract() {
     esac
 }
 
+_gt_yargs_completions()
+{
+  local reply
+  local si=$IFS
+  IFS=$'
+' reply=($(COMP_CWORD="$((CURRENT-1))" COMP_LINE="$BUFFER" COMP_POINT="$CURSOR" graphite --get-yargs-completions "${words[@]}"))
+  IFS=$si
+  _describe 'values' reply
+}
+
 # ============================================================================
 # Aliases
 # ============================================================================
+alias gg='graphite'
+compdef _gt_yargs_completions graphite
+compdef _gt_yargs_completions gg
 alias g='git'
 compdef _git g
 alias ag='rg'
@@ -212,8 +258,8 @@ compdef '_gtr_all_targets' gcd
 # ============================================================================
 # Tool Completions
 # ============================================================================
-command -v pnpm &>/dev/null && eval "$(pnpm completion zsh 2>/dev/null)"
-command -v gh &>/dev/null && eval "$(gh completion -s zsh)"
+command -v pnpm &>/dev/null && _zsh_cached_source pnpm pnpm-completion completion zsh
+command -v gh &>/dev/null && _zsh_cached_source gh gh-completion completion -s zsh
 [[ -f ~/.cargo/env ]] && source ~/.cargo/env
 
 # ============================================================================
@@ -241,23 +287,22 @@ fi
 
 # Add ~/.local/bin to PATH for user binaries
 export PATH="$HOME/.local/bin:$PATH"
-#compdef gt
-###-begin-gt-completions-###
-#
-# yargs command completion script
-#
-# Installation: gt completion >> ~/.zshrc
-#    or gt completion >> ~/.zprofile on OSX.
-#
-_gt_yargs_completions()
-{
-  local reply
-  local si=$IFS
-  IFS=$'
-' reply=($(COMP_CWORD="$((CURRENT-1))" COMP_LINE="$BUFFER" COMP_POINT="$CURSOR" gt --get-yargs-completions "${words[@]}"))
-  IFS=$si
-  _describe 'values' reply
-}
-compdef _gt_yargs_completions gt
-###-end-gt-completions-###
 
+# --- Gas Town Integration (managed by gt) ---
+[[ -f "/home/jallen/.config/gastown/shell-hook.sh" ]] && source "/home/jallen/.config/gastown/shell-hook.sh"
+# --- End Gas Town ---
+
+# Speed up: only run gastown precmd hook when the directory actually changes.
+# The hook does git rev-parse + file-system checks on every Enter keypress,
+# which makes rapid Enter presses slow. Since GT_TOWN_ROOT/GT_RIG can't change
+# without a directory change, it's safe to skip when $PWD is unchanged.
+if (( $+functions[_gastown_hook] )); then
+  _gastown_precmd_last_dir=
+  _gastown_hook_fast() {
+    [[ "$PWD" == "$_gastown_precmd_last_dir" ]] && return 0
+    _gastown_precmd_last_dir=$PWD
+    _gastown_hook
+  }
+  add-zsh-hook -d precmd _gastown_hook
+  add-zsh-hook precmd _gastown_hook_fast
+fi
