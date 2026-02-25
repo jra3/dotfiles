@@ -1,28 +1,7 @@
 {
-  "promptSuggestionEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
-  "model": "sonnet",
-  "alwaysThinkingEnabled": true,
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/statusline.sh",
-    "padding": 0
-  },
-  "enabledPlugins": {
-    "gopls-lsp@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": false,
-    "code-review@claude-plugins-official": false,
-    "code-simplifier@claude-plugins-official": false,
-    "typescript-lsp@claude-plugins-official": true,
-    "pr-review-toolkit@claude-plugins-official": true,
-    "ralph-loop@claude-plugins-official": false,
-    "claude-reflect@claude-reflect-marketplace": true,
-    "superpowers@claude-plugins-official": true
-  },
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
-      "Read(/mnt/linear/**)",
+      "Read(~/linear/**)",
       "Bash(npm *)",
       "Bash(npx *)",
       "Bash(pnpm *)",
@@ -110,6 +89,7 @@
       "Bash(ghostty *)",
       "Bash(zsh *)",
       "Bash(bash *)",
+      "Bash(for *)",
       "WebSearch",
       "WebFetch",
       "mcp__linear-server__create_issue",
@@ -119,6 +99,26 @@
       "mcp__linear-server__get_user",
       "mcp__linear-server__update_issue",
       "mcp__linear-server__create_comment"
-    ]
-  }
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh",
+    "padding": 0
+  },
+  "enabledPlugins": {
+    "gopls-lsp@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": false,
+    "code-review@claude-plugins-official": false,
+    "code-simplifier@claude-plugins-official": false,
+    "typescript-lsp@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": false,
+    "claude-reflect@claude-reflect-marketplace": true,
+    "superpowers@claude-plugins-official": true
+  },
+  "alwaysThinkingEnabled": true,
+  "promptSuggestionEnabled": false,
+  "skipDangerousModePermissionPrompt": true
 }
