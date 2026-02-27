@@ -186,6 +186,16 @@ if command -v direnv &>/dev/null; then
 fi
 
 # ============================================================================
+# pyenv
+# ============================================================================
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+if command -v pyenv &>/dev/null; then
+    eval "$(pyenv init -)"
+    eval "$(pyenv virtualenv-init -)"
+fi
+
+# ============================================================================
 # Shared Functions
 # ============================================================================
 fe()  { local f; IFS=$'\n' f=($(fzf --query="$1" --multi)); [[ -n "$f" ]] && ${EDITOR:-vim} "${f[@]}"; }
