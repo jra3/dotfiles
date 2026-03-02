@@ -141,6 +141,9 @@ bindkey '^W' backward-kill-word
 _fbr_widget() { fbr; zle reset-prompt; }
 zle -N _fbr_widget
 bindkey '^Xb' _fbr_widget
+_fgtr_widget() { fgtr; zle reset-prompt; }
+zle -N _fgtr_widget
+bindkey '^Xg' _fgtr_widget
 
 # ============================================================================
 # Cached eval helper: regenerates only when binary is newer than cache
