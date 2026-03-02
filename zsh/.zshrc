@@ -138,6 +138,9 @@ bindkey '^U' backward-kill-line
 bindkey '^?' backward-delete-char
 bindkey '^H' backward-delete-char
 bindkey '^W' backward-kill-word
+_fbr_widget() { fbr; zle reset-prompt; }
+zle -N _fbr_widget
+bindkey '^Xb' _fbr_widget
 
 # ============================================================================
 # Cached eval helper: regenerates only when binary is newer than cache
