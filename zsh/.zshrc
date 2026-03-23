@@ -178,13 +178,6 @@ export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
 export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --inline-info'
 
 # ============================================================================
-# zoxide
-# ============================================================================
-if command -v zoxide &>/dev/null; then
-    _zsh_cached_source zoxide zoxide-init init zsh
-fi
-
-# ============================================================================
 # direnv
 # ============================================================================
 if command -v direnv &>/dev/null; then
@@ -321,4 +314,11 @@ if (( $+functions[_gastown_hook] )); then
   }
   add-zsh-hook -d precmd _gastown_hook
   add-zsh-hook precmd _gastown_hook_fast
+fi
+
+# ============================================================================
+# zoxide (must be at the very end of .zshrc)
+# ============================================================================
+if command -v zoxide &>/dev/null; then
+    _zsh_cached_source zoxide zoxide-init init zsh
 fi
