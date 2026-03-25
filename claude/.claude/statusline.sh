@@ -73,11 +73,15 @@ if git -C "$CWD" rev-parse --git-dir &>/dev/null; then
     LINEAR_COMPONENT="${ESC}]8;;${LINEAR_URL}${ESC}\\${GREEN}${ISSUE_ID}${RESET}${ESC}]8;;${ESC}\\"
   fi
 
-  # === PR link ===
-  PR_URL=$(gh pr view "$BRANCH" --json url -q .url 2>/dev/null)
-  if [[ -n "$PR_URL" ]]; then
+  # === PR link with title ===
+  PR_JSON=$(gh pr view "$BRANCH" --json url,title 2>/dev/null)
+  if [[ -n "$PR_JSON" ]]; then
+    PR_URL=$(echo "$PR_JSON" | jq -r '.url // empty')
+    PR_TITLE=$(echo "$PR_JSON" | jq -r '.title // empty')
     PR_NUMBER=$(echo "$PR_URL" | grep -oP '/pull/\K[0-9]+')
-    [[ -n "$PR_NUMBER" ]] && PR_COMPONENT=" ${ESC}]8;;${PR_URL}${ESC}\\${CYAN}#${PR_NUMBER}${RESET}${ESC}]8;;${ESC}\\"
+    if [[ -n "$PR_NUMBER" ]]; then
+      PR_COMPONENT=" ${ESC}]8;;${PR_URL}${ESC}\\${CYAN}#${PR_NUMBER}${RESET}${ESC}]8;;${ESC}\\ ${PR_TITLE}"
+    fi
   fi
 else
   # Not in a git repo - just show directory basename

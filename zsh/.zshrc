@@ -233,6 +233,10 @@ extract() {
     esac
 }
 
+# Omarchy shell helpers (worktree ga/gd, tmux tdl/tdlm/tsl)
+source ~/.local/share/omarchy/default/bash/fns/worktrees
+source ~/.local/share/omarchy/default/bash/fns/tmux
+
 _gt_yargs_completions()
 {
   local reply
