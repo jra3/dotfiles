@@ -1,0 +1,17 @@
+# browser is the shell (/bin/sh) command executed once the proxy starts.
+# When browser exits, the proxy exits.
+browser = """
+    chromium \
+    --user-data-dir="$HOME/.chromium-captive" \
+    --proxy-server="socks5://$PROXY" \
+    --host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE localhost" \
+    --no-first-run --new-window --incognito \
+    http://example.com
+"""
+
+# dhcp-dns extracts the DHCP-provided DNS server from networkctl.
+# The first IPv4 address match is used.
+dhcp-dns = "networkctl status wlan0 | grep DNS:"
+
+# socks5-addr is the listen address for the SOCKS5 proxy server.
+socks5-addr = "localhost:1666"
