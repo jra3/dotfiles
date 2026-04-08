@@ -301,24 +301,7 @@ fi
 # Add ~/.local/bin to PATH for user binaries
 export PATH="$HOME/.local/bin:$PATH"
 
-# --- Gas Town Integration (managed by gt) ---
-[[ -f "/home/jallen/.config/gastown/shell-hook.sh" ]] && source "/home/jallen/.config/gastown/shell-hook.sh"
-# --- End Gas Town ---
-
-# Speed up: only run gastown precmd hook when the directory actually changes.
-# The hook does git rev-parse + file-system checks on every Enter keypress,
-# which makes rapid Enter presses slow. Since GT_TOWN_ROOT/GT_RIG can't change
-# without a directory change, it's safe to skip when $PWD is unchanged.
-if (( $+functions[_gastown_hook] )); then
-  _gastown_precmd_last_dir=
-  _gastown_hook_fast() {
-    [[ "$PWD" == "$_gastown_precmd_last_dir" ]] && return 0
-    _gastown_precmd_last_dir=$PWD
-    _gastown_hook
-  }
-  add-zsh-hook -d precmd _gastown_hook
-  add-zsh-hook precmd _gastown_hook_fast
-fi
+. "$HOME/.local/bin/env"
 
 # ============================================================================
 # zoxide (must be at the very end of .zshrc)
