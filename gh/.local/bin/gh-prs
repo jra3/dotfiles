@@ -51,7 +51,7 @@ fetch_prs() {
          elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
          else "pass" end) end),
       # Extract Linear issue ID from branch name (e.g., "john/eng-123-foo" -> "ENG-123")
-      (.headRefName | capture("(?<team>[a-zA-Z]+)-(?<num>[0-9]+)") | "\(.team | ascii_upcase)-\(.num)" // ""),
+      (.headRefName | (capture("(?<team>[a-zA-Z]+)-(?<num>[0-9]+)") | "\(.team | ascii_upcase)-\(.num)") // ""),
       .title
     ] | @tsv' | \
     awk -F'\t' -v repo="$REPO_URL" -v title_width="$TITLE_WIDTH" '
