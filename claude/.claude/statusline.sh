@@ -95,6 +95,27 @@ fi
 LINKS="${LINEAR_COMPONENT}${PR_COMPONENT}"
 REST="${DIR_COMPONENT}${BRANCH_COMPONENT}${WORKTREE_COMPONENT}"
 
+# === QUEUE STATUS (BFS processing indicator) ===
+QUEUE_COMPONENT=""
+GENES_DIR="/home/jallen/jra3/genes"
+QUEUE_MARKER=$(ls "${GENES_DIR}/.tmp/claude-queue-"* 2>/dev/null | head -1)
+if [[ -f "$QUEUE_MARKER" ]]; then
+  QUEUE_NAME=$(cat "$QUEUE_MARKER" 2>/dev/null)
+  if [[ -n "$QUEUE_NAME" ]]; then
+    STATS_RAW=$("${GENES_DIR}/queues/bfs" "$QUEUE_NAME" stats 2>/dev/null | tail -1)
+    if [[ -n "$STATS_RAW" ]]; then
+      # Parse: iterations  processed  dead_ends  queued  total
+      read -r ITERS PROC DEAD QUEUED TOTAL <<< "$STATS_RAW"
+      DONE=$(( PROC + DEAD ))
+      QUEUE_COMPONENT=" ${YELLOW}🌳 ${QUEUE_NAME}: ${DONE}/${TOTAL} done, ${QUEUED} queued${RESET}"
+    else
+      QUEUE_COMPONENT=" ${YELLOW}🌳 ${QUEUE_NAME}${RESET}"
+    fi
+  fi
+fi
+
+REST="${DIR_COMPONENT}${BRANCH_COMPONENT}${WORKTREE_COMPONENT}${QUEUE_COMPONENT}"
+
 # Try multiline output
 if [[ -n "$LINKS" ]]; then
   printf '%s\n%s\n' "${REST}" "${LINKS}"
