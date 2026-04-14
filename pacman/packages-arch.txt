@@ -24,4 +24,5 @@ syncthing
 tailscale
 tmux
 tmuxp
+udiskie
 zsh
