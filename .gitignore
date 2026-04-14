@@ -1,1 +1,4 @@
 *.bak*
+
+# System-installed shader symlinks (written by Aether into the stowed hypr dir)
+hypr/.config/hypr/shaders/
