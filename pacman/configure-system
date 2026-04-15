@@ -26,4 +26,14 @@ else
     echo "  Emacs not installed, skipping."
 fi
 
+# --- Pacman hooks ---
+echo "Installing pacman hooks..."
+HOOKS_DIR="$(cd "$(dirname "$0")" && pwd)/hooks"
+if [ -d "$HOOKS_DIR" ]; then
+    sudo cp "$HOOKS_DIR"/*.hook /etc/pacman.d/hooks/
+    echo "  Pacman hooks installed."
+else
+    echo "  No hooks directory found, skipping."
+fi
+
 echo "Done!"
