@@ -30,43 +30,71 @@ while [[ $# -gt 0 ]]; do
 done
 
 fetch_prs() {
-  local REPO_URL TERM_WIDTH TITLE_WIDTH
-  REPO_URL=$(gh repo view --json url -q .url)
+  local REPO_URL OWNER REPO TERM_WIDTH TITLE_WIDTH PR_JSON UNRES_JSON QUERY pr_aliases num
+  IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
   TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
-  # Fixed columns: PR(6) + sep(2) + LINEAR(9) + sep(2) + CI(8) + sep(2) = 29
-  TITLE_WIDTH=$((TERM_WIDTH - 29))
+  # Fixed columns: PR(6) + sep(2) + LINEAR(9) + sep(2) + CI(8) + sep(2) + UNRES(5) + sep(2) = 36
+  TITLE_WIDTH=$((TERM_WIDTH - 36))
   [[ $TITLE_WIDTH -lt 20 ]] && TITLE_WIDTH=20
 
-  gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName | \
-    jq -r '.[] | [
+  PR_JSON=$(gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName)
+
+  # Single aliased GraphQL call for unresolved review-thread counts (avoids N+1).
+  pr_aliases=""
+  while IFS= read -r num; do
+    [[ -z "$num" ]] && continue
+    pr_aliases+="    p${num}: pullRequest(number: ${num}) { reviewThreads(first: 100) { nodes { isResolved } } }"$'\n'
+  done < <(echo "$PR_JSON" | jq -r '.[].number')
+
+  if [[ -n "$pr_aliases" ]]; then
+    QUERY="query { repository(owner: \"${OWNER}\", name: \"${REPO}\") {"$'\n'"${pr_aliases}  } }"
+    UNRES_JSON=$(gh api graphql -f query="$QUERY" 2>/dev/null || echo '{}')
+  else
+    UNRES_JSON='{}'
+  fi
+
+  echo "$PR_JSON" | \
+    jq -r --argjson unres "$UNRES_JSON" '
+      ($unres.data.repository // {}) as $repo |
+      .[] |
+      (($repo["p\(.number)"].reviewThreads.nodes // [])
+        | map(select(.isResolved == false))
+        | length) as $unresolved |
+      [
       (.number | tostring),
       (if .isDraft then "draft"
        elif .mergeable == "CONFLICTING" then "conflict"
        elif .reviewDecision == "CHANGES_REQUESTED" then "changes"
        elif .reviewDecision == "APPROVED" then "approved"
        else "pending" end),
+      # Drop non-CI meta-checks (e.g. Graphite mergeability, which stays pending
+      # on stacked PRs until the downstack merges) before deciding pass/running/fail.
       (if .statusCheckRollup == null or .statusCheckRollup == [] then "pending"
-       else (.statusCheckRollup |
-         if any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
-         elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
-         else "pass" end) end),
+       else (.statusCheckRollup
+         | map(select(((.name // .context) // "") | test("^Graphite / mergeability_check$") | not))
+         | if length == 0 then "pass"
+           elif any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
+           elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
+           else "pass" end) end),
       # Extract Linear issue ID from branch name (e.g., "john/eng-123-foo" -> "ENG-123")
       (.headRefName | (capture("(?<team>[a-zA-Z]+)-(?<num>[0-9]+)") | "\(.team | ascii_upcase)-\(.num)") // ""),
+      ($unresolved | tostring),
       .title
     ] | @tsv' | \
     awk -F'\t' -v repo="$REPO_URL" -v title_width="$TITLE_WIDTH" '
       BEGIN {
-        printf "%-6s  %-9s  %-8s  %s\n", "PR", "LINEAR", "CI", "TITLE"
-        printf "%-6s  %-9s  %-8s  %s\n", "------", "---------", "--------", "-----"
+        printf "%-6s  %-9s  %-8s  %-5s  %s\n", "PR", "LINEAR", "CI", "UNRES", "TITLE"
+        printf "%-6s  %-9s  %-8s  %-5s  %s\n", "------", "---------", "--------", "-----", "-----"
       }
       {
         # Pad visible text BEFORE adding escape codes (printf counts escapes as chars)
         pr_text = sprintf("%-6s", "#" $1)
         linear_text = sprintf("%-9s", $4 != "" ? $4 : "-")
         ci_text = sprintf("%-8s", $3)
+        unres_text = sprintf("%-5s", $5 != "0" ? $5 : "-")
 
         # Truncate title to available width
-        title = substr($5, 1, title_width)
+        title = substr($6, 1, title_width)
 
         # OSC 8 hyperlink: \033]8;;URL\033\\TEXT\033]8;;\033\\
         url = repo "/pull/" $1
@@ -86,6 +114,10 @@ fetch_prs() {
         else if (ci_text ~ /fail/) ci = "\033[31m" ci_text "\033[0m"
         else ci = "\033[33m" ci_text "\033[0m"
 
+        # Color UNRES count: red when there are open threads, grey "-" when zero
+        if ($5 != "0") unres = "\033[31m" unres_text "\033[0m"
+        else           unres = "\033[90m" unres_text "\033[0m"
+
         # Linear issue as clickable hyperlink
         if ($4 != "") {
           linear_url = "https://linear.app/antimetal/issue/" $4
@@ -94,7 +126,7 @@ fetch_prs() {
           linear = "\033[90m" linear_text "\033[0m"
         }
 
-        printf "%s  %s  %s  %s\n", pr, linear, ci, title
+        printf "%s  %s  %s  %s  %s\n", pr, linear, ci, unres, title
       }'
 }
 
