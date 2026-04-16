@@ -233,9 +233,9 @@ extract() {
     esac
 }
 
-# Omarchy shell helpers (worktree ga/gd, tmux tdl/tdlm/tsl)
-source ~/.local/share/omarchy/default/bash/fns/worktrees
-source ~/.local/share/omarchy/default/bash/fns/tmux
+# Omarchy shell helpers (worktree ga/gd, tmux tdl/tdlm/tsl) — Arch only
+[[ -f ~/.local/share/omarchy/default/bash/fns/worktrees ]] && source ~/.local/share/omarchy/default/bash/fns/worktrees
+[[ -f ~/.local/share/omarchy/default/bash/fns/tmux ]] && source ~/.local/share/omarchy/default/bash/fns/tmux
 
 _gt_yargs_completions()
 {
@@ -301,7 +301,7 @@ fi
 # Add ~/.local/bin to PATH for user binaries
 export PATH="$HOME/.local/bin:$PATH"
 
-. "$HOME/.local/bin/env"
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
 # ============================================================================
 # zoxide (must be at the very end of .zshrc)
