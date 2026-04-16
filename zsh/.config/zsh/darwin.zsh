@@ -43,5 +43,3 @@ ut() {
 # PATH additions
 path=(/opt/homebrew/opt/postgresql@16/bin $path)
 
-# Aliases
-alias claude="$HOME/.claude/local/claude"
