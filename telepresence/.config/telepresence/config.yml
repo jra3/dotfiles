@@ -1,0 +1,5 @@
+routing:
+  # Remap cluster CIDRs that overlap with Tailscale's 100.64.0.0/10 CGNAT space
+  # into this virtual subnet. Without this, telepresence claims 100.64.0.0/10 on
+  # tel0 and hijacks all Tailscale peer traffic.
+  virtualSubnet: 211.55.0.0/16
