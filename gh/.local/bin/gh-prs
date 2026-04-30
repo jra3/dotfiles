@@ -32,6 +32,7 @@ done
 fetch_prs() {
   local REPO_URL OWNER REPO TERM_WIDTH TITLE_WIDTH PR_JSON UNRES_JSON QUERY pr_aliases num
   IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
+  GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
   TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
   # Fixed columns: PR(6) + sep(2) + LINEAR(9) + sep(2) + CI(8) + sep(2) + UNRES(5) + sep(2) = 36
   TITLE_WIDTH=$((TERM_WIDTH - 36))
@@ -81,7 +82,7 @@ fetch_prs() {
       ($unresolved | tostring),
       .title
     ] | @tsv' | \
-    awk -F'\t' -v repo="$REPO_URL" -v title_width="$TITLE_WIDTH" '
+    awk -F'\t' -v graphite_base="$GRAPHITE_BASE" -v title_width="$TITLE_WIDTH" '
       BEGIN {
         printf "%-6s  %-9s  %-8s  %-5s  %s\n", "PR", "LINEAR", "CI", "UNRES", "TITLE"
         printf "%-6s  %-9s  %-8s  %-5s  %s\n", "------", "---------", "--------", "-----", "-----"
@@ -97,7 +98,7 @@ fetch_prs() {
         title = substr($6, 1, title_width)
 
         # OSC 8 hyperlink: \033]8;;URL\033\\TEXT\033]8;;\033\\
-        url = repo "/pull/" $1
+        url = graphite_base "/" $1
         link_start = "\033]8;;" url "\033\\"
         link_end = "\033]8;;\033\\"
 
@@ -131,16 +132,15 @@ fetch_prs() {
 }
 
 if [[ $WATCH -eq 1 ]]; then
-  trap 'exit 0' INT
-  tput civis  # hide cursor
-  trap 'tput cnorm; exit 0' INT  # restore cursor on exit
+  # Enter alternate screen buffer + hide cursor; restore both on exit.
+  printf '\033[?1049h\033[H'
+  tput civis
+  trap 'tput cnorm; printf "\033[?1049l"; exit 0' INT TERM EXIT
   while true; do
     output=$(fetch_prs)
-    # Move to home position (no clear), overwrite in place
-    echo -e "\033[H\033[90m[$(date +%H:%M:%S)] Refreshing every ${INTERVAL}s - Ctrl+C to stop\033[0m"
-    echo
+    printf '\033[H\033[2J'  # home + clear screen
+    printf '\033[90m[%s] Refreshing every %ss - Ctrl+C to stop\033[0m\n\n' "$(date +%H:%M:%S)" "$INTERVAL"
     echo "$output"
-    echo -e "\033[J"  # clear from cursor to end of screen (removes stale lines)
     sleep "$INTERVAL"
   done
 else
