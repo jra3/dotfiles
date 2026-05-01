@@ -153,5 +153,7 @@
   "alwaysThinkingEnabled": true,
   "effortLevel": "medium",
   "promptSuggestionEnabled": false,
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true
 }
