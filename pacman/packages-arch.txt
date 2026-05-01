@@ -8,7 +8,9 @@ efibootmgr
 emacs-wayland
 firefox
 fwupd
+github-cli
 go
+iptables-nft
 keepassxc
 nano
 neovim
