@@ -296,6 +296,21 @@ else
     source "$HOME/.config/zsh/arch.zsh"
 fi
 
+# Override Omarchy's zd wrapper (aliased as `cd`) so non-interactive shells
+# fall back to plain builtin cd. Claude Code's Bash tool sources a shell
+# snapshot that doesn't preserve zoxide's chpwd_functions hook, so __zoxide_doctor
+# fires a spurious "configuration issue" warning and `z` lookups exit 1 on miss.
+zd() {
+  if [[ -o interactive ]] && command -v zoxide &>/dev/null; then
+    (( $# == 0 )) && { builtin cd ~; return }
+    [[ -d $1 ]] && { builtin cd "$1"; return }
+    z "$@" || { echo "Error: Directory not found"; return 1 }
+    printf "\U000F17A9 "; pwd
+  else
+    builtin cd "$@"
+  fi
+}
+
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # Add ~/.local/bin to PATH for user binaries
