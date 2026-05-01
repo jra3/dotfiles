@@ -3,3 +3,14 @@ routing:
   # into this virtual subnet. Without this, telepresence claims 100.64.0.0/10 on
   # tel0 and hijacks all Tailscale peer traffic.
   virtualSubnet: 211.55.0.0/16
+
+  # Home wifi LAN routes 10.0.0.0/16 via the router; the EKS cluster's VPC
+  # also uses 10.0.0.0/16. Allow telepresence to proceed despite the conflict
+  # so cluster traffic actually reaches the cluster, then carve out the
+  # specific host subnets we still want to reach over wifi (the router
+  # itself, our own machine, and the second LAN segment).
+  allowConflictingSubnets:
+    - 10.0.0.0/16
+  neverProxySubnets:
+    - 10.0.10.0/24
+    - 10.0.20.0/24
