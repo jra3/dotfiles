@@ -88,11 +88,17 @@ fetch_prs() {
         printf "%-6s  %-9s  %-8s  %-5s  %s\n", "------", "---------", "--------", "-----", "-----"
       }
       {
-        # Pad visible text BEFORE adding escape codes (printf counts escapes as chars)
-        pr_text = sprintf("%-6s", "#" $1)
-        linear_text = sprintf("%-9s", $4 != "" ? $4 : "-")
-        ci_text = sprintf("%-8s", $3)
-        unres_text = sprintf("%-5s", $5 != "0" ? $5 : "-")
+        # Visible text (unpadded). Padding is added AFTER hyperlink/color escapes
+        # so trailing spaces are not part of the clickable region.
+        pr_visible = "#" $1
+        linear_visible = ($4 != "" ? $4 : "-")
+        ci_visible = $3
+        unres_visible = ($5 != "0" ? $5 : "-")
+
+        pr_pad = sprintf("%*s", 6 - length(pr_visible), "")
+        linear_pad = sprintf("%*s", 9 - length(linear_visible), "")
+        ci_pad = sprintf("%*s", 8 - length(ci_visible), "")
+        unres_pad = sprintf("%*s", 5 - length(unres_visible), "")
 
         # Truncate title to available width
         title = substr($6, 1, title_width)
@@ -102,29 +108,29 @@ fetch_prs() {
         link_start = "\033]8;;" url "\033\\"
         link_end = "\033]8;;\033\\"
 
-        # Color PR number based on status (with clickable link)
-        if ($2 == "draft") pr = link_start "\033[90m" pr_text "\033[0m" link_end
-        else if ($2 == "approved") pr = link_start "\033[32m" pr_text "\033[0m" link_end
-        else if ($2 == "pending") pr = link_start "\033[33m" pr_text "\033[0m" link_end
-        else if ($2 == "changes") pr = link_start "\033[35m" pr_text "\033[0m" link_end
-        else if ($2 == "conflict") pr = link_start "\033[31m" pr_text "\033[0m" link_end
-        else pr = link_start pr_text link_end
+        # Color PR number based on status (with clickable link); pad outside link.
+        if ($2 == "draft") pr = link_start "\033[90m" pr_visible "\033[0m" link_end pr_pad
+        else if ($2 == "approved") pr = link_start "\033[32m" pr_visible "\033[0m" link_end pr_pad
+        else if ($2 == "pending") pr = link_start "\033[33m" pr_visible "\033[0m" link_end pr_pad
+        else if ($2 == "changes") pr = link_start "\033[35m" pr_visible "\033[0m" link_end pr_pad
+        else if ($2 == "conflict") pr = link_start "\033[31m" pr_visible "\033[0m" link_end pr_pad
+        else pr = link_start pr_visible link_end pr_pad
 
         # Color CI status
-        if (ci_text ~ /pass/) ci = "\033[32m" ci_text "\033[0m"
-        else if (ci_text ~ /fail/) ci = "\033[31m" ci_text "\033[0m"
-        else ci = "\033[33m" ci_text "\033[0m"
+        if (ci_visible ~ /pass/) ci = "\033[32m" ci_visible "\033[0m" ci_pad
+        else if (ci_visible ~ /fail/) ci = "\033[31m" ci_visible "\033[0m" ci_pad
+        else ci = "\033[33m" ci_visible "\033[0m" ci_pad
 
         # Color UNRES count: red when there are open threads, grey "-" when zero
-        if ($5 != "0") unres = "\033[31m" unres_text "\033[0m"
-        else           unres = "\033[90m" unres_text "\033[0m"
+        if ($5 != "0") unres = "\033[31m" unres_visible "\033[0m" unres_pad
+        else           unres = "\033[90m" unres_visible "\033[0m" unres_pad
 
-        # Linear issue as clickable hyperlink
+        # Linear issue as clickable hyperlink; pad outside link.
         if ($4 != "") {
           linear_url = "https://linear.app/antimetal/issue/" $4
-          linear = "\033]8;;" linear_url "\033\\\033[36m" linear_text "\033[0m\033]8;;\033\\"
+          linear = "\033]8;;" linear_url "\033\\\033[36m" linear_visible "\033[0m\033]8;;\033\\" linear_pad
         } else {
-          linear = "\033[90m" linear_text "\033[0m"
+          linear = "\033[90m" linear_visible "\033[0m" linear_pad
         }
 
         printf "%s  %s  %s  %s  %s\n", pr, linear, ci, unres, title
