@@ -206,6 +206,61 @@ fetch_prs() {
       }'
 }
 
+fetch_tree() {
+  local REPO_URL OWNER REPO TERM_WIDTH GRAPHITE_BASE GT_OUT PR_JSON UNRES_JSON QUERY pr_aliases num PR_TSV
+  IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
+  GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
+  TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
+
+  GT_OUT=$(gt ls 2>&1) || {
+    printf '%s\n' "$GT_OUT" >&2
+    echo "Run 'gt track' if this branch is not yet tracked." >&2
+    return 1
+  }
+
+  PR_JSON=$(gh pr list --author @me --state open \
+    --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName,updatedAt)
+
+  pr_aliases=""
+  while IFS= read -r num; do
+    [[ -z "$num" ]] && continue
+    pr_aliases+="    p${num}: pullRequest(number: ${num}) { reviewThreads(first: 100) { nodes { isResolved } } }"$'\n'
+  done < <(echo "$PR_JSON" | jq -r '.[].number')
+
+  if [[ -n "$pr_aliases" ]]; then
+    QUERY="query { repository(owner: \"${OWNER}\", name: \"${REPO}\") {"$'\n'"${pr_aliases}  } }"
+    UNRES_JSON=$(gh api graphql -f query="$QUERY" 2>/dev/null || echo '{}')
+  else
+    UNRES_JSON='{}'
+  fi
+
+  PR_TSV=$(echo "$PR_JSON" | jq -r --argjson unres "$UNRES_JSON" '
+    ($unres.data.repository // {}) as $repo |
+    .[] |
+    (($repo["p\(.number)"].reviewThreads.nodes // [])
+      | map(select(.isResolved == false))
+      | length) as $unresolved |
+    [
+      .headRefName,
+      (.number | tostring),
+      (if .isDraft then "draft"
+       elif .mergeable == "CONFLICTING" then "conflict"
+       elif .reviewDecision == "CHANGES_REQUESTED" then "changes"
+       elif .reviewDecision == "APPROVED" then "approved"
+       else "pending" end),
+      (if .statusCheckRollup == null or .statusCheckRollup == [] then "pending"
+       else (.statusCheckRollup
+         | map(select(((.name // .context) // "") | test("^Graphite / mergeability_check$") | not))
+         | if length == 0 then "pass"
+           elif any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
+           elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
+           else "pass" end) end),
+      ($unresolved | tostring)
+    ] | @tsv')
+
+  _render_tree "$GT_OUT" "$PR_TSV" "$GRAPHITE_BASE" "$TERM_WIDTH"
+}
+
 main() {
   WATCH=0
   INTERVAL=15
