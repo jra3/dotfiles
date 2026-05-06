@@ -1,6 +1,9 @@
 alacritty
 amd-ucode
 aws-cli-v2
+bats
+bats-assert
+bats-support
 bear
 bitwarden
 bpf
