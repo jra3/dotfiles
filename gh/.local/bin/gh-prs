@@ -3,10 +3,13 @@
 # PR colors: grey=draft, green=approved, yellow=pending review, magenta=changes requested, red=conflicts
 # PR numbers and Linear issue IDs are clickable (OSC 8 hyperlinks) - Ctrl+click to open in browser
 #
-# Usage: gh prs [--watch [SECONDS]] [--branch]
+# Usage: gh prs [--watch [SECONDS]] [--branch] [--tree]
 #   --watch         Refresh every 15 seconds (default)
 #   --watch N       Refresh every N seconds
 #   --branch, -b    Show branch names instead of PR titles
+#   --tree, -t      Render the Graphite stack tree (`gt ls`) with right-justified
+#                   PR# (review-state colored, CI-glyph prefixed) and unresolved-
+#                   thread count. Mutually exclusive with --watch and --branch.
 
 # Ensure ${#var} counts characters (not bytes) for multi-byte glyphs.
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
@@ -16,7 +19,7 @@ export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 # Tree chars are multi-byte UTF-8 (◯ ◉ │ ─ ┘ └ ├ etc); since branch names start
 # with an ASCII letter, we strip everything up to the first ASCII letter.
 _extract_branch_name() {
-  printf '%s' "$1" | sed -E 's/^[^A-Za-z]*//; s/ *\([^)]*\) *$//'
+  printf '%s' "$1" | sed -E 's/^[^A-Za-z]*//; s/( *\([^)]*\))+ *$//'
 }
 
 # Build the right-side PR cell. Returns "<visible_width>\t<styled_text>".
@@ -302,7 +305,9 @@ main() {
     fi
   fi
 
-  if [[ $WATCH -eq 1 ]]; then
+  if (( TREE == 1 )); then
+    fetch_tree
+  elif [[ $WATCH -eq 1 ]]; then
     # Enter alternate screen buffer + hide cursor; restore both on exit.
     printf '\033[?1049h\033[H'
     tput civis

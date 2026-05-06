@@ -35,6 +35,12 @@ setup() {
   assert_output 'john/eng-4601-anvil-05c-prisma-evaluators'
 }
 
+@test "extract_branch_name: branch with multiple trailing annotations" {
+  run _extract_branch_name '◯    john/eng-4602-anvil-05c-external-dep-evaluators (needs restack) (eng-4602-fix)'
+  assert_success
+  assert_output 'john/eng-4602-anvil-05c-external-dep-evaluators'
+}
+
 @test "format_pr_cell: approved + pass + unres=0 — width and styled bytes" {
   run _format_pr_cell 1234 approved pass 0 'https://g.example'
   assert_success
