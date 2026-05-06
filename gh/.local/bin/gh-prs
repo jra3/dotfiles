@@ -9,7 +9,8 @@
 #   --branch, -b    Show branch names instead of PR titles
 #   --tree, -t      Render the Graphite stack tree (`gt ls`) with right-justified
 #                   PR# (review-state colored, CI-glyph prefixed) and unresolved-
-#                   thread count. Mutually exclusive with --watch and --branch.
+#                   thread count. Combinable with --watch. Mutually exclusive
+#                   with --branch.
 
 # Ensure ${#var} counts characters (not bytes) for multi-byte glyphs.
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
@@ -302,31 +303,29 @@ main() {
     esac
   done
 
-  if (( TREE == 1 )); then
-    if (( WATCH == 1 )); then
-      echo "error: --tree and --watch are mutually exclusive" >&2
-      return 1
-    fi
-    if (( SHOW_BRANCH == 1 )); then
-      echo "error: --tree and --branch are mutually exclusive" >&2
-      return 1
-    fi
+  if (( TREE == 1 && SHOW_BRANCH == 1 )); then
+    echo "error: --tree and --branch are mutually exclusive" >&2
+    return 1
   fi
 
-  if (( TREE == 1 )); then
-    fetch_tree
-  elif [[ $WATCH -eq 1 ]]; then
+  if (( WATCH == 1 )); then
     # Enter alternate screen buffer + hide cursor; restore both on exit.
     printf '\033[?1049h\033[H'
     tput civis
     trap 'tput cnorm; printf "\033[?1049l"; exit 0' INT TERM EXIT
     while true; do
-      output=$(fetch_prs)
+      if (( TREE == 1 )); then
+        output=$(fetch_tree)
+      else
+        output=$(fetch_prs)
+      fi
       printf '\033[H\033[2J'  # home + clear screen
       printf '\033[90m[%s] Refreshing every %ss - Ctrl+C to stop\033[0m\n\n' "$(date +%H:%M:%S)" "$INTERVAL"
       echo "$output"
       sleep "$INTERVAL"
     done
+  elif (( TREE == 1 )); then
+    fetch_tree
   else
     fetch_prs
   fi

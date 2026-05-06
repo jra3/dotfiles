@@ -52,8 +52,9 @@ used as the join key against PR data.
 ## Behavior
 
 1. **Branch order** comes from `gt ls`, not from `updatedAt`.
-2. **Watch mode** is not supported with `--tree` (out of scope for now).
-   Passing `--watch --tree` is an error.
+2. **Watch mode** works with `--tree`: `gh prs --tree --watch [SECONDS]`
+   refreshes the joined view on the same alt-screen loop the table mode
+   uses.
 3. **Not in a Graphite-tracked stack** is an error: print a hint pointing
    at `gt track` and exit non-zero. No fallback to the table.
 4. **`--tree` and `--branch` are mutually exclusive** — the tree already
@@ -89,7 +90,6 @@ Existing `gh-prs` already produces a TSV row per PR via its `jq` pipeline
 
 ## Out of scope
 
-- Watch mode for `--tree`.
 - Showing PR title or Linear ID in tree mode (intentionally minimal — the
   tree is already wide).
 - Non-Graphite repos.
