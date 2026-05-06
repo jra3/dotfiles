@@ -26,15 +26,15 @@ while true; do
 
   case "$key" in
     ctrl-x)
-      display=$(awk '{print $3}' <<< "$selection" | tr -d '[]' | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
+      display=$(awk '{n=split($1,a,"/"); print a[n]}' <<< "$selection" | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
       echo "Deleting $display..." >&2
       failed=0
       while IFS= read -r path; do
         [[ -z "$path" ]] && continue
         if ! err=$(git worktree remove --force "$path" 2>&1); then
-          branch=$(awk -v p="$path" '$1==p{print $3}' <<< "$selection" | tr -d '[]')
+          name=$(basename "$path")
           echo >&2
-          echo "Error deleting ${branch:-$path}:" >&2
+          echo "Error deleting ${name}:" >&2
           echo "$err" >&2
           failed=1
         fi
