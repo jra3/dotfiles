@@ -19,6 +19,49 @@ _extract_branch_name() {
   printf '%s' "$1" | sed -E 's/^[^A-Za-z]*//; s/ *\([^)]*\) *$//'
 }
 
+# Build the right-side PR cell. Returns "<visible_width>\t<styled_text>".
+# Args: pr_num review_state ci_state unres graphite_base
+#   review_state ∈ {draft,approved,pending,changes,conflict,""}
+#   ci_state ∈ {pass,running,fail,""}
+_format_pr_cell() {
+  local pr_num=$1 review=$2 ci=$3 unres=$4 base=$5
+  local ESC=$'\e'
+
+  local glyph glyph_c
+  case "$ci" in
+    pass)    glyph='●'; glyph_c=32 ;;
+    running) glyph='◐'; glyph_c=33 ;;
+    fail)    glyph='✗'; glyph_c=31 ;;
+    *)       glyph=' '; glyph_c=0 ;;
+  esac
+
+  local pr_c
+  case "$review" in
+    draft)    pr_c=90 ;;
+    approved) pr_c=32 ;;
+    pending)  pr_c=33 ;;
+    changes)  pr_c=35 ;;
+    conflict) pr_c=31 ;;
+    *)        pr_c=0 ;;
+  esac
+
+  local unres_text unres_c
+  if [[ $unres =~ ^[0-9]+$ ]] && (( unres > 0 )); then
+    unres_text=$unres; unres_c=31
+  else
+    unres_text='-'; unres_c=90
+  fi
+
+  local link_start="${ESC}]8;;${base}/${pr_num}${ESC}\\"
+  local link_end="${ESC}]8;;${ESC}\\"
+  local glyph_part="${ESC}[${glyph_c}m${glyph}${ESC}[0m"
+  local pr_part="${link_start}${ESC}[${pr_c}m#${pr_num}${ESC}[0m${link_end}"
+  local unres_part="${ESC}[${unres_c}m${unres_text}${ESC}[0m"
+
+  local plain="${glyph} #${pr_num}  ${unres_text}"
+  printf '%d\t%s %s  %s' "${#plain}" "$glyph_part" "$pr_part" "$unres_part"
+}
+
 fetch_prs() {
   local REPO_URL OWNER REPO TERM_WIDTH TITLE_WIDTH PR_JSON UNRES_JSON QUERY pr_aliases num
   IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')

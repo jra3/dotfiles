@@ -34,3 +34,48 @@ setup() {
   assert_success
   assert_output 'john/eng-4601-anvil-05c-prisma-evaluators'
 }
+
+@test "format_pr_cell: approved + pass + unres=0 — width and styled bytes" {
+  run _format_pr_cell 1234 approved pass 0 'https://g.example'
+  assert_success
+
+  # Output is "<width>\t<styled>". Visible cell: "● #1234  -" = 10 chars.
+  local width="${output%%$'\t'*}"
+  local styled="${output#*$'\t'}"
+  local expected_styled
+  expected_styled=$'\e[32m●\e[0m \e]8;;https://g.example/1234\e\\\e[32m#1234\e[0m\e]8;;\e\\  \e[90m-\e[0m'
+
+  assert_equal "$width" "10"
+  assert_equal "$styled" "$expected_styled"
+}
+
+@test "format_pr_cell: changes + fail + unres=2" {
+  run _format_pr_cell 9 changes fail 2 'https://g.example'
+  assert_success
+
+  # Visible: "✗ #9  2" = 1+1+2+2+1 = 7.
+  local width="${output%%$'\t'*}"
+  local styled="${output#*$'\t'}"
+  local expected_styled
+  expected_styled=$'\e[31m✗\e[0m \e]8;;https://g.example/9\e\\\e[35m#9\e[0m\e]8;;\e\\  \e[31m2\e[0m'
+
+  assert_equal "$width" "7"
+  assert_equal "$styled" "$expected_styled"
+}
+
+@test "format_pr_cell: draft + running + unres=10 (two-digit)" {
+  run _format_pr_cell 12 draft running 10 'https://g.example'
+  assert_success
+
+  # Visible: "◐ #12  10" = 1+1+3+2+2 = 9.
+  local width="${output%%$'\t'*}"
+  assert_equal "$width" "9"
+}
+
+@test "format_pr_cell: empty review and CI states use neutral defaults" {
+  run _format_pr_cell 42 '' '' 0 'https://g.example'
+  assert_success
+  # Visible: " #42  -" = 1+1+3+2+1 = 8.
+  local width="${output%%$'\t'*}"
+  assert_equal "$width" "8"
+}
