@@ -11,6 +11,14 @@
 # Ensure ${#var} counts characters (not bytes) for multi-byte glyphs.
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
+# Given a `gt ls` line, echo the branch name.
+# Strips leading tree-drawing chars/spaces and any trailing " (annotation)".
+# Tree chars are multi-byte UTF-8 (◯ ◉ │ ─ ┘ └ ├ etc); since branch names start
+# with an ASCII letter, we strip everything up to the first ASCII letter.
+_extract_branch_name() {
+  printf '%s' "$1" | sed -E 's/^[^A-Za-z]*//; s/ *\([^)]*\) *$//'
+}
+
 fetch_prs() {
   local REPO_URL OWNER REPO TERM_WIDTH TITLE_WIDTH PR_JSON UNRES_JSON QUERY pr_aliases num
   IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')

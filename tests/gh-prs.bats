@@ -11,6 +11,26 @@ setup() {
   source "$GHPRS_BIN"
 }
 
-@test "scaffold: bats harness loads and gh-prs sources cleanly" {
-  declare -f fetch_prs >/dev/null
+@test "extract_branch_name: simple branch on its own row" {
+  run _extract_branch_name '◯    main'
+  assert_success
+  assert_output 'main'
+}
+
+@test "extract_branch_name: indented child branch" {
+  run _extract_branch_name '│ ◯  john/eng-4624-anvil-06a-pr2-onboarding-endpoint'
+  assert_success
+  assert_output 'john/eng-4624-anvil-06a-pr2-onboarding-endpoint'
+}
+
+@test "extract_branch_name: current branch with merge connector and annotation" {
+  run _extract_branch_name '◉─┘  john/eng-4598-anvil-05c-pr3-admin-package (needs restack)'
+  assert_success
+  assert_output 'john/eng-4598-anvil-05c-pr3-admin-package'
+}
+
+@test "extract_branch_name: branch with tracking annotation" {
+  run _extract_branch_name '◯    john/eng-4601-anvil-05c-prisma-evaluators (eng-4601-fix)'
+  assert_success
+  assert_output 'john/eng-4601-anvil-05c-prisma-evaluators'
 }
