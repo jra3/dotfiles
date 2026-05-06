@@ -3,31 +3,13 @@
 # PR colors: grey=draft, green=approved, yellow=pending review, magenta=changes requested, red=conflicts
 # PR numbers and Linear issue IDs are clickable (OSC 8 hyperlinks) - Ctrl+click to open in browser
 #
-# Usage: gh prs [--watch [SECONDS]]
+# Usage: gh prs [--watch [SECONDS]] [--branch]
 #   --watch         Refresh every 15 seconds (default)
 #   --watch N       Refresh every N seconds
+#   --branch, -b    Show branch names instead of PR titles
 
-WATCH=0
-INTERVAL=15
-
-# Debug: uncomment to see args
-# echo "DEBUG: args=[$*] count=$#" >&2
-
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --watch|-w)
-      WATCH=1
-      if [[ $2 =~ ^[0-9]+$ ]]; then
-        INTERVAL=$2
-        shift
-      fi
-      shift
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
+# Ensure ${#var} counts characters (not bytes) for multi-byte glyphs.
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
 fetch_prs() {
   local REPO_URL OWNER REPO TERM_WIDTH TITLE_WIDTH PR_JSON UNRES_JSON QUERY pr_aliases num
@@ -38,7 +20,8 @@ fetch_prs() {
   TITLE_WIDTH=$((TERM_WIDTH - 36))
   [[ $TITLE_WIDTH -lt 20 ]] && TITLE_WIDTH=20
 
-  PR_JSON=$(gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName)
+  PR_JSON=$(gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName,updatedAt \
+    | jq 'sort_by(.updatedAt) | reverse')
 
   # Single aliased GraphQL call for unresolved review-thread counts (avoids N+1).
   pr_aliases=""
@@ -80,11 +63,13 @@ fetch_prs() {
       # Extract Linear issue ID from branch name (e.g., "john/eng-123-foo" -> "ENG-123")
       (.headRefName | (capture("(?<team>[a-zA-Z]+)-(?<num>[0-9]+)") | "\(.team | ascii_upcase)-\(.num)") // ""),
       ($unresolved | tostring),
-      .title
+      .title,
+      .headRefName
     ] | @tsv' | \
-    awk -F'\t' -v graphite_base="$GRAPHITE_BASE" -v title_width="$TITLE_WIDTH" '
+    awk -F'\t' -v graphite_base="$GRAPHITE_BASE" -v title_width="$TITLE_WIDTH" -v show_branch="$SHOW_BRANCH" '
       BEGIN {
-        printf "%-6s  %-9s  %-8s  %-5s  %s\n", "PR", "LINEAR", "CI", "UNRES", "TITLE"
+        last_header = show_branch == "1" ? "BRANCH" : "TITLE"
+        printf "%-6s  %-9s  %-8s  %-5s  %s\n", "PR", "LINEAR", "CI", "UNRES", last_header
         printf "%-6s  %-9s  %-8s  %-5s  %s\n", "------", "---------", "--------", "-----", "-----"
       }
       {
@@ -100,8 +85,8 @@ fetch_prs() {
         ci_pad = sprintf("%*s", 8 - length(ci_visible), "")
         unres_pad = sprintf("%*s", 5 - length(unres_visible), "")
 
-        # Truncate title to available width
-        title = substr($6, 1, title_width)
+        # Truncate title or branch to available width
+        title = substr(show_branch == "1" ? $7 : $6, 1, title_width)
 
         # OSC 8 hyperlink: \033]8;;URL\033\\TEXT\033]8;;\033\\
         url = graphite_base "/" $1
@@ -137,18 +122,51 @@ fetch_prs() {
       }'
 }
 
-if [[ $WATCH -eq 1 ]]; then
-  # Enter alternate screen buffer + hide cursor; restore both on exit.
-  printf '\033[?1049h\033[H'
-  tput civis
-  trap 'tput cnorm; printf "\033[?1049l"; exit 0' INT TERM EXIT
-  while true; do
-    output=$(fetch_prs)
-    printf '\033[H\033[2J'  # home + clear screen
-    printf '\033[90m[%s] Refreshing every %ss - Ctrl+C to stop\033[0m\n\n' "$(date +%H:%M:%S)" "$INTERVAL"
-    echo "$output"
-    sleep "$INTERVAL"
+main() {
+  WATCH=0
+  INTERVAL=15
+  SHOW_BRANCH=0
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --watch|-w)
+        WATCH=1
+        if [[ ${2:-} =~ ^[0-9]+$ ]]; then
+          INTERVAL=$2
+          shift
+        fi
+        shift
+        ;;
+      --branch|-b)
+        SHOW_BRANCH=1
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
   done
-else
-  fetch_prs
+
+  if [[ $WATCH -eq 1 ]]; then
+    # Enter alternate screen buffer + hide cursor; restore both on exit.
+    printf '\033[?1049h\033[H'
+    tput civis
+    trap 'tput cnorm; printf "\033[?1049l"; exit 0' INT TERM EXIT
+    while true; do
+      output=$(fetch_prs)
+      printf '\033[H\033[2J'  # home + clear screen
+      printf '\033[90m[%s] Refreshing every %ss - Ctrl+C to stop\033[0m\n\n' "$(date +%H:%M:%S)" "$INTERVAL"
+      echo "$output"
+      sleep "$INTERVAL"
+    done
+  else
+    fetch_prs
+  fi
+}
+
+# Only run main if executed directly, not when sourced (e.g. by tests).
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  git rev-parse --git-dir >/dev/null 2>&1 || { echo "Not in a git repository" >&2; exit 1; }
+  main "$@"
+  exit $?
 fi
