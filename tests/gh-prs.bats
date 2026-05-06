@@ -109,3 +109,17 @@ setup() {
   assert_success
   assert_output '◯    untracked-branch'
 }
+
+@test "cli: --tree --watch is rejected" {
+  run "$GHPRS_BIN" --tree --watch
+  assert_failure
+  assert_output --partial '--tree'
+  assert_output --partial '--watch'
+}
+
+@test "cli: --tree --branch is rejected" {
+  run "$GHPRS_BIN" --tree --branch
+  assert_failure
+  assert_output --partial '--tree'
+  assert_output --partial '--branch'
+}

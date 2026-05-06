@@ -265,6 +265,7 @@ main() {
   WATCH=0
   INTERVAL=15
   SHOW_BRANCH=0
+  TREE=0
 
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -280,11 +281,26 @@ main() {
         SHOW_BRANCH=1
         shift
         ;;
+      --tree|-t)
+        TREE=1
+        shift
+        ;;
       *)
         shift
         ;;
     esac
   done
+
+  if (( TREE == 1 )); then
+    if (( WATCH == 1 )); then
+      echo "error: --tree and --watch are mutually exclusive" >&2
+      return 1
+    fi
+    if (( SHOW_BRANCH == 1 )); then
+      echo "error: --tree and --branch are mutually exclusive" >&2
+      return 1
+    fi
+  fi
 
   if [[ $WATCH -eq 1 ]]; then
     # Enter alternate screen buffer + hide cursor; restore both on exit.
