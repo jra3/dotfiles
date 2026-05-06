@@ -62,6 +62,39 @@ _format_pr_cell() {
   printf '%d\t%s %s  %s' "${#plain}" "$glyph_part" "$pr_part" "$unres_part"
 }
 
+# Render the joined tree.
+# Args: gt_output pr_tsv graphite_base term_width
+#   pr_tsv has one row per PR, tab-separated: branch \t num \t review \t ci \t unres
+#   gt_output is the captured stdout of `gt ls` (no color escapes when piped).
+_render_tree() {
+  local gt_output=$1 pr_tsv=$2 base=$3 term_width=$4
+  local -A prmap=()
+
+  if [[ -n "$pr_tsv" ]]; then
+    while IFS=$'\t' read -r branch num review ci unres; do
+      [[ -z "$branch" ]] && continue
+      prmap[$branch]="${num}	${review}	${ci}	${unres}"
+    done <<< "$pr_tsv"
+  fi
+
+  [[ -z "$gt_output" ]] && return 0
+
+  local line branch num review ci unres cell_w cell pad left_w
+  while IFS= read -r line; do
+    branch=$(_extract_branch_name "$line")
+    if [[ -n "$branch" && -n "${prmap[$branch]+x}" ]]; then
+      IFS=$'\t' read -r num review ci unres <<< "${prmap[$branch]}"
+      IFS=$'\t' read -r cell_w cell < <(_format_pr_cell "$num" "$review" "$ci" "$unres" "$base")
+      left_w=${#line}
+      pad=$(( term_width - left_w - cell_w ))
+      (( pad < 2 )) && pad=2
+      printf '%s%*s%s\n' "$line" "$pad" '' "$cell"
+    else
+      printf '%s\n' "$line"
+    fi
+  done <<< "$gt_output"
+}
+
 fetch_prs() {
   local REPO_URL OWNER REPO TERM_WIDTH TITLE_WIDTH PR_JSON UNRES_JSON QUERY pr_aliases num
   IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')

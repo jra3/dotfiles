@@ -79,3 +79,33 @@ setup() {
   local width="${output%%$'\t'*}"
   assert_equal "$width" "8"
 }
+
+@test "render_tree: joins PR data on matching branches and passes others through" {
+  local gt_in='◯    foo
+◯    main'
+  local pr_in='foo	1234	approved	pass	0'
+
+  # Visible "◯    foo" = 8, cell width = 10, term = 60, pad = 60-8-10 = 42.
+  local expected_cell
+  expected_cell=$'\e[32m●\e[0m \e]8;;https://g.example/1234\e\\\e[32m#1234\e[0m\e]8;;\e\\  \e[90m-\e[0m'
+  local pad
+  pad=$(printf '%*s' 42 '')
+  local expected="◯    foo${pad}${expected_cell}"$'\n''◯    main'
+
+  run _render_tree "$gt_in" "$pr_in" 'https://g.example' 60
+  assert_success
+  assert_output "$expected"
+}
+
+@test "render_tree: empty gt input produces empty output" {
+  run _render_tree '' '' 'https://g.example' 80
+  assert_success
+  assert_output ''
+}
+
+@test "render_tree: branch with no matching PR row passes through unchanged" {
+  local gt_in='◯    untracked-branch'
+  run _render_tree "$gt_in" '' 'https://g.example' 80
+  assert_success
+  assert_output '◯    untracked-branch'
+}
