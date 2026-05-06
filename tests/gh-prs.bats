@@ -41,6 +41,46 @@ setup() {
   assert_output 'john/eng-4602-anvil-05c-external-dep-evaluators'
 }
 
+@test "extract_branch_name: handles ANSI-colored gt-ls line" {
+  # Simulates `FORCE_COLOR=1 gt ls` output: 24-bit color SGR escapes around glyph and branch name.
+  local line=$'\e[38;2;76;203;241m◯\e[39m    \e[38;2;77;202;125mjohn/foo\e[39m'
+  run _extract_branch_name "$line"
+  assert_success
+  assert_output 'john/foo'
+}
+
+@test "visible_width: plain text" {
+  run _visible_width 'hello'
+  assert_success
+  assert_output '5'
+}
+
+@test "visible_width: ANSI CSI sequences are excluded" {
+  run _visible_width $'\e[31mhello\e[0m'
+  assert_success
+  assert_output '5'
+}
+
+@test "visible_width: 24-bit color escapes are excluded" {
+  run _visible_width $'\e[38;2;76;203;241m●\e[39m'
+  assert_success
+  assert_output '1'
+}
+
+@test "visible_width: OSC8 hyperlink wrapper is excluded" {
+  run _visible_width $'\e]8;;https://example.com\e\\link\e]8;;\e\\'
+  assert_success
+  assert_output '4'
+}
+
+@test "visible_width: gt-ls-style colored line" {
+  local line=$'\e[38;2;76;203;241m◯\e[39m    \e[38;2;77;202;125mjohn/foo\e[39m'
+  # Visible: "◯    john/foo" = 1+4+8 = 13.
+  run _visible_width "$line"
+  assert_success
+  assert_output '13'
+}
+
 @test "format_pr_cell: approved + pass + unres=0 — width and styled bytes" {
   run _format_pr_cell 1234 approved pass 0 'https://g.example'
   assert_success
@@ -114,6 +154,23 @@ setup() {
   run _render_tree "$gt_in" '' 'https://g.example' 80
   assert_success
   assert_output '◯    untracked-branch'
+}
+
+@test "render_tree: pads correctly when gt-ls input contains ANSI colors" {
+  # Simulates colored gt output. Visible width of left side: "◯    foo" = 8.
+  local gt_in=$'\e[38;2;76;203;241m◯\e[39m    \e[38;2;77;202;125mfoo\e[39m'
+  local pr_in='foo	1234	approved	pass	0'
+
+  # Cell = 10, term = 60, pad = 60 - 8 - 10 = 42. Left side preserved verbatim.
+  local expected_cell
+  expected_cell=$'\e[32m●\e[0m \e]8;;https://g.example/1234\e\\\e[32m#1234\e[0m\e]8;;\e\\  \e[90m-\e[0m'
+  local pad
+  pad=$(printf '%*s' 42 '')
+  local expected="${gt_in}${pad}${expected_cell}"
+
+  run _render_tree "$gt_in" "$pr_in" 'https://g.example' 60
+  assert_success
+  assert_output "$expected"
 }
 
 @test "cli: --tree --watch is rejected" {

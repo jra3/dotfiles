@@ -14,12 +14,20 @@
 # Ensure ${#var} counts characters (not bytes) for multi-byte glyphs.
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
+# Echo the printable-character count of a string, ignoring ANSI CSI sequences
+# and OSC8 hyperlink wrappers. Requires LC_ALL=*.UTF-8 for multi-byte chars.
+_visible_width() {
+  local stripped
+  stripped=$(printf '%s' "$1" | sed -E $'s/\e\\[[0-9;]*[a-zA-Z]//g; s/\e\\]8;;[^\a\e]*(\a|\e\\\\)//g')
+  printf '%d' "${#stripped}"
+}
+
 # Given a `gt ls` line, echo the branch name.
-# Strips leading tree-drawing chars/spaces and any trailing " (annotation)".
-# Tree chars are multi-byte UTF-8 (◯ ◉ │ ─ ┘ └ ├ etc); since branch names start
-# with an ASCII letter, we strip everything up to the first ASCII letter.
+# First strips ANSI CSI/OSC8 escapes (gt may emit colors when FORCE_COLOR is
+# set), then strips leading tree-drawing chars/spaces and any trailing
+# parenthesized annotations. Branch names start with an ASCII letter.
 _extract_branch_name() {
-  printf '%s' "$1" | sed -E 's/^[^A-Za-z]*//; s/( *\([^)]*\))+ *$//'
+  printf '%s' "$1" | sed -E $'s/\e\\[[0-9;]*[a-zA-Z]//g; s/\e\\]8;;[^\a\e]*(\a|\e\\\\)//g; s/^[^A-Za-z]*//; s/( *\\([^)]*\\))+ *$//'
 }
 
 # Build the right-side PR cell. Returns "<visible_width>\t<styled_text>".
@@ -88,7 +96,7 @@ _render_tree() {
     if [[ -n "$branch" && -n "${prmap[$branch]+x}" ]]; then
       IFS=$'\t' read -r num review ci unres <<< "${prmap[$branch]}"
       IFS=$'\t' read -r cell_w cell < <(_format_pr_cell "$num" "$review" "$ci" "$unres" "$base")
-      left_w=${#line}
+      left_w=$(_visible_width "$line")
       pad=$(( term_width - left_w - cell_w ))
       (( pad < 2 )) && pad=2
       printf '%s%*s%s\n' "$line" "$pad" '' "$cell"
@@ -215,7 +223,7 @@ fetch_tree() {
   GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
   TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
 
-  GT_OUT=$(gt ls 2>&1) || {
+  GT_OUT=$(FORCE_COLOR=1 gt ls 2>&1) || {
     printf '%s\n' "$GT_OUT" >&2
     echo "Run 'gt track' if this branch is not yet tracked." >&2
     return 1
