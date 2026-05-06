@@ -45,3 +45,5 @@
 
 [includeIf "gitdir:~/am/"]
     path = config-work
+[maintenance]
+	repo = /home/john/am/overlook

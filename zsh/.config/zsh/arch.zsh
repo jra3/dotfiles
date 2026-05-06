@@ -1,9 +1,9 @@
 # Arch Linux specific configuration
 
 # Omarchy defaults
+[[ -f ~/.local/share/omarchy/default/bash/envs ]] && source ~/.local/share/omarchy/default/bash/envs
 [[ -f ~/.local/share/omarchy/default/bash/aliases ]] && source ~/.local/share/omarchy/default/bash/aliases
 [[ -f ~/.local/share/omarchy/default/bash/functions ]] && source ~/.local/share/omarchy/default/bash/functions
-[[ -f ~/.local/share/omarchy/default/bash/envs ]] && source ~/.local/share/omarchy/default/bash/envs
 
 # Environment setup
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
