@@ -135,8 +135,17 @@ _handle_field() {
         _notify "Bitwarden" "No notes for this entry"
         return 0
       fi
-      _copy_with_clear "$value"
-      _notify "Bitwarden" "Notes copied (clears in 30s)"
+      # Write to per-user tmpfs (0700) and view with glow in a floating terminal.
+      # Glow's pager mode is naturally readonly. File is auto-deleted in 5 min.
+      local notes_dir notes_file
+      notes_dir="${XDG_RUNTIME_DIR:-/tmp}"
+      notes_file="$(mktemp "$notes_dir/bw-pick-notes-XXXXXX.md")"
+      printf '%s\n' "$value" >"$notes_file"
+      omarchy-launch-tui bash -c 'glow "$1" | LESS=-R less' _ "$notes_file" >/dev/null 2>&1 &
+      disown
+      ( sleep 300 && rm -f "$notes_file" ) >/dev/null 2>&1 &
+      disown
+      _notify "Bitwarden" "Notes opened in glow"
       ;;
   esac
 }

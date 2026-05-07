@@ -15,6 +15,7 @@ emacs-wayland
 fwupd
 ghostty
 github-cli
+glow
 go
 iptables-nft
 kubectl
