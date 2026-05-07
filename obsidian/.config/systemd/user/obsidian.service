@@ -1,0 +1,21 @@
+[Unit]
+Description=Obsidian (always-on for livesync replication)
+Documentation=https://obsidian.md/
+# Wait for the graphical session because Obsidian/Electron needs a display.
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# /usr/bin/obsidian is a wrapper that picks up flags from
+# ~/.config/obsidian/user-flags.conf (e.g. -disable-gpu, --enable-wayland-ime).
+ExecStart=/usr/bin/obsidian
+Restart=on-failure
+RestartSec=15s
+# Don't fight an already-running interactive Obsidian: if a second instance
+# can't acquire the single-instance lock and exits cleanly, treat that as
+# success rather than restarting forever.
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=graphical-session.target
