@@ -30,9 +30,6 @@ if command -v fzf &>/dev/null; then
     "
 fi
 
-# SSH agent (Bitwarden)
-export SSH_AUTH_SOCK="$HOME/.bitwarden-ssh-agent.sock"
-
 # Unix timestamp (GNU date)
 ut() {
     if [ $# -eq 0 ]; then

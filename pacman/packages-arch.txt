@@ -5,7 +5,6 @@ bats
 bats-assert
 bats-support
 bear
-bitwarden
 bpf
 claude-code
 cmake
