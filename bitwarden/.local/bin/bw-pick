@@ -42,11 +42,6 @@ _disambiguate_labels() {
   done
 }
 
-# True if the line is the synthetic sync pseudo-entry.
-_is_sync_action() {
-  [[ "$1" == "↻ Sync vault" ]]
-}
-
 # True if the string is empty or only whitespace.
 _is_blank() {
   [[ -z "${1// /}" ]]
@@ -58,9 +53,130 @@ _totp_seconds_remaining() {
   printf '%d\n' $(( 30 - (now % 30) ))
 }
 
-# ---- main flow added in next commit ----
+# ---- main flow ----
+
+# Notify if libnotify is present, silent otherwise.
+_notify() {
+  command -v notify-send >/dev/null 2>&1 && notify-send "$@" || true
+}
+
+# Hard-fail with a desktop notification if rbw is unconfigured.
+_check_rbw_configured() {
+  if ! rbw config show 2>/dev/null | jq -e '.email != null and .email != ""' >/dev/null; then
+    _notify "Bitwarden" "rbw not configured. Run: rbw config set email YOUR@EMAIL && rbw login"
+    exit 1
+  fi
+}
+
+# Pop walker dmenu mode and return the selected line's index on stdout.
+# Stdin: newline-separated options.
+# Exits non-zero if the user cancels.
+_pick_index() {
+  walker -d -i -p "$1"
+}
+
+# Pop walker dmenu mode and return the selected line itself.
+_pick_value() {
+  walker -d -p "$1"
+}
+
+# Copy a value to the Wayland clipboard. A 30s background watchdog clears it
+# in case the user never pastes. (--paste-once is unreliable here: clipboard
+# history daemons / compositor reads consume the single paste before us.)
+_copy_with_clear() {
+  printf '%s' "$1" | wl-copy
+  ( sleep 30 && wl-copy --clear ) >/dev/null 2>&1 &
+  disown
+}
+
+# Decrypt and copy the requested field. Username may be empty.
+_handle_field() {
+  local field="$1" name="$2" username="$3"
+  local value rbw_get_args=("$name")
+  [[ -n "$username" ]] && rbw_get_args+=("$username")
+
+  case "$field" in
+    Password)
+      value="$(rbw get "${rbw_get_args[@]}")"
+      _copy_with_clear "$value"
+      _notify "Bitwarden" "Password copied (clears in 30s)"
+      ;;
+    Username)
+      if _is_blank "$username"; then
+        _notify "Bitwarden" "No username for this entry"
+        return 0
+      fi
+      _copy_with_clear "$username"
+      _notify "Bitwarden" "Username copied"
+      ;;
+    TOTP)
+      value="$(rbw code "${rbw_get_args[@]}" 2>/dev/null || true)"
+      if _is_blank "$value"; then
+        _notify "Bitwarden" "No TOTP for this entry"
+        return 0
+      fi
+      _copy_with_clear "$value"
+      local secs
+      secs="$(_totp_seconds_remaining "$(date +%s)")"
+      _notify "Bitwarden" "TOTP copied (valid ${secs}s)"
+      ;;
+    URL)
+      value="$(rbw get --raw "${rbw_get_args[@]}" | jq -r '.data.uris[0].uri // ""')"
+      if _is_blank "$value"; then
+        _notify "Bitwarden" "No URL for this entry"
+        return 0
+      fi
+      _copy_with_clear "$value"
+      _notify "Bitwarden" "URL copied"
+      ;;
+    Notes)
+      value="$(rbw get --raw "${rbw_get_args[@]}" | jq -r '.notes // ""')"
+      if _is_blank "$value"; then
+        _notify "Bitwarden" "No notes for this entry"
+        return 0
+      fi
+      _copy_with_clear "$value"
+      _notify "Bitwarden" "Notes copied (clears in 30s)"
+      ;;
+  esac
+}
+
+main() {
+  _check_rbw_configured
+
+  local -a entries
+  mapfile -t entries < <(rbw list --fields name,user)
+
+  local -a labels
+  mapfile -t labels < <(printf '%s\n' "${entries[@]}" | _disambiguate_labels | sed 's/^/󰌆  /')
+  labels+=('  Sync vault')
+
+  local idx
+  idx="$(printf '%s\n' "${labels[@]}" | _pick_index "Bitwarden")" || exit 0
+  [[ -z "$idx" ]] && exit 0
+
+  if (( idx == ${#labels[@]} - 1 )); then
+    rbw sync
+    _notify "Bitwarden" "Vault synced"
+    exit 0
+  fi
+
+  local entry="${entries[$idx]}" name username
+  name="${entry%%$'\t'*}"
+  if [[ "$entry" == *$'\t'* ]]; then
+    username="${entry#*$'\t'}"
+  else
+    username=""
+  fi
+
+  local field
+  field="$(printf '%s\n' '󰌆  Password' '󰀄  Username' '󰥔  TOTP' '󰖟  URL' '󰠮  Notes' | _pick_value "${labels[$idx]}")" || exit 0
+  [[ -z "$field" ]] && exit 0
+  field="${field##* }"  # strip "<icon>  " prefix; remaining is the field name
+
+  _handle_field "$field" "$name" "$username"
+}
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  echo "bw-pick: main() not yet implemented" >&2
-  exit 1
+  main "$@"
 fi

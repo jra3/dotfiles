@@ -53,17 +53,6 @@ EOF
   assert_output "$(printf 'B (x)\nA\nB (z)')"
 }
 
-# _is_sync_action: true for the synthetic sync pseudo-entry, false otherwise.
-@test "is_sync_action: matches sync line" {
-  run _is_sync_action '↻ Sync vault'
-  assert_success
-}
-
-@test "is_sync_action: does not match a real entry" {
-  run _is_sync_action 'Gmail'
-  assert_failure
-}
-
 # _is_blank: empty / whitespace-only treated as missing.
 @test "is_blank: empty string" {
   run _is_blank ''
