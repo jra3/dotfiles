@@ -28,6 +28,7 @@ omarchy-keyring
 pandoc-cli
 pnpm
 pyenv
+rbw
 steam
 stow
 syncthing
