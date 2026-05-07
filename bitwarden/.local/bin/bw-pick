@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# bw-pick — keyboard-driven Bitwarden picker for Hyprland.
+#
+# First-run setup (one-time, per machine):
+#   rbw config set email YOUR@EMAIL
+#   rbw config set pinentry pinentry-gnome3
+#   rbw login
+#   rbw sync
+#
+# Triggered from Hyprland: bindd = SUPER SHIFT, SLASH, Passwords, exec, uwsm-app -- bw-pick
+#
+# Flow: rbw list → walker (entry index) → walker (field) → wl-copy --paste-once + 30s clear watchdog.
+
+set -euo pipefail
+
+# ---- pure helpers (unit-tested in tests/bw-pick.bats) ----
+
+# Read tab-separated "name<TAB>user" rows on stdin, write display labels on stdout.
+# Names that occur once are emitted as-is. Names that collide AND have a user
+# get a "(user)" suffix to keep the displayed lines distinguishable.
+_disambiguate_labels() {
+  local -A count=()
+  local -a rows=()
+  local row name user
+  while IFS= read -r row || [[ -n "$row" ]]; do
+    name="${row%%$'\t'*}"
+    count[$name]=$(( ${count[$name]:-0} + 1 ))
+    rows+=("$row")
+  done
+  for row in "${rows[@]}"; do
+    name="${row%%$'\t'*}"
+    if [[ "$row" == *$'\t'* ]]; then
+      user="${row#*$'\t'}"
+    else
+      user=""
+    fi
+    if (( ${count[$name]:-0} > 1 )) && [[ -n "$user" ]]; then
+      printf '%s (%s)\n' "$name" "$user"
+    else
+      printf '%s\n' "$name"
+    fi
+  done
+}
+
+# True if the line is the synthetic sync pseudo-entry.
+_is_sync_action() {
+  [[ "$1" == "↻ Sync vault" ]]
+}
+
+# True if the string is empty or only whitespace.
+_is_blank() {
+  [[ -z "${1// /}" ]]
+}
+
+# Seconds until the next TOTP 30s rotation boundary.
+_totp_seconds_remaining() {
+  local now="$1"
+  printf '%d\n' $(( 30 - (now % 30) ))
+}
+
+# ---- main flow added in next commit ----
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  echo "bw-pick: main() not yet implemented" >&2
+  exit 1
+fi
