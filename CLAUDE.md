@@ -65,6 +65,7 @@ This documents the default software stack configured in Omarchy:
 - `claude/` - Claude Code settings and custom commands
 - `bitwarden/` - Bitwarden CLI helper script (`get-signature`) for extracting attachments
 - `pacman/` - Arch package lists and `configure-system` for post-install setup
+- `qmk/` - Optional: `qmk-mic-led-sync.py` daemon syncing mic/DND/voxtype/pomodoro state to a Framework 16 ANSI keyboard via raw HID
 
 **XDG compliance** - Configs use XDG Base Directory paths:
 - Config files go in `<package>/.config/<app>/`
