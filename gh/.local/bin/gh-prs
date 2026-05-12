@@ -156,35 +156,80 @@ _FETCHED_GT_OUT=""
 _FETCHED_GT_ERR=""
 _FETCHED_TREE_PR_TSV=""
 
+# Build the aliased GraphQL subquery body for per-PR detail lookups.
+# Emits one `p<num>: pullRequest(number: <num>) { ... }` block per PR number on
+# stdin, fetching unresolved review threads plus the status-check rollup with
+# each context's `isRequired` flag.
+#
+# `isRequired(pullRequestNumber:)` only reflects branch protection on the PR's
+# actual base. For stacked PRs (base = an intermediate branch) it returns false
+# for everything, even when the checks would block on merge to the default
+# branch. Callers compensate by taking the *union* of required-names across all
+# returned PRs — any sibling PR targeting the default branch reveals the set.
+_pr_detail_aliases() {
+  local pr_json=$1 num aliases=""
+  while IFS= read -r num; do
+    [[ -z "$num" ]] && continue
+    aliases+="    p${num}: pullRequest(number: ${num}) {
+      reviewThreads(first: 100) { nodes { isResolved } }
+      statusCheckRollup {
+        contexts(first: 100) {
+          nodes {
+            __typename
+            ... on CheckRun {
+              name
+              status
+              conclusion
+              isRequired(pullRequestNumber: ${num})
+            }
+            ... on StatusContext {
+              context
+              state
+              isRequired(pullRequestNumber: ${num})
+            }
+          }
+        }
+      }
+    }
+"
+  done < <(echo "$pr_json" | jq -r '.[].number')
+  printf '%s' "$aliases"
+}
+
 fetch_prs() {
-  local REPO_URL OWNER REPO PR_JSON UNRES_JSON QUERY pr_aliases num
+  local REPO_URL OWNER REPO PR_JSON DETAILS_JSON QUERY pr_aliases
   IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
   _FETCHED_GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
 
-  PR_JSON=$(gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName,updatedAt,additions,deletions \
+  PR_JSON=$(gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,headRefName,updatedAt,additions,deletions \
     | jq 'sort_by(.updatedAt) | reverse')
 
-  # Single aliased GraphQL call for unresolved review-thread counts (avoids N+1).
-  pr_aliases=""
-  while IFS= read -r num; do
-    [[ -z "$num" ]] && continue
-    pr_aliases+="    p${num}: pullRequest(number: ${num}) { reviewThreads(first: 100) { nodes { isResolved } } }"$'\n'
-  done < <(echo "$PR_JSON" | jq -r '.[].number')
-
+  pr_aliases=$(_pr_detail_aliases "$PR_JSON")
   if [[ -n "$pr_aliases" ]]; then
     QUERY="query { repository(owner: \"${OWNER}\", name: \"${REPO}\") {"$'\n'"${pr_aliases}  } }"
-    UNRES_JSON=$(gh api graphql -f query="$QUERY" 2>/dev/null || echo '{}')
+    DETAILS_JSON=$(gh api graphql -f query="$QUERY" 2>/dev/null || echo '{}')
   else
-    UNRES_JSON='{}'
+    DETAILS_JSON='{}'
   fi
 
   _FETCHED_PRS_TSV=$(echo "$PR_JSON" | \
-    jq -r --argjson unres "$UNRES_JSON" '
-      ($unres.data.repository // {}) as $repo |
+    jq -r --argjson details "$DETAILS_JSON" '
+      ($details.data.repository // {}) as $repo |
+      # Build canonical required-check set as union across all PRs.
+      # GraphQL only marks isRequired=true for contexts on PRs whose base has
+      # protection (i.e. PRs targeting main); stacked PRs reuse that set by name.
+      ([$repo | to_entries[] | .value.statusCheckRollup.contexts.nodes // [] | .[]
+         | select(.isRequired == true)
+         | (.name // .context) // empty]
+        | unique
+        | map({(.): true}) | add // {}) as $req_set |
       .[] |
-      (($repo["p\(.number)"].reviewThreads.nodes // [])
+      $repo["p\(.number)"] as $pr |
+      (($pr.reviewThreads.nodes // [])
         | map(select(.isResolved == false))
         | length) as $unresolved |
+      (($pr.statusCheckRollup.contexts.nodes // [])
+        | map(select($req_set[(.name // .context) // ""] == true))) as $req |
       [
       (.number | tostring),
       (if .isDraft then "draft"
@@ -192,15 +237,18 @@ fetch_prs() {
        elif .reviewDecision == "CHANGES_REQUESTED" then "changes"
        elif .reviewDecision == "APPROVED" then "approved"
        else "pending" end),
-      # Drop non-CI meta-checks (e.g. Graphite mergeability, which stays pending
-      # on stacked PRs until the downstack merges) before deciding pass/running/fail.
-      (if .statusCheckRollup == null or .statusCheckRollup == [] then "pending"
-       else (.statusCheckRollup
-         | map(select(((.name // .context) // "") | test("^Graphite / mergeability_check$") | not))
-         | if length == 0 then "pass"
-           elif any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
-           elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
-           else "pass" end) end),
+      # CI state derived from required-only contexts. No required checks (or no
+      # rollup yet) → "pending" → blank glyph, rather than implying success.
+      (if ($req | length) == 0 then "pending"
+       elif any($req[];
+         (.__typename == "CheckRun" and (.status == "QUEUED" or .status == "IN_PROGRESS" or .status == "PENDING" or .status == "WAITING" or .status == "REQUESTED"))
+         or (.__typename == "StatusContext" and (.state == "EXPECTED" or .state == "PENDING"))
+       ) then "running"
+       elif any($req[];
+         (.__typename == "CheckRun" and (.conclusion == "FAILURE" or .conclusion == "TIMED_OUT" or .conclusion == "CANCELLED" or .conclusion == "ACTION_REQUIRED" or .conclusion == "STARTUP_FAILURE" or .conclusion == "STALE"))
+         or (.__typename == "StatusContext" and (.state == "FAILURE" or .state == "ERROR"))
+       ) then "fail"
+       else "pass" end),
       # Extract Linear issue ID from branch name (e.g., "john/eng-123-foo" -> "ENG-123")
       (.headRefName | (capture("(?<team>[a-zA-Z]+)-(?<num>[0-9]+)") | "\(.team | ascii_upcase)-\(.num)") // ""),
       ($unresolved | tostring),
@@ -301,7 +349,7 @@ print_prs() {
 }
 
 fetch_tree() {
-  local REPO_URL OWNER REPO PR_JSON UNRES_JSON QUERY pr_aliases num
+  local REPO_URL OWNER REPO PR_JSON DETAILS_JSON QUERY pr_aliases
   IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
   _FETCHED_GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
 
@@ -314,27 +362,31 @@ fetch_tree() {
   _FETCHED_GT_ERR=""
 
   PR_JSON=$(gh pr list --author @me --state open \
-    --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName,updatedAt,additions,deletions)
+    --json number,title,isDraft,reviewDecision,mergeable,headRefName,updatedAt,additions,deletions)
 
-  pr_aliases=""
-  while IFS= read -r num; do
-    [[ -z "$num" ]] && continue
-    pr_aliases+="    p${num}: pullRequest(number: ${num}) { reviewThreads(first: 100) { nodes { isResolved } } }"$'\n'
-  done < <(echo "$PR_JSON" | jq -r '.[].number')
-
+  pr_aliases=$(_pr_detail_aliases "$PR_JSON")
   if [[ -n "$pr_aliases" ]]; then
     QUERY="query { repository(owner: \"${OWNER}\", name: \"${REPO}\") {"$'\n'"${pr_aliases}  } }"
-    UNRES_JSON=$(gh api graphql -f query="$QUERY" 2>/dev/null || echo '{}')
+    DETAILS_JSON=$(gh api graphql -f query="$QUERY" 2>/dev/null || echo '{}')
   else
-    UNRES_JSON='{}'
+    DETAILS_JSON='{}'
   fi
 
-  _FETCHED_TREE_PR_TSV=$(echo "$PR_JSON" | jq -r --argjson unres "$UNRES_JSON" '
-    ($unres.data.repository // {}) as $repo |
+  _FETCHED_TREE_PR_TSV=$(echo "$PR_JSON" | jq -r --argjson details "$DETAILS_JSON" '
+    ($details.data.repository // {}) as $repo |
+    # Required-check set as union across all PRs (see fetch_prs comment).
+    ([$repo | to_entries[] | .value.statusCheckRollup.contexts.nodes // [] | .[]
+       | select(.isRequired == true)
+       | (.name // .context) // empty]
+      | unique
+      | map({(.): true}) | add // {}) as $req_set |
     .[] |
-    (($repo["p\(.number)"].reviewThreads.nodes // [])
+    $repo["p\(.number)"] as $pr |
+    (($pr.reviewThreads.nodes // [])
       | map(select(.isResolved == false))
       | length) as $unresolved |
+    (($pr.statusCheckRollup.contexts.nodes // [])
+      | map(select($req_set[(.name // .context) // ""] == true))) as $req |
     [
       .headRefName,
       (.number | tostring),
@@ -343,13 +395,17 @@ fetch_tree() {
        elif .reviewDecision == "CHANGES_REQUESTED" then "changes"
        elif .reviewDecision == "APPROVED" then "approved"
        else "pending" end),
-      (if .statusCheckRollup == null or .statusCheckRollup == [] then "pending"
-       else (.statusCheckRollup
-         | map(select(((.name // .context) // "") | test("^Graphite / mergeability_check$") | not))
-         | if length == 0 then "pass"
-           elif any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
-           elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
-           else "pass" end) end),
+      # CI state derived from required-only contexts (see fetch_prs).
+      (if ($req | length) == 0 then "pending"
+       elif any($req[];
+         (.__typename == "CheckRun" and (.status == "QUEUED" or .status == "IN_PROGRESS" or .status == "PENDING" or .status == "WAITING" or .status == "REQUESTED"))
+         or (.__typename == "StatusContext" and (.state == "EXPECTED" or .state == "PENDING"))
+       ) then "running"
+       elif any($req[];
+         (.__typename == "CheckRun" and (.conclusion == "FAILURE" or .conclusion == "TIMED_OUT" or .conclusion == "CANCELLED" or .conclusion == "ACTION_REQUIRED" or .conclusion == "STARTUP_FAILURE" or .conclusion == "STALE"))
+         or (.__typename == "StatusContext" and (.state == "FAILURE" or .state == "ERROR"))
+       ) then "fail"
+       else "pass" end),
       ($unresolved | tostring),
       (.additions | tostring),
       (.deletions | tostring)
