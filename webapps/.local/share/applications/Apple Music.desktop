@@ -2,7 +2,7 @@
 Version=1.0
 Name=Apple Music
 Comment=Apple Music
-Exec=omarchy-launch-webapp https://music.apple.com
+Exec=setsid uwsm-app -- chromium --app=https://music.apple.com
 Terminal=false
 Type=Application
 Icon=/home/john/.local/share/applications/icons/Apple Music.png
