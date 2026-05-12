@@ -3,14 +3,18 @@
 # PR colors: grey=draft, green=approved, yellow=pending review, magenta=changes requested, red=conflicts
 # PR numbers and Linear issue IDs are clickable (OSC 8 hyperlinks) - Ctrl+click to open in browser
 #
-# Usage: gh prs [--watch [SECONDS]] [--branch] [--tree]
+# Usage: gh prs [--watch [SECONDS]] [--branch] [--tree] [--mode MODE]
 #   --watch         Refresh every 15 seconds (default)
 #   --watch N       Refresh every N seconds
 #   --branch, -b    Show branch names instead of PR titles
 #   --tree, -t      Render the Graphite stack tree (`gt ls`) with right-justified
-#                   PR# (review-state colored, CI-glyph prefixed) and unresolved-
-#                   thread count. Combinable with --watch. Mutually exclusive
-#                   with --branch.
+#                   PR# (review-state colored, CI-glyph prefixed) and the current
+#                   metric. Combinable with --watch. Mutually exclusive with
+#                   --branch.
+#   --mode MODE     Metric column to display:
+#                     unres (default)  unresolved review threads
+#                     diff             lines added/removed (+X/-Y)
+# In --watch mode, press 'm' to cycle modes, 'q' to quit.
 
 # Ensure ${#var} counts characters (not bytes) for multi-byte glyphs.
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
@@ -32,11 +36,12 @@ _extract_branch_name() {
 }
 
 # Build the right-side PR cell. Returns "<visible_width>\t<styled_text>".
-# Args: pr_num review_state ci_state unres graphite_base
+# Args: pr_num review_state ci_state mode unres adds dels graphite_base
 #   review_state ∈ {draft,approved,pending,changes,conflict,""}
 #   ci_state ∈ {pass,running,fail,""}
+#   mode ∈ {unres,diff}
 _format_pr_cell() {
-  local pr_num=$1 review=$2 ci=$3 unres=$4 base=$5
+  local pr_num=$1 review=$2 ci=$3 mode=$4 unres=$5 adds=$6 dels=$7 base=$8
   local ESC=$'\e'
 
   local glyph glyph_c
@@ -57,46 +62,82 @@ _format_pr_cell() {
     *)        pr_c=0 ;;
   esac
 
-  local unres_text unres_c
-  if [[ $unres =~ ^[0-9]+$ ]] && (( unres > 0 )); then
-    unres_text=$unres; unres_c=31
-  else
-    unres_text='-'; unres_c=90
-  fi
+  local metric_text metric_styled metric_width
+  case "$mode" in
+    diff)
+      [[ $adds =~ ^[0-9]+$ ]] || adds=0
+      [[ $dels =~ ^[0-9]+$ ]] || dels=0
+      local adds_str="+${adds}" dels_str="-${dels}"
+      # Right-align "+adds" in 5 and left-align "-dels" in 5 so '/' is in a
+      # fixed column. Overflows (5+ digit sides) cause this row to widen by
+      # the overflow amount; other rows still align with each other.
+      local adds_pad='' dels_pad='' adds_pad_len dels_pad_len
+      adds_pad_len=$(( 5 - ${#adds_str} ))
+      dels_pad_len=$(( 5 - ${#dels_str} ))
+      (( adds_pad_len < 0 )) && adds_pad_len=0
+      (( dels_pad_len < 0 )) && dels_pad_len=0
+      (( adds_pad_len > 0 )) && printf -v adds_pad '%*s' "$adds_pad_len" ''
+      (( dels_pad_len > 0 )) && printf -v dels_pad '%*s' "$dels_pad_len" ''
+      metric_text="${adds_pad}${adds_str}/${dels_str}${dels_pad}"
+      metric_styled="${adds_pad}${ESC}[32m${adds_str}${ESC}[0m/${ESC}[31m${dels_str}${ESC}[0m${dels_pad}"
+      metric_width=11
+      ;;
+    *)
+      if [[ $unres =~ ^[0-9]+$ ]] && (( unres > 0 )); then
+        metric_text=$unres
+        metric_styled="${ESC}[31m${unres}${ESC}[0m"
+      else
+        metric_text='-'
+        metric_styled="${ESC}[90m-${ESC}[0m"
+      fi
+      metric_width=5
+      ;;
+  esac
+
+  # Right-align metric and #PR within fixed-width sub-columns so every row's
+  # cell has identical visible width, making right edges align in _render_tree.
+  local metric_pad='' metric_pad_len=$(( metric_width - ${#metric_text} ))
+  (( metric_pad_len < 0 )) && metric_pad_len=0
+  (( metric_pad_len > 0 )) && printf -v metric_pad '%*s' "$metric_pad_len" ''
+
+  local pr_width=5 pr_pad='' pr_pad_len
+  pr_pad_len=$(( pr_width - 1 - ${#pr_num} ))
+  (( pr_pad_len < 0 )) && pr_pad_len=0
+  (( pr_pad_len > 0 )) && printf -v pr_pad '%*s' "$pr_pad_len" ''
 
   local link_start="${ESC}]8;;${base}/${pr_num}${ESC}\\"
   local link_end="${ESC}]8;;${ESC}\\"
   local glyph_part="${ESC}[${glyph_c}m${glyph}${ESC}[0m"
   local pr_part="${link_start}${ESC}[${pr_c}m#${pr_num}${ESC}[0m${link_end}"
-  local unres_part="${ESC}[${unres_c}m${unres_text}${ESC}[0m"
 
-  local plain="${glyph} #${pr_num}  ${unres_text}"
-  printf '%d\t%s %s  %s' "${#plain}" "$glyph_part" "$pr_part" "$unres_part"
+  local plain="${glyph} ${pr_pad}#${pr_num}  ${metric_pad}${metric_text}"
+  printf '%d\t%s %s%s  %s%s' "${#plain}" "$glyph_part" "$pr_pad" "$pr_part" "$metric_pad" "$metric_styled"
 }
 
 # Render the joined tree.
-# Args: gt_output pr_tsv graphite_base term_width
-#   pr_tsv has one row per PR, tab-separated: branch \t num \t review \t ci \t unres
+# Args: gt_output pr_tsv graphite_base term_width mode
+#   pr_tsv has one row per PR, tab-separated:
+#     branch \t num \t review \t ci \t unres \t adds \t dels
 #   gt_output is the captured stdout of `gt ls` (no color escapes when piped).
 _render_tree() {
-  local gt_output=$1 pr_tsv=$2 base=$3 term_width=$4
+  local gt_output=$1 pr_tsv=$2 base=$3 term_width=$4 mode=$5
   local -A prmap=()
 
   if [[ -n "$pr_tsv" ]]; then
-    while IFS=$'\t' read -r branch num review ci unres; do
+    while IFS=$'\t' read -r branch num review ci unres adds dels; do
       [[ -z "$branch" ]] && continue
-      prmap[$branch]="${num}	${review}	${ci}	${unres}"
+      prmap[$branch]="${num}	${review}	${ci}	${unres}	${adds}	${dels}"
     done <<< "$pr_tsv"
   fi
 
   [[ -z "$gt_output" ]] && return 0
 
-  local line branch num review ci unres cell_w cell pad left_w
+  local line branch num review ci unres adds dels cell_w cell pad left_w
   while IFS= read -r line; do
     branch=$(_extract_branch_name "$line")
     if [[ -n "$branch" && -n "${prmap[$branch]+x}" ]]; then
-      IFS=$'\t' read -r num review ci unres <<< "${prmap[$branch]}"
-      IFS=$'\t' read -r cell_w cell < <(_format_pr_cell "$num" "$review" "$ci" "$unres" "$base")
+      IFS=$'\t' read -r num review ci unres adds dels <<< "${prmap[$branch]}"
+      IFS=$'\t' read -r cell_w cell < <(_format_pr_cell "$num" "$review" "$ci" "$mode" "$unres" "$adds" "$dels" "$base")
       left_w=$(_visible_width "$line")
       pad=$(( term_width - left_w - cell_w ))
       (( pad < 2 )) && pad=2
@@ -107,16 +148,20 @@ _render_tree() {
   done <<< "$gt_output"
 }
 
-fetch_prs() {
-  local REPO_URL OWNER REPO TERM_WIDTH TITLE_WIDTH PR_JSON UNRES_JSON QUERY pr_aliases num
-  IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
-  GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
-  TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
-  # Fixed columns: PR(6) + sep(2) + LINEAR(9) + sep(2) + CI(8) + sep(2) + UNRES(5) + sep(2) = 36
-  TITLE_WIDTH=$((TERM_WIDTH - 36))
-  [[ $TITLE_WIDTH -lt 20 ]] && TITLE_WIDTH=20
+# Cached state populated by fetch_*, consumed by print_*.
+# Lets watch-mode cycle the metric mode without re-hitting the network.
+_FETCHED_GRAPHITE_BASE=""
+_FETCHED_PRS_TSV=""
+_FETCHED_GT_OUT=""
+_FETCHED_GT_ERR=""
+_FETCHED_TREE_PR_TSV=""
 
-  PR_JSON=$(gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName,updatedAt \
+fetch_prs() {
+  local REPO_URL OWNER REPO PR_JSON UNRES_JSON QUERY pr_aliases num
+  IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
+  _FETCHED_GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
+
+  PR_JSON=$(gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName,updatedAt,additions,deletions \
     | jq 'sort_by(.updatedAt) | reverse')
 
   # Single aliased GraphQL call for unresolved review-thread counts (avoids N+1).
@@ -133,7 +178,7 @@ fetch_prs() {
     UNRES_JSON='{}'
   fi
 
-  echo "$PR_JSON" | \
+  _FETCHED_PRS_TSV=$(echo "$PR_JSON" | \
     jq -r --argjson unres "$UNRES_JSON" '
       ($unres.data.repository // {}) as $repo |
       .[] |
@@ -159,14 +204,33 @@ fetch_prs() {
       # Extract Linear issue ID from branch name (e.g., "john/eng-123-foo" -> "ENG-123")
       (.headRefName | (capture("(?<team>[a-zA-Z]+)-(?<num>[0-9]+)") | "\(.team | ascii_upcase)-\(.num)") // ""),
       ($unresolved | tostring),
+      (.additions | tostring),
+      (.deletions | tostring),
       .title,
       .headRefName
-    ] | @tsv' | \
-    awk -F'\t' -v graphite_base="$GRAPHITE_BASE" -v title_width="$TITLE_WIDTH" -v show_branch="$SHOW_BRANCH" '
+    ] | @tsv')
+}
+
+print_prs() {
+  local TERM_WIDTH TITLE_WIDTH METRIC_WIDTH
+  TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
+  case "$MODE" in
+    diff) METRIC_WIDTH=11 ;;
+    *)    METRIC_WIDTH=5 ;;
+  esac
+  # Fixed: PR(6) + sep(2) + LINEAR(9) + sep(2) + CI(8) + sep(2) + METRIC + sep(2) = 31 + METRIC
+  TITLE_WIDTH=$((TERM_WIDTH - 31 - METRIC_WIDTH))
+  [[ $TITLE_WIDTH -lt 20 ]] && TITLE_WIDTH=20
+
+  printf '%s' "$_FETCHED_PRS_TSV" | \
+    awk -F'\t' -v graphite_base="$_FETCHED_GRAPHITE_BASE" -v title_width="$TITLE_WIDTH" -v show_branch="$SHOW_BRANCH" -v mode="$MODE" -v metric_width="$METRIC_WIDTH" '
       BEGIN {
+        metric_header = (mode == "diff") ? "DIFF" : "UNRES"
+        metric_dashes = ""
+        for (i = 0; i < metric_width; i++) metric_dashes = metric_dashes "-"
         last_header = show_branch == "1" ? "BRANCH" : "TITLE"
-        printf "%-6s  %-9s  %-8s  %-5s  %s\n", "PR", "LINEAR", "CI", "UNRES", last_header
-        printf "%-6s  %-9s  %-8s  %-5s  %s\n", "------", "---------", "--------", "-----", "-----"
+        printf "%-6s  %-9s  %-8s  %-*s  %s\n", "PR", "LINEAR", "CI", metric_width, metric_header, last_header
+        printf "%-6s  %-9s  %-8s  %-*s  %s\n", "------", "---------", "--------", metric_width, metric_dashes, "-----"
       }
       {
         # Visible text (unpadded). Padding is added AFTER hyperlink/color escapes
@@ -174,15 +238,35 @@ fetch_prs() {
         pr_visible = "#" $1
         linear_visible = ($4 != "" ? $4 : "-")
         ci_visible = $3
-        unres_visible = ($5 != "0" ? $5 : "-")
+
+        if (mode == "diff") {
+          adds = ($6 == "" ? "0" : $6)
+          dels = ($7 == "" ? "0" : $7)
+          adds_str = "+" adds
+          dels_str = "-" dels
+          adds_pad_len = 5 - length(adds_str)
+          dels_pad_len = 5 - length(dels_str)
+          if (adds_pad_len < 0) adds_pad_len = 0
+          if (dels_pad_len < 0) dels_pad_len = 0
+          adds_pad = sprintf("%*s", adds_pad_len, "")
+          dels_pad = sprintf("%*s", dels_pad_len, "")
+          metric_visible = adds_pad adds_str "/" dels_str dels_pad
+          metric_styled = adds_pad "\033[32m" adds_str "\033[0m/\033[31m" dels_str "\033[0m" dels_pad
+        } else {
+          metric_visible = ($5 != "0" ? $5 : "-")
+          if ($5 != "0") metric_styled = "\033[31m" metric_visible "\033[0m"
+          else           metric_styled = "\033[90m" metric_visible "\033[0m"
+        }
 
         pr_pad = sprintf("%*s", 6 - length(pr_visible), "")
         linear_pad = sprintf("%*s", 9 - length(linear_visible), "")
         ci_pad = sprintf("%*s", 8 - length(ci_visible), "")
-        unres_pad = sprintf("%*s", 5 - length(unres_visible), "")
+        metric_pad_len = metric_width - length(metric_visible)
+        if (metric_pad_len < 0) metric_pad_len = 0
+        metric_pad = sprintf("%*s", metric_pad_len, "")
 
         # Truncate title or branch to available width
-        title = substr(show_branch == "1" ? $7 : $6, 1, title_width)
+        title = substr(show_branch == "1" ? $9 : $8, 1, title_width)
 
         # OSC 8 hyperlink: \033]8;;URL\033\\TEXT\033]8;;\033\\
         url = graphite_base "/" $1
@@ -202,9 +286,7 @@ fetch_prs() {
         else if (ci_visible ~ /fail/) ci = "\033[31m" ci_visible "\033[0m" ci_pad
         else ci = "\033[33m" ci_visible "\033[0m" ci_pad
 
-        # Color UNRES count: red when there are open threads, grey "-" when zero
-        if ($5 != "0") unres = "\033[31m" unres_visible "\033[0m" unres_pad
-        else           unres = "\033[90m" unres_visible "\033[0m" unres_pad
+        metric = metric_styled metric_pad
 
         # Linear issue as clickable hyperlink; pad outside link.
         if ($4 != "") {
@@ -214,24 +296,25 @@ fetch_prs() {
           linear = "\033[90m" linear_visible "\033[0m" linear_pad
         }
 
-        printf "%s  %s  %s  %s  %s\n", pr, linear, ci, unres, title
+        printf "%s  %s  %s  %s  %s\n", pr, linear, ci, metric, title
       }'
 }
 
 fetch_tree() {
-  local REPO_URL OWNER REPO TERM_WIDTH GRAPHITE_BASE GT_OUT PR_JSON UNRES_JSON QUERY pr_aliases num PR_TSV
+  local REPO_URL OWNER REPO PR_JSON UNRES_JSON QUERY pr_aliases num
   IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
-  GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
-  TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
+  _FETCHED_GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
 
-  GT_OUT=$(FORCE_COLOR=1 gt ls 2>&1) || {
-    printf '%s\n' "$GT_OUT" >&2
-    echo "Run 'gt track' if this branch is not yet tracked." >&2
+  if ! _FETCHED_GT_OUT=$(FORCE_COLOR=1 gt ls 2>&1); then
+    _FETCHED_GT_ERR=$_FETCHED_GT_OUT
+    _FETCHED_GT_OUT=""
+    _FETCHED_TREE_PR_TSV=""
     return 1
-  }
+  fi
+  _FETCHED_GT_ERR=""
 
   PR_JSON=$(gh pr list --author @me --state open \
-    --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName,updatedAt)
+    --json number,title,isDraft,reviewDecision,mergeable,statusCheckRollup,headRefName,updatedAt,additions,deletions)
 
   pr_aliases=""
   while IFS= read -r num; do
@@ -246,7 +329,7 @@ fetch_tree() {
     UNRES_JSON='{}'
   fi
 
-  PR_TSV=$(echo "$PR_JSON" | jq -r --argjson unres "$UNRES_JSON" '
+  _FETCHED_TREE_PR_TSV=$(echo "$PR_JSON" | jq -r --argjson unres "$UNRES_JSON" '
     ($unres.data.repository // {}) as $repo |
     .[] |
     (($repo["p\(.number)"].reviewThreads.nodes // [])
@@ -267,10 +350,35 @@ fetch_tree() {
            elif any(.status == "IN_PROGRESS" or .status == "QUEUED" or .status == "PENDING") then "running"
            elif any(.conclusion == "FAILURE" or .conclusion == "failure") then "fail"
            else "pass" end) end),
-      ($unresolved | tostring)
+      ($unresolved | tostring),
+      (.additions | tostring),
+      (.deletions | tostring)
     ] | @tsv')
+}
 
-  _render_tree "$GT_OUT" "$PR_TSV" "$GRAPHITE_BASE" "$TERM_WIDTH"
+print_tree() {
+  local TERM_WIDTH
+  if [[ -n "$_FETCHED_GT_ERR" ]]; then
+    printf '%s\n' "$_FETCHED_GT_ERR"
+    echo "Run 'gt track' if this branch is not yet tracked."
+    return 1
+  fi
+  TERM_WIDTH=$(tput cols 2>/dev/null || echo 120)
+  _render_tree "$_FETCHED_GT_OUT" "$_FETCHED_TREE_PR_TSV" "$_FETCHED_GRAPHITE_BASE" "$TERM_WIDTH" "$MODE"
+}
+
+# Available metric modes in cycle order.
+MODES=(unres diff)
+
+_next_mode() {
+  local current=$1 i
+  for (( i = 0; i < ${#MODES[@]}; i++ )); do
+    if [[ ${MODES[$i]} == "$current" ]]; then
+      echo "${MODES[$(( (i + 1) % ${#MODES[@]} ))]}"
+      return
+    fi
+  done
+  echo "${MODES[0]}"
 }
 
 main() {
@@ -278,6 +386,7 @@ main() {
   INTERVAL=15
   SHOW_BRANCH=0
   TREE=0
+  MODE=unres
 
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -297,6 +406,14 @@ main() {
         TREE=1
         shift
         ;;
+      --mode|-m)
+        if [[ -z ${2:-} ]]; then
+          echo "error: --mode requires an argument (one of: ${MODES[*]})" >&2
+          return 1
+        fi
+        MODE=$2
+        shift 2
+        ;;
       *)
         shift
         ;;
@@ -308,26 +425,67 @@ main() {
     return 1
   fi
 
+  local valid_mode=0 m
+  for m in "${MODES[@]}"; do
+    [[ $m == "$MODE" ]] && valid_mode=1 && break
+  done
+  if (( valid_mode == 0 )); then
+    echo "error: unknown --mode '$MODE' (expected one of: ${MODES[*]})" >&2
+    return 1
+  fi
+
   if (( WATCH == 1 )); then
-    # Enter alternate screen buffer + hide cursor; restore both on exit.
+    # Enter alternate screen buffer + hide cursor; switch tty to non-canonical
+    # so a single keypress returns from `read` without waiting for newline.
     printf '\033[?1049h\033[H'
     tput civis
-    trap 'tput cnorm; printf "\033[?1049l"; exit 0' INT TERM EXIT
+    [[ -t 0 ]] && stty -icanon -echo min 1 time 0 2>/dev/null
+    trap '[[ -t 0 ]] && stty icanon echo 2>/dev/null; tput cnorm; printf "\033[?1049l"; exit 0' INT TERM EXIT
+
+    local output key now elapsed remaining last_fetch=0
     while true; do
+      now=$(date +%s)
+      if (( now - last_fetch >= INTERVAL )); then
+        if (( TREE == 1 )); then
+          fetch_tree || true
+        else
+          fetch_prs || true
+        fi
+        last_fetch=$now
+      fi
+
       if (( TREE == 1 )); then
-        output=$(fetch_tree)
+        output=$(print_tree)
       else
-        output=$(fetch_prs)
+        output=$(print_prs)
       fi
       printf '\033[H\033[2J'  # home + clear screen
-      printf '\033[90m[%s] Refreshing every %ss - Ctrl+C to stop\033[0m\n\n' "$(date +%H:%M:%S)" "$INTERVAL"
+      printf '\033[90m[%s] Refreshing every %ss - Mode: %s (m=cycle, q=quit)\033[0m\n\n' \
+        "$(date +%H:%M:%S)" "$INTERVAL" "$MODE"
       echo "$output"
-      sleep "$INTERVAL"
+
+      elapsed=$(( $(date +%s) - last_fetch ))
+      remaining=$(( INTERVAL - elapsed ))
+      (( remaining < 1 )) && remaining=1
+
+      key=""
+      if IFS= read -rsN1 -t "$remaining" key 2>/dev/null; then
+        case "$key" in
+          m|M) MODE=$(_next_mode "$MODE") ;;
+          q|Q) break ;;
+        esac
+      fi
     done
   elif (( TREE == 1 )); then
-    fetch_tree
+    if ! fetch_tree; then
+      printf '%s\n' "$_FETCHED_GT_ERR" >&2
+      echo "Run 'gt track' if this branch is not yet tracked." >&2
+      return 1
+    fi
+    print_tree
   else
     fetch_prs
+    print_prs
   fi
 }
 
