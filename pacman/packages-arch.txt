@@ -37,6 +37,7 @@ tmux
 tmuxp
 ttf-cascadia-mono-nerd
 udiskie
+usbmuxd
 yq
 yubikey-manager
 zsh
