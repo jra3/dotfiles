@@ -14,6 +14,9 @@
 #   --mode MODE     Metric column to display:
 #                     unres (default)  unresolved review threads
 #                     diff             lines added/removed (+X/-Y)
+#   --raw           Emit tab-separated rows (number, linear, repo URL, rendered
+#                   line) with no header. Used by gh-prs-tui as the data source
+#                   for fzf. Implies a single shot — no watch loop.
 # In --watch mode, press 'm' to cycle modes, 'q' to quit.
 
 # Ensure ${#var} counts characters (not bytes) for multi-byte glyphs.
@@ -271,14 +274,16 @@ print_prs() {
   [[ $TITLE_WIDTH -lt 20 ]] && TITLE_WIDTH=20
 
   printf '%s' "$_FETCHED_PRS_TSV" | \
-    awk -F'\t' -v graphite_base="$_FETCHED_GRAPHITE_BASE" -v title_width="$TITLE_WIDTH" -v show_branch="$SHOW_BRANCH" -v mode="$MODE" -v metric_width="$METRIC_WIDTH" '
+    awk -F'\t' -v graphite_base="$_FETCHED_GRAPHITE_BASE" -v title_width="$TITLE_WIDTH" -v show_branch="$SHOW_BRANCH" -v mode="$MODE" -v metric_width="$METRIC_WIDTH" -v raw="${RAW:-0}" '
       BEGIN {
-        metric_header = (mode == "diff") ? "DIFF" : "UNRES"
-        metric_dashes = ""
-        for (i = 0; i < metric_width; i++) metric_dashes = metric_dashes "-"
-        last_header = show_branch == "1" ? "BRANCH" : "TITLE"
-        printf "%-6s  %-9s  %-8s  %-*s  %s\n", "PR", "LINEAR", "CI", metric_width, metric_header, last_header
-        printf "%-6s  %-9s  %-8s  %-*s  %s\n", "------", "---------", "--------", metric_width, metric_dashes, "-----"
+        if (!raw) {
+          metric_header = (mode == "diff") ? "DIFF" : "UNRES"
+          metric_dashes = ""
+          for (i = 0; i < metric_width; i++) metric_dashes = metric_dashes "-"
+          last_header = show_branch == "1" ? "BRANCH" : "TITLE"
+          printf "%-6s  %-9s  %-8s  %-*s  %s\n", "PR", "LINEAR", "CI", metric_width, metric_header, last_header
+          printf "%-6s  %-9s  %-8s  %-*s  %s\n", "------", "---------", "--------", metric_width, metric_dashes, "-----"
+        }
       }
       {
         # Visible text (unpadded). Padding is added AFTER hyperlink/color escapes
@@ -344,7 +349,12 @@ print_prs() {
           linear = "\033[90m" linear_visible "\033[0m" linear_pad
         }
 
-        printf "%s  %s  %s  %s  %s\n", pr, linear, ci, metric, title
+        if (raw) {
+          rendered = sprintf("%s  %s  %s  %s  %s", pr, linear, ci, metric, title)
+          printf "%s\t%s\t%s\t%s\n", $1, $4, graphite_base, rendered
+        } else {
+          printf "%s  %s  %s  %s  %s\n", pr, linear, ci, metric, title
+        }
       }'
 }
 
@@ -442,6 +452,7 @@ main() {
   INTERVAL=15
   SHOW_BRANCH=0
   TREE=0
+  RAW=0
   MODE=unres
 
   while [[ $# -gt 0 ]]; do
@@ -462,6 +473,10 @@ main() {
         TREE=1
         shift
         ;;
+      --raw)
+        RAW=1
+        shift
+        ;;
       --mode|-m)
         if [[ -z ${2:-} ]]; then
           echo "error: --mode requires an argument (one of: ${MODES[*]})" >&2
@@ -478,6 +493,10 @@ main() {
 
   if (( TREE == 1 && SHOW_BRANCH == 1 )); then
     echo "error: --tree and --branch are mutually exclusive" >&2
+    return 1
+  fi
+  if (( RAW == 1 && (WATCH == 1 || TREE == 1) )); then
+    echo "error: --raw cannot be combined with --watch or --tree" >&2
     return 1
   fi
 

@@ -1,0 +1,49 @@
+#!/bin/bash
+# gh-prs-tui - Interactive TUI wrapper around `gh-prs` using fzf.
+#
+# Keys:
+#   enter / o   Open PR in browser
+#   l           Open linked Linear issue in browser (if present)
+#   c           Checkout PR locally
+#   v           View PR details (pager)
+#   d           View PR diff (pager)
+#   r / ctrl-r  Refresh list
+#   q / esc     Quit
+
+set -euo pipefail
+
+if ! command -v fzf >/dev/null 2>&1; then
+  echo "gh-prs-tui: fzf is required but not installed" >&2
+  exit 1
+fi
+
+# fzf runs reload commands in its own shell, so the fetcher must be a command
+# string, not an exported function (exported functions rely on parent-shell
+# state that fzf's reload subshell doesn't always inherit cleanly).
+FETCH='gh-prs --raw'
+
+# Columns in --raw output (tab-separated):
+#   {1} PR number (plain)
+#   {2} Linear ID (may be empty)
+#   {3} Repo URL
+#   {4} Rendered colored display line
+#
+# --with-nth=4.. shows only the rendered line; {1}/{2}/{3} remain addressable
+# in bindings.
+
+eval "$FETCH" | fzf \
+  --ansi \
+  --no-sort \
+  --delimiter=$'\t' \
+  --with-nth=4.. \
+  --prompt='PRs> ' \
+  --header='enter/o=open  l=Linear  c=checkout  v=view  d=diff  r=refresh  q=quit' \
+  --bind "enter:execute-silent(gh pr view --web {1})" \
+  --bind "o:execute-silent(gh pr view --web {1})" \
+  --bind "l:execute-silent(id={2}; case \"\$id\" in ?*) xdg-open \"https://linear.app/antimetal/issue/\$id\" ;; esac)" \
+  --bind "c:execute(gh pr checkout {1})" \
+  --bind "v:execute(GH_FORCE_TTY=1 gh pr view {1} | LESS=-R less)" \
+  --bind "d:execute(gh pr diff {1} | bat --language=diff --style=plain --paging=always)" \
+  --bind "r:reload($FETCH)" \
+  --bind "ctrl-r:reload($FETCH)" \
+  --bind "q:abort"
