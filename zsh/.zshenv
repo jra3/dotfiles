@@ -40,10 +40,5 @@ case ":$PATH:" in
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 
-# SSH askpass: notify-send wrapper for YubiKey touch prompts.
-# Leave SSH_ASKPASS_REQUIRE unset so askpass is only used as a
-# touch notifier — password prompts still go to the TTY.
-export SSH_ASKPASS="$HOME/.local/bin/ssh-askpass-notify"
-
 # Load local environment if exists
 [[ -f ~/.zshenv.local ]] && source ~/.zshenv.local

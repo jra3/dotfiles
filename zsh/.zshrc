@@ -190,6 +190,10 @@ fi
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
 if command -v pyenv &>/dev/null; then
+    # Clear stale rehash lock left by a killed pyenv-rehash (e.g. terminal closed mid-rehash).
+    if [[ -f "$PYENV_ROOT/shims/.pyenv-shim" ]] && ! pgrep -f pyenv-rehash &>/dev/null; then
+        rm -f "$PYENV_ROOT/shims/.pyenv-shim"
+    fi
     eval "$(pyenv init -)"
     eval "$(pyenv virtualenv-init -)"
 fi
@@ -280,12 +284,12 @@ command -v gh &>/dev/null && _zsh_cached_source gh gh-completion completion -s z
 # ============================================================================
 path=($HOME/bin $HOME/.local/bin $HOME/go/bin /usr/local/bin $path)
 
-# # ============================================================================
-# # mise (version manager for Node, etc.)
-# # ============================================================================
-# if command -v mise &>/dev/null; then
-#    eval "$(mise activate zsh)"
-# fi
+# ============================================================================
+# mise (version manager for Node, etc.)
+# ============================================================================
+if command -v mise &>/dev/null; then
+   eval "$(mise activate zsh)"
+fi
 
 # ============================================================================
 # Platform-Specific Configuration
@@ -324,3 +328,5 @@ export PATH="$HOME/.local/bin:$PATH"
 if command -v zoxide &>/dev/null; then
     _zsh_cached_source zoxide zoxide-init init zsh
 fi
+
+[ -f "/home/john/.config/am-dev-tools/pup.env" ] && . "/home/john/.config/am-dev-tools/pup.env"  # am-dev-tools pup creds

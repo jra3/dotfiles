@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# OpenSSH invokes this in the background to prompt YubiKey touch
-# (notify_start) and SIGTERMs it on completion (notify_complete).
-prompt="${1:-Touch your YubiKey}"
-notify-send -u normal -i security-high "SSH" "$prompt"
-exec sleep 60
