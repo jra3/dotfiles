@@ -5,6 +5,3 @@ hypr/.config/hypr/shaders/
 
 # Per-machine telepresence client identity (UUID, generated on first run)
 telepresence/.config/telepresence/id
-
-# Per-machine monitor layout (positions/scales differ between hosts)
-hypr/.config/hypr/monitors.conf
