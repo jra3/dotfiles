@@ -7,6 +7,22 @@
     st = status
     what = log --raw --no-merges
     whatchanged = log --raw --no-merges
+    # Delete local branches whose PR is MERGED (squash-merge-aware via gh).
+    # Skips main/master, the current branch, and worktree-checked-out branches.
+    #   --dry-run  preview only          --closed  also list CLOSED-PR branches (never deletes them)
+    prune-merged = "!f() { \
+        dry=0; closed=0; \
+        for a in \"$@\"; do case \"$a\" in --dry-run) dry=1;; --closed) closed=1;; esac; done; \
+        cur=$(git symbolic-ref --quiet --short HEAD); \
+        for b in $(git for-each-ref --format='%(refname:short)' refs/heads/); do \
+            case \"$b\" in main|master|\"$cur\") continue;; esac; \
+            git worktree list --porcelain | grep -qxF \"branch refs/heads/$b\" && continue; \
+            st=$(gh pr list --head \"$b\" --state all --limit 1 --json state --jq '.[0].state' 2>/dev/null); \
+            if [ \"$st\" = MERGED ]; then \
+                if [ \"$dry\" = 1 ]; then echo \"would prune (merged): $b\"; \
+                else git branch -D \"$b\" >/dev/null 2>&1 && echo \"pruned $b\"; fi; \
+            elif [ \"$st\" = CLOSED ] && [ \"$closed\" = 1 ]; then echo \"closed, review manually: $b\"; fi; \
+        done; }; f"
 [init]
     defaultBranch = master
 [pull]
