@@ -1,0 +1,62 @@
+# lazygit config
+# Graphite (gt) stacked-diff actions. All use `output: terminal` so gt takes
+# over the terminal — interactive prompts (PR title/body, branch pickers) work
+# normally. Keys are capitals to avoid clobbering common built-ins; press `?`
+# in a panel to see them (the `description` is the label shown in that menu).
+customCommands:
+  # ── Submit the stack as drafts (--draft applies to NEW PRs only; already-
+  #    published PRs keep their state, so promote-to-published is safe). ──
+  - key: "S"
+    context: "localBranches"
+    description: "Graphite: submit stack as drafts"
+    command: "gt submit --stack --draft"
+    output: terminal
+
+  # ── Restack: rebase the stack onto moved parents ──
+  - key: "E"
+    context: "localBranches"
+    description: "Graphite: restack onto parents"
+    command: "gt restack"
+    output: terminal
+
+  # ── Sync: pull trunk, delete merged branches, restack survivors ──
+  - key: "Y"
+    context: "localBranches"
+    description: "Graphite: sync (pull trunk, prune merged)"
+    command: "gt sync"
+    output: terminal
+
+  # ── Peek at the stack (gt's own view, full screen; press q to return) ──
+  - key: "W"
+    context: "localBranches"
+    description: "Graphite: view stack log"
+    command: "gt log short"
+    output: terminal
+
+  # ── Interactive checkout: gt's stack picker ──
+  - key: "G"
+    context: "localBranches"
+    description: "Graphite: checkout branch (picker)"
+    command: "gt checkout"
+    output: terminal
+
+  # ── Create a new stacked branch from staged changes ──
+  - key: "N"
+    context: "files"
+    description: "Graphite: create stacked branch"
+    prompts:
+      - type: "input"
+        title: "Branch name (blank = derive from message)"
+        key: "Branch"
+      - type: "input"
+        title: "Commit message"
+        key: "Message"
+    command: 'gt create {{if .Form.Branch}}{{.Form.Branch}} {{end}}-m "{{.Form.Message}}"'
+    output: terminal
+
+  # ── Amend staged changes into the current branch's commit ──
+  - key: "A"
+    context: "files"
+    description: "Graphite: amend into current commit"
+    command: "gt modify"
+    output: terminal
