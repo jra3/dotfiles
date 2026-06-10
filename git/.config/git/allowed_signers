@@ -9,3 +9,6 @@
 
 # chonky (YubiKey 5 Nano, serial 37196467)
 github@porcnick.com,john@antimetal.com sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIP39PRkEdWcEtQgFBiI7+p3AZpyYIj3Ft/2wLL+nu9vpAAAAC3NzaDpnaXRzaWdu
+
+# cupcake (YubiKey 5 Nano, serial 37196474)
+github@porcnick.com,john@antimetal.com sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIIoAxOqEIBgBukNqVzSOO1az4KxqzAOHVfmYcdyJuMQKAAAAC3NzaDpnaXRzaWdu
