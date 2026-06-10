@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+#
+# setup-git-signing — provision YubiKey-backed SSH commit signing on this machine.
+#
+# Each machine signs with its OWN resident key on its OWN YubiKey, stored at a
+# canonical path so the shared git config (user.signingkey) works everywhere.
+# Idempotent: re-running only does what's still missing.
+#
+#   1. Generate a resident no-touch/no-PIN sk-ed25519 signing key (one touch + PIN).
+#   2. Register the public key in the shared allowed_signers file (then commit it).
+#   3. Upload the public key to GitHub as a "signing" key.
+#
+set -euo pipefail
+
+KEY="$HOME/.ssh/id_ed25519_sk_gitsign"
+SIGNERS="${XDG_CONFIG_HOME:-$HOME/.config}/git/allowed_signers"
+PRINCIPALS="github@porcnick.com,john@antimetal.com"
+HOST="$(hostname -s)"
+
+# 1. Generate the resident signing key if it doesn't exist yet.
+if [[ ! -f "$KEY" ]]; then
+  echo "==> Generating resident signing key on the YubiKey (touch + PIN once)…"
+  ssh-keygen -t ed25519-sk -O resident -O application=ssh:gitsign \
+    -O no-touch-required -N "" -C "git signing ($HOST)" -f "$KEY"
+else
+  echo "==> Signing key already present: $KEY"
+fi
+
+keytype_data="$(awk '{print $1, $2}' "$KEY.pub")"
+key_b64="$(awk '{print $2}' "$KEY.pub")"
+
+# 2. Register in the shared allowed_signers (idempotent).
+if [[ -f "$SIGNERS" ]] && grep -qF "$key_b64" "$SIGNERS"; then
+  echo "==> Already in allowed_signers."
+else
+  { printf '\n# %s\n%s %s\n' "$HOST" "$PRINCIPALS" "$keytype_data"; } >> "$SIGNERS"
+  echo "==> Added this machine's key to allowed_signers — commit it to dotfiles:"
+  echo "      (cd ~/.dotfiles && git add git/.config/git/allowed_signers \\"
+  echo "         && git commit -m \"Add $HOST signing key to allowed_signers\")"
+fi
+
+# 3. Upload to GitHub as a signing key (idempotent; needs admin:ssh_signing_key scope).
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  if gh ssh-key list 2>/dev/null | grep -qF "$key_b64"; then
+    echo "==> Already uploaded to GitHub."
+  elif gh ssh-key add "$KEY.pub" --type signing --title "git signing ($HOST)"; then
+    echo "==> Uploaded to GitHub as a signing key."
+  else
+    echo "==> GitHub upload failed — likely missing scope. Run:"
+    echo "      gh auth refresh -h github.com -s admin:ssh_signing_key"
+    echo "    then re-run this script."
+  fi
+else
+  echo "==> gh not authenticated; upload the key manually once gh is set up:"
+  echo "      gh ssh-key add $KEY.pub --type signing --title \"git signing ($HOST)\""
+fi
+
+echo "==> Done. Commits on $HOST will be signed and verifiable."

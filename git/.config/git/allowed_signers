@@ -1,5 +1,11 @@
 # SSH allowed signers — maps committer email → signing public key.
 # Used by `gpg.ssh.allowedSignersFile` for `git log --show-signature` and
-# `git verify-commit`. GitHub verifies independently from the key uploaded
-# to your account (Settings → SSH and GPG keys → Signing key).
+# `git verify-commit`. GitHub verifies independently (Settings → SSH and GPG
+# keys → Signing key).
+#
+# One line per machine's YubiKey signing key — each machine signs with its own
+# resident key. Both identities (personal + work) share each key. Register a
+# new machine with:  ~/.local/bin/setup-git-signing
+
+# chonky (YubiKey 5 Nano, serial 37196467)
 github@porcnick.com,john@antimetal.com sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIP39PRkEdWcEtQgFBiI7+p3AZpyYIj3Ft/2wLL+nu9vpAAAAC3NzaDpnaXRzaWdu
