@@ -25,6 +25,7 @@ nodejs-lts-jod
 npm
 ollama
 omarchy-keyring
+openssh
 pandoc-cli
 pnpm
 pyenv

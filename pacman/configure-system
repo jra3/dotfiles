@@ -17,6 +17,49 @@ else
     echo "  Tailscale not installed, skipping."
 fi
 
+# --- SSH: enable + bind to the Tailscale interface only ---
+# Requires Tailscale to be up (authenticated) so its address is known. On a
+# brand-new machine, run 'tailscale up' first, then re-run this script.
+if command -v tailscale &>/dev/null && command -v sshd &>/dev/null; then
+    ts_v4="$(tailscale ip -4 2>/dev/null || true)"
+    ts_v6="$(tailscale ip -6 2>/dev/null || true)"
+    if [ -n "$ts_v4" ]; then
+        echo "Binding sshd to Tailscale addresses ($ts_v4${ts_v6:+, $ts_v6})..."
+        {
+            echo "# Managed by dotfiles configure-system."
+            echo "# Bind SSH to the Tailscale interface only (see: tailscale ip)."
+            echo "ListenAddress $ts_v4"
+            [ -n "$ts_v6" ] && echo "ListenAddress $ts_v6" || true
+        } | sudo tee /etc/ssh/sshd_config.d/10-tailscale.conf >/dev/null
+
+        # Order sshd after Tailscale and retry, so it can still bind once the
+        # Tailscale address is configured on the interface during boot.
+        sudo install -d /etc/systemd/system/sshd.service.d
+        printf '%s\n' \
+            '[Unit]' \
+            'After=tailscaled.service' \
+            'Wants=tailscaled.service' \
+            '' \
+            '[Service]' \
+            'Restart=on-failure' \
+            'RestartSec=3' \
+            | sudo tee /etc/systemd/system/sshd.service.d/10-tailscale.conf >/dev/null
+
+        if sudo sshd -t; then
+            sudo systemctl daemon-reload
+            sudo systemctl enable sshd
+            sudo systemctl restart sshd
+            echo "  sshd enabled on boot and bound to Tailscale only."
+        else
+            echo "  ERROR: sshd config test failed; left previous runtime config in place." >&2
+        fi
+    else
+        echo "  Tailscale not up yet (run 'tailscale up'); skipping SSH setup."
+    fi
+else
+    echo "  sshd or Tailscale not present; skipping SSH setup."
+fi
+
 # --- Emacs ---
 if command -v emacs &>/dev/null; then
     echo "Configuring Emacs daemon..."
