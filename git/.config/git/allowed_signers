@@ -12,3 +12,6 @@ github@porcnick.com,john@antimetal.com sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC
 
 # cupcake (YubiKey 5 Nano, serial 37196474)
 github@porcnick.com,john@antimetal.com sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIIoAxOqEIBgBukNqVzSOO1az4KxqzAOHVfmYcdyJuMQKAAAAC3NzaDpnaXRzaWdu
+
+# am-jallen (YubiKey 5C Nano, serial 16946249)
+github@porcnick.com,john@antimetal.com sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAICZZoMN3/GLtlnc4G2B0uj4WI+diPw9qbm0dSyLsbcO2AAAAC3NzaDpnaXRzaWdu
