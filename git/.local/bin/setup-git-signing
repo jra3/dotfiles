@@ -17,6 +17,18 @@ SIGNERS="${XDG_CONFIG_HOME:-$HOME/.config}/git/allowed_signers"
 PRINCIPALS="github@porcnick.com,john@antimetal.com"
 HOST="$(hostname -s)"
 
+# Descriptive label for the allowed_signers comment, e.g.
+#   "cupcake (YubiKey 5 Nano, serial 37196474)".
+# Only when ykman sees exactly one YubiKey with a serial; else just the host
+# (avoids guessing which device the key lives on when several are plugged in).
+SIGNER_LABEL="$HOST"
+if command -v ykman >/dev/null 2>&1; then
+  mapfile -t _yks < <(ykman list 2>/dev/null | grep -F 'Serial:')
+  if [[ ${#_yks[@]} -eq 1 ]]; then
+    SIGNER_LABEL="$HOST (${_yks[0]%% (*}, serial ${_yks[0]##*Serial: })"
+  fi
+fi
+
 # 1. Generate the resident signing key if it doesn't exist yet.
 if [[ ! -f "$KEY" ]]; then
   echo "==> Generating resident signing key on the YubiKey (touch + PIN once)…"
@@ -33,7 +45,7 @@ key_b64="$(awk '{print $2}' "$KEY.pub")"
 if [[ -f "$SIGNERS" ]] && grep -qF "$key_b64" "$SIGNERS"; then
   echo "==> Already in allowed_signers."
 else
-  { printf '\n# %s\n%s %s\n' "$HOST" "$PRINCIPALS" "$keytype_data"; } >> "$SIGNERS"
+  { printf '\n# %s\n%s %s\n' "$SIGNER_LABEL" "$PRINCIPALS" "$keytype_data"; } >> "$SIGNERS"
   echo "==> Added this machine's key to allowed_signers — commit it to dotfiles:"
   echo "      (cd ~/.dotfiles && git add git/.config/git/allowed_signers \\"
   echo "         && git commit -m \"Add $HOST signing key to allowed_signers\")"
