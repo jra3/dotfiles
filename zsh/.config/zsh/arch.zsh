@@ -30,6 +30,11 @@ if command -v fzf &>/dev/null; then
     "
 fi
 
+# Telepresence: connect with VNAT so cluster CIDRs are NAT'd into the
+# virtualSubnet (198.18.0.0/16) instead of claiming the Tailscale CGNAT
+# range (100.64.0.0/10). Avoids the tel0/tailscale0 routing conflict.
+alias tp='telepresence connect --vnat all'
+
 # Unix timestamp (GNU date)
 ut() {
     if [ $# -eq 0 ]; then
