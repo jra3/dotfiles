@@ -60,6 +60,27 @@ else
     echo "  sshd or Tailscale not present; skipping SSH setup."
 fi
 
+# --- SSH agent (user) ---
+# Run OpenSSH's own ssh-agent (FIDO2/sk-capable, unlike gnome-keyring's) and
+# auto-load this machine's YubiKey keys into it at login, so SSH agent
+# forwarding (e.g. to am-jallen / chonky) can broker them. SSH_AUTH_SOCK is
+# pointed at the socket via ssh/.config/environment.d/ssh-agent.conf.
+# ssh-add-keys.service is stowed from the `ssh` package and self-skips (via
+# ConditionPathExists) until the signing key exists, so enabling it before
+# setup-git-signing has run is harmless.
+if command -v ssh-agent &>/dev/null; then
+    echo "Configuring SSH agent (user)..."
+    systemctl --user enable --now ssh-agent.socket
+    if systemctl --user cat ssh-add-keys.service &>/dev/null; then
+        systemctl --user enable --now ssh-add-keys.service
+        echo "  ssh-agent socket + key auto-load enabled."
+    else
+        echo "  ssh-agent socket enabled; ssh-add-keys.service not stowed, skipping."
+    fi
+else
+    echo "  ssh-agent not installed, skipping."
+fi
+
 # --- Emacs ---
 if command -v emacs &>/dev/null; then
     echo "Configuring Emacs daemon..."

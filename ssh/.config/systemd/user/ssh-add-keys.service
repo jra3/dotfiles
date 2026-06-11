@@ -1,0 +1,22 @@
+# Load this machine's YubiKey-backed sk keys into the ssh-agent once per login.
+#
+# Loading an sk key only registers its on-disk credential handle — it never
+# contacts the YubiKey (touch/PIN happen at *use* time), so this runs headless
+# and even with the key unplugged. Keys must be in the local agent for SSH
+# agent forwarding (e.g. to am-jallen / chonky) to broker them.
+#
+# Enable once per machine:  systemctl --user enable --now ssh-add-keys.service
+[Unit]
+Description=Load YubiKey sk keys into the ssh-agent
+After=ssh-agent.socket
+Requires=ssh-agent.socket
+ConditionPathExists=%h/.ssh/id_ed25519_sk_gitsign
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=SSH_AUTH_SOCK=%t/ssh-agent.socket
+ExecStart=/usr/bin/ssh-add %h/.ssh/id_ed25519_github_sk %h/.ssh/id_ed25519_sk_gitsign %h/.ssh/id_ed25519_sk
+
+[Install]
+WantedBy=default.target
