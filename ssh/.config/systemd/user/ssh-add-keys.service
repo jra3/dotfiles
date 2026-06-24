@@ -16,7 +16,9 @@ ConditionPathExists=%h/.ssh/id_ed25519_sk_gitsign
 Type=oneshot
 RemainAfterExit=yes
 Environment=SSH_AUTH_SOCK=%t/ssh-agent.socket
-ExecStart=/usr/bin/ssh-add %h/.ssh/id_ed25519_github_sk %h/.ssh/id_ed25519_sk_gitsign %h/.ssh/id_ed25519_sk
+# Load only the sk keys that exist on this machine — not every machine owns all
+# three, and ssh-add fails the whole unit if any listed file is missing.
+ExecStart=/bin/sh -c 'k=$(ls %h/.ssh/id_ed25519_github_sk %h/.ssh/id_ed25519_sk_gitsign %h/.ssh/id_ed25519_sk 2>/dev/null); [ -n "$k" ] && exec ssh-add $k'
 
 [Install]
 WantedBy=default.target
