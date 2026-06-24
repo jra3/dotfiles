@@ -60,6 +60,13 @@ else
     echo "  sshd or Tailscale not present; skipping SSH setup."
 fi
 
+# --- SSH client control sockets ---
+# config.shared enables connection multiplexing with `ControlPath ~/.ssh/sockets/cm-%C`.
+# ssh won't create the directory itself, so every connection fails until it exists.
+echo "Ensuring SSH control-socket dir..."
+install -d -m 700 "$HOME/.ssh/sockets"
+echo "  ~/.ssh/sockets present."
+
 # --- SSH agent (user) ---
 # Run OpenSSH's own ssh-agent (FIDO2/sk-capable, unlike gnome-keyring's) and
 # auto-load this machine's YubiKey keys into it at login, so SSH agent
