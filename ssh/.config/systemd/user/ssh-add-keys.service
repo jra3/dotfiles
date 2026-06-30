@@ -5,20 +5,25 @@
 # and even with the key unplugged. Keys must be in the local agent for SSH
 # agent forwarding (e.g. to am-jallen / chonky) to broker them.
 #
+# The set of sk keys varies per host, so the list lives in a host-local file
+# ~/.ssh/agent-keys (one key per line, relative to ~/.ssh; '#' comments and
+# blank lines ignored; missing files skipped). That file is not stowed, so it
+# stays out of the dotfiles repo. The unit no-ops on hosts without it.
+#
 # Enable once per machine:  systemctl --user enable --now ssh-add-keys.service
 [Unit]
 Description=Load YubiKey sk keys into the ssh-agent
 After=ssh-agent.socket
 Requires=ssh-agent.socket
-ConditionPathExists=%h/.ssh/id_ed25519_sk_gitsign
+ConditionPathExists=%h/.ssh/agent-keys
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 Environment=SSH_AUTH_SOCK=%t/ssh-agent.socket
-# Load only the sk keys that exist on this machine — not every machine owns all
-# three, and ssh-add fails the whole unit if any listed file is missing.
-ExecStart=/bin/sh -c 'k=$(ls %h/.ssh/id_ed25519_github_sk %h/.ssh/id_ed25519_sk_gitsign %h/.ssh/id_ed25519_sk 2>/dev/null); [ -n "$k" ] && exec ssh-add $k'
+# Logic lives in a script — inline shell here would collide with systemd's own
+# ${...} / %% expansion in ExecStart.
+ExecStart=%h/.local/bin/load-ssh-agent-keys
 
 [Install]
 WantedBy=default.target

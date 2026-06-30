@@ -1,0 +1,29 @@
+#!/bin/sh
+# Load this host's sk keys into the ssh-agent. Invoked by ssh-add-keys.service.
+#
+# The set of sk keys varies per host, so the list lives in a host-local file
+# ~/.ssh/agent-keys (one key per line, relative to ~/.ssh; absolute paths also
+# work; '#' comments and blank lines ignored; missing files skipped). That file
+# is not stowed, so it stays out of the dotfiles repo.
+#
+# Loading an sk key only registers its on-disk credential handle — it never
+# contacts the YubiKey (touch/PIN happen at *use* time), so this runs headless
+# and even with the key unplugged.
+set -eu
+
+list="$HOME/.ssh/agent-keys"
+[ -f "$list" ] || exit 0
+cd "$HOME/.ssh" || exit 0
+
+keys=""
+while IFS= read -r line; do
+	line=${line%%#*}                       # strip trailing comment
+	for name in $line; do                  # word-split; blanks vanish
+		[ -f "$name" ] && keys="$keys $name"
+	done
+done < "$list"
+
+# ssh-add fails the whole invocation if given a missing file, hence the
+# per-entry existence check above. Unquoted on purpose: word-split into args.
+[ -n "$keys" ] && exec ssh-add $keys
+exit 0
