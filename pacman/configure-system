@@ -67,14 +67,39 @@ echo "Ensuring SSH control-socket dir..."
 install -d -m 700 "$HOME/.ssh/sockets"
 echo "  ~/.ssh/sockets present."
 
+# --- SSH agent key list (host-local) ---
+# ssh-add-keys.service loads the sk keys named in ~/.ssh/agent-keys. Which keys
+# belong in the agent varies per host, so the file is host-local (~/.ssh is not
+# stowed; it never enters the repo) and each host seeds its own: if the file is
+# missing, list every sk private key already on disk. Re-runs never touch an
+# existing file, so curate it freely after seeding.
+if [ ! -f "$HOME/.ssh/agent-keys" ]; then
+    echo "Seeding ~/.ssh/agent-keys from on-disk sk keys..."
+    {
+        echo "# SK keys to load into the ssh-agent on THIS host (read by ssh-add-keys.service)."
+        echo "# One key per line, relative to ~/.ssh (absolute paths also work). '#' comments"
+        echo "# and blank lines are ignored; entries whose file is missing are skipped."
+        echo "# Host-local: ~/.ssh is not stowed, so this file never enters the dotfiles repo."
+        for key in "$HOME"/.ssh/id_*sk*; do
+            if [[ $key != *.pub && -f $key ]]; then
+                echo "${key##*/}"
+            fi
+        done
+    } > "$HOME/.ssh/agent-keys"
+    chmod 600 "$HOME/.ssh/agent-keys"
+    echo "  seeded: $(grep -vc '^#' "$HOME/.ssh/agent-keys") key(s). Edit ~/.ssh/agent-keys to curate."
+else
+    echo "  ~/.ssh/agent-keys already present; leaving it alone."
+fi
+
 # --- SSH agent (user) ---
 # Run OpenSSH's own ssh-agent (FIDO2/sk-capable, unlike gnome-keyring's) and
 # auto-load this machine's YubiKey keys into it at login, so SSH agent
 # forwarding (e.g. to am-jallen / chonky) can broker them. SSH_AUTH_SOCK is
 # pointed at the socket via ssh/.config/environment.d/ssh-agent.conf.
 # ssh-add-keys.service is stowed from the `ssh` package and self-skips (via
-# ConditionPathExists) until the signing key exists, so enabling it before
-# setup-git-signing has run is harmless.
+# ConditionPathExists) until ~/.ssh/agent-keys exists — seeded just above, so
+# ordering here matters.
 if command -v ssh-agent &>/dev/null; then
     echo "Configuring SSH agent (user)..."
     systemctl --user enable --now ssh-agent.socket
