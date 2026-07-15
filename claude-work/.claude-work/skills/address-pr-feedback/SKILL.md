@@ -10,10 +10,18 @@ allowed-tools: "Bash(command:*), Read, Glob, Grep, Edit, Write, EnterWorktree, E
 
 Check out a PR into an isolated git worktree, address all unresolved review comments, resolve threads on GitHub, push the fixes, and clean up after CI passes.
 
+## Worktree contract
+
+`--current-worktree` mode follows the shared **Leaf contract** — read
+[`../_pr-tending/worktree-contract.md`](../_pr-tending/worktree-contract.md) (Part A) before
+any worktree operation. The invariants there (switch-in-place, skip-if-checked-out-elsewhere,
+**always-restore on every exit**, failure-surfaces-in-report) are canonical; this file documents
+only this skill's specifics.
+
 ## Arguments
 
 - `$ARGUMENTS` — the PR number (e.g., `1234`), optionally preceded by the `--current-worktree` flag.
-- **`--current-worktree`** — opt-in mode: run in the *current* worktree instead of creating a fresh one. Switches this worktree to the PR branch in place and restores the original branch on exit; no `EnterWorktree`/`ExitWorktree`. Used by `/tend-stack`, which drives this skill from inside an existing worktree where `EnterWorktree` can't nest.
+- **`--current-worktree`** — opt-in mode: run in the *current* worktree instead of creating a fresh one. Switches this worktree to the PR branch in place and **restores the original branch on every exit** (success *or* failure); no `EnterWorktree`/`ExitWorktree`. Used by `/tend-stack`, which drives this skill from inside an existing worktree where `EnterWorktree` can't nest.
 
 ## Execution Steps
 
@@ -179,8 +187,8 @@ This blocks until all CI checks complete.
 
 - **If CI passes**: proceed to cleanup (Step 10).
 - **If CI fails**: report which checks failed, then stop.
-  - **Default mode**: do NOT call `ExitWorktree`. Tell the user the worktree is preserved for investigation — `ExitWorktree(action: "keep")` returns to the main repo, `ExitWorktree(action: "remove", discard_changes: true)` cleans up.
-  - **Current-worktree mode**: leave the worktree on the PR branch — do **not** restore `ORIG_BRANCH`. Tell the user it's parked on `$HEAD_REF` for investigation and they can `git switch "$ORIG_BRANCH"` when done.
+  - **Default mode**: do NOT call `ExitWorktree`. Tell the user the worktree is preserved for investigation — `ExitWorktree(action: "keep")` returns to the main repo, `ExitWorktree(action: "remove", discard_changes: true)` cleans up. (The worktree is this skill's own throwaway, so parking it is fine.)
+  - **Current-worktree mode**: the caller owns this worktree, so **restore `ORIG_BRANCH`** (`git switch "$ORIG_BRANCH"`) even on CI failure — invariant in, invariant out. The fix and the failing checks were already **pushed** in Steps 7–8, so nothing is lost by switching back. Surface the failure in the **report** (`CI red on $HEAD_REF: <checks>`), not by leaving the worktree parked. Then stop.
 
 ### Step 10: Cleanup
 
@@ -232,7 +240,7 @@ In current-worktree mode, the `Worktree:` line reads `restored to <ORIG_BRANCH>`
 ## Important Notes
 
 - **Default mode uses `EnterWorktree`/`ExitWorktree`** — never raw `git worktree add/remove` via Bash. The built-in tools trigger project hooks (e.g., copying `.env`, running `pnpm install`) and properly manage the session's working directory.
-- **Current-worktree mode (`--current-worktree`)** runs inside the caller's existing worktree — it `git switch`es that worktree to the PR branch in place and restores the original branch on exit. No worktree is created or removed. It's the mode `/tend-stack` uses, since that command runs from inside a worktree where `EnterWorktree` can't nest. A PR branch already checked out in another worktree is skipped with a warning, not force-released.
+- **Current-worktree mode (`--current-worktree`)** runs inside the caller's existing worktree — it `git switch`es that worktree to the PR branch in place and restores the original branch on **every** exit, success or CI failure (the caller owns the worktree lifecycle; see the shared Leaf contract). No worktree is created or removed. It's the mode `/tend-stack` uses, since that command runs from inside a worktree where `EnterWorktree` can't nest. A PR branch already checked out in another worktree is skipped with a warning, not force-released.
 - This command works in ANY GitHub repository. It detects owner/repo automatically.
 - Thread resolution happens AFTER pushing, so reviewers see threads resolved only when fixes are on the remote.
 - Threads that need human judgment (design questions, clarifications) are intentionally skipped.

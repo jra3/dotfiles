@@ -10,6 +10,14 @@ allowed-tools: "Bash(command:*), Read, Glob, Grep, Edit, Write, EnterWorktree, E
 
 Diagnose and fix a failing PR by reading CI logs, applying the fix in a worktree, verifying locally, pushing via `gt submit`, and watching CI. If CI fails again, the skill loops back to diagnose. The worktree is cleaned up on exit (success or terminal failure).
 
+## Worktree contract
+
+The worktree modes below follow the shared **Leaf contract** — read
+[`../_pr-tending/worktree-contract.md`](../_pr-tending/worktree-contract.md) (Part A) before any
+worktree operation. In particular, `--current-worktree` mode is **always-restore on every exit**
+(switch-in-place, skip-if-checked-out-elsewhere, failure-surfaces-in-report). This file documents
+only this skill's specifics.
+
 ## Dispatch
 
 Behaviour depends on the arguments:
