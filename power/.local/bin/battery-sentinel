@@ -1,0 +1,36 @@
+#!/bin/bash
+# Escalating low-battery warnings, run by battery-sentinel.timer every minute.
+# Complements omarchy-battery-monitor (one-shot notice at 10%): heads-up at
+# 15%, then a repeating critical nag at <=7% before UPower hibernates at 5%
+# (PercentageAction/CriticalPowerAction, set by pacman/configure-system).
+
+set -euo pipefail
+
+BAT=/sys/class/power_supply/BAT1
+FLAG="${XDG_RUNTIME_DIR:-/run/user/$UID}/battery-sentinel-tier"
+
+status=$(cat "$BAT/status")
+capacity=$(cat "$BAT/capacity")
+
+if [[ $status != "Discharging" ]]; then
+    rm -f "$FLAG"
+    exit 0
+fi
+
+remaining=$(omarchy-battery-remaining-time 2>/dev/null) || remaining=""
+
+if ((capacity <= 7)); then
+    # Repeat every run: this is the last call before the 5% auto-hibernate.
+    notify-send -u critical -t 30000 -i battery-caution \
+        "󰂃 Battery critical (${capacity}%)" \
+        "Hibernating at 5% — plug in or save your work now.${remaining:+ (~$remaining left)}"
+    echo critical >"$FLAG"
+elif ((capacity <= 15)); then
+    [[ $(cat "$FLAG" 2>/dev/null) == low ]] && exit 0
+    notify-send -u normal -i battery-low \
+        "󰁻 Battery low (${capacity}%)" \
+        "Auto-hibernate kicks in at 5%.${remaining:+ (~$remaining left)}"
+    echo low >"$FLAG"
+else
+    rm -f "$FLAG"
+fi

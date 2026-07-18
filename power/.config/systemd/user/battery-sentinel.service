@@ -1,0 +1,7 @@
+[Unit]
+Description=Escalating low-battery warnings
+ConditionPathExists=/sys/class/power_supply/BAT1
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/battery-sentinel

@@ -122,6 +122,48 @@ else
     echo "  Emacs not installed, skipping."
 fi
 
+# --- Power: hibernation + low-battery policy ---
+# Hibernation is provisioned by the Omarchy installer (swapfile + resume= on
+# the cmdline). Note: any app holding memfd_secret() memory disables hibernate
+# kernel-wide (the Bitwarden desktop app did this until we replaced it with
+# rbw). We deliberately keep secretmem ENABLED as a tripwire — the kernel
+# refusing to hibernate beats writing an opted-in app's secrets to disk. If
+# hibernate ever reports unavailable again, find the holder:
+#   sudo grep -l secretmem /proc/[0-9]*/maps
+# rbw's own keys are purged pre-sleep by hypridle's before_sleep_cmd instead.
+echo "Configuring power management..."
+if [ -f /etc/limine-entry-tool.d/secretmem.conf ]; then
+    sudo rm /etc/limine-entry-tool.d/secretmem.conf
+    sudo limine-update
+    echo "  Removed stale secretmem.enable=0 from kernel cmdline."
+fi
+
+# Hibernate at 5% instead of UPower's default hard poweroff at 2%.
+sudo sed -i \
+    -e 's/^PercentageCritical=.*/PercentageCritical=10.0/' \
+    -e 's/^PercentageAction=.*/PercentageAction=5.0/' \
+    -e 's/^CriticalPowerAction=.*/CriticalPowerAction=Hibernate/' \
+    /etc/UPower/UPower.conf
+sudo systemctl try-restart upower
+echo "  UPower: hibernate at 5% (was: poweroff at 2%)."
+
+# Lid close: suspend, then hibernate after 2h (s2idle drains a few %/hour, so
+# a closed laptop should end up on disk, not dead). Applies after reboot.
+sudo install -d /etc/systemd/logind.conf.d /etc/systemd/sleep.conf.d
+printf '[Login]\nHandleLidSwitch=suspend-then-hibernate\n' |
+    sudo tee /etc/systemd/logind.conf.d/20-suspend-then-hibernate.conf >/dev/null
+printf '[Sleep]\nHibernateDelaySec=2h\n' |
+    sudo tee /etc/systemd/sleep.conf.d/20-hibernate-delay.conf >/dev/null
+echo "  Lid close set to suspend-then-hibernate."
+
+# Escalating low-battery notifications (stow the `power` package first).
+if systemctl --user cat battery-sentinel.timer &>/dev/null; then
+    systemctl --user enable --now battery-sentinel.timer
+    echo "  battery-sentinel.timer enabled."
+else
+    echo "  battery-sentinel.timer not stowed; run 'stow power' and re-run."
+fi
+
 # --- iPhone USB tethering (systemd-networkd) ---
 # The iPhone's `ipheth` driver creates an Ethernet-class interface when Personal
 # Hotspot is on and the phone is plugged in. DHCP it, with a route metric between
