@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Slack URL Handler (browser)
+Comment=Open slack:// deep links in the browser instead of a desktop app
+Exec=/home/john/.local/bin/slack-url-handler %u
+Terminal=false
+NoDisplay=true
+MimeType=x-scheme-handler/slack;

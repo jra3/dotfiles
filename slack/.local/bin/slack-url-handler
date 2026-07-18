@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Handle slack:// deep links by rewriting them to the Slack web client and
+# opening them in the default browser — instead of trying (and failing) to
+# launch a desktop Slack app, which isn't installed on this Linux setup.
+#
+# Registered as the x-scheme-handler/slack default (see the sibling .desktop).
+# Slack's web interstitial (antimetal.slack.com/archives/...) fires a URL like
+#   slack://channel?team=T0123&id=D0456&st=<token>
+# which otherwise dead-ends at GNOME's "No Apps available" chooser.
+#
+# Set SLACK_HANDLER_DRYRUN=1 to print the resolved URL instead of opening it.
+set -euo pipefail
+
+uri="${1:-}"
+[ -n "$uri" ] || exit 0
+
+rest="${uri#slack://}"
+path="${rest%%\?*}"
+query=""
+case "$rest" in *\?*) query="${rest#*\?}" ;; esac
+
+# Extract a query param by name (first match wins).
+param() { printf '%s' "$query" | tr '&' '\n' | sed -n "s/^$1=//p" | head -1; }
+team="$(param team)"
+id="$(param id)"
+
+# Path-form fallback: slack://channel/T0123/C0456
+if [ -z "$team" ]; then
+  case "$path" in
+    */*/*) team="$(printf '%s' "$path" | cut -d/ -f2)"; id="$(printf '%s' "$path" | cut -d/ -f3)" ;;
+  esac
+fi
+
+base="https://app.slack.com/client"
+if [ -n "$team" ] && [ -n "$id" ]; then
+  url="$base/$team/$id"
+elif [ -n "$team" ]; then
+  url="$base/$team"
+else
+  # No team we can resolve — fall back to the workspace switcher.
+  url="https://app.slack.com"
+fi
+
+if [ "${SLACK_HANDLER_DRYRUN:-}" = "1" ]; then
+  printf '%s\n' "$url"
+  exit 0
+fi
+
+exec xdg-open "$url"

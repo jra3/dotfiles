@@ -64,6 +64,7 @@ This documents the default software stack configured in Omarchy:
 - `gtr/` - Git worktree runner wrapper
 - `lazygit/` - lazygit TUI config with Graphite (gt) stacked-diff custom commands
 - `claude/` - Claude Code settings and custom commands
+- `slack/` - `slack://` deep-link handler that opens links in the browser (no desktop Slack app); see `slack/README.md`
 - `bitwarden/` - Bitwarden CLI helper script (`get-signature`) for extracting attachments
 - `pacman/` - Arch package lists and `configure-system` for post-install setup
 - `qmk/` - Optional: `qmk-mic-led-sync.py` daemon syncing mic/DND/voxtype/pomodoro state to a Framework 16 ANSI keyboard via raw HID
