@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Toggle Granola-style meeting capture (voxtype meeting mode).
+#
+# First press:  start transcribing mic + system audio.
+# Second press: stop, export the transcript, have Claude write meeting
+#               notes, save to $MEETING_NOTES_DIR, notify with the path.
+#
+# Bound to SUPER+CTRL+M in hypr/bindings.conf.
+set -uo pipefail
+
+NOTES_DIR="${MEETING_NOTES_DIR:-$HOME/Documents/meetings}"
+
+notify() { notify-send -a Meetings "$@"; }
+
+if voxtype meeting status | grep -q "No meeting currently in progress"; then
+    if voxtype meeting start; then
+        notify "● Meeting capture started" "SUPER+CTRL+M again to stop and write notes"
+    else
+        notify -u critical "Meeting capture failed to start" "Run 'voxtype meeting start' in a terminal for details"
+    fi
+    exit
+fi
+
+voxtype meeting stop
+notify "■ Meeting capture stopped" "Transcribing and writing notes…"
+
+mkdir -p "$NOTES_DIR"
+stamp=$(date +%Y-%m-%d-%H%M)
+transcript=$(mktemp --suffix=.md)
+notes=$(mktemp --suffix=.md)
+trap 'rm -f "$transcript" "$notes"' EXIT
+
+# stop returns before the last chunks finish transcribing; retry the export
+# until it produces content
+for _ in $(seq 12); do
+    voxtype meeting export latest -f markdown --speakers --timestamps --metadata >"$transcript" 2>/dev/null
+    [ -s "$transcript" ] && break
+    sleep 5
+done
+
+if ! [ -s "$transcript" ]; then
+    notify -u critical "Meeting export failed" "Try: voxtype meeting export latest"
+    exit 1
+fi
+
+notes_file="$NOTES_DIR/$stamp-meeting.md"
+
+prompt='Write post-meeting notes from the transcript on stdin. The transcript is
+machine-generated: expect mis-transcribed names/terms (infer from context) and
+imperfect speaker attribution. Output only the notes in markdown, structured as:
+
+# <inferred meeting topic> — <date if known>
+## TL;DR            (2-3 sentences)
+## Decisions        (omit section if none)
+## Action items     (- [ ] item — owner, if identifiable)
+## Discussion       (the substance, brief but complete)
+## Open questions   (omit section if none)
+
+Do not invent facts not supported by the transcript.'
+
+if claude -p "$prompt" <"$transcript" >"$notes" && [ -s "$notes" ]; then
+    { cat "$notes"; printf '\n---\n\n## Transcript\n\n'; cat "$transcript"; } >"$notes_file"
+    notify "✓ Meeting notes ready" "$notes_file"
+else
+    { printf '# Meeting %s (raw transcript — summarization failed)\n\n' "$stamp"; cat "$transcript"; } >"$notes_file"
+    notify -u critical "Notes failed — saved raw transcript" "$notes_file"
+fi
