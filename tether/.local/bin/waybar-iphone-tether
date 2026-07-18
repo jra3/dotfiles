@@ -1,0 +1,30 @@
+#!/bin/bash
+# Waybar custom module: iPhone USB-tethering indicator.
+#
+# Finds the network interface bound to the `ipheth` kernel driver (the driver
+# Apple's USB tether presents as) and reports:
+#   - routing   : interface is up AND has an IPv4 lease  -> USB glyph
+#   - plugged   : ipheth present but not yet routing      -> phone glyph
+#                 (usually means Personal Hotspot is off / phone locked)
+#   - absent    : no ipheth interface                     -> module hides
+#
+# Output is Waybar JSON (return-type "json"); an empty "text" hides the module.
+
+for dev in /sys/class/net/*; do
+    driver_link="$dev/device/driver"
+    [ -e "$driver_link" ] || continue
+    [ "$(basename "$(readlink -f "$driver_link")")" = ipheth ] || continue
+
+    iface=$(basename "$dev")
+    if [ "$(cat "$dev/operstate" 2>/dev/null)" = up ]; then
+        addr=$(ip -4 -o addr show "$iface" 2>/dev/null | awk '{print $4}' | head -n1)
+        if [ -n "$addr" ]; then
+            printf '{"text":"","class":"connected","tooltip":"iPhone tethered — %s (%s)"}\n' "$iface" "$addr"
+            exit 0
+        fi
+    fi
+    printf '{"text":"","class":"pending","tooltip":"iPhone connected (%s) — enable Personal Hotspot"}\n' "$iface"
+    exit 0
+done
+
+printf '{"text":""}\n'
