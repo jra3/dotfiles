@@ -138,6 +138,13 @@
       "Bash(lsusb *)",
       "Read(//home/jallen/.config/**)"
     ],
+    "deny": [
+      "AskUserQuestion",
+      "mcp__claude_ai_Gmail",
+      "mcp__claude_ai_Google_Calendar",
+      "mcp__claude_ai_Google_Drive",
+      "mcp__claude_ai_Instacart"
+    ],
     "defaultMode": "auto"
   },
   "statusLine": {
@@ -153,7 +160,9 @@
   "alwaysThinkingEnabled": true,
   "effortLevel": "xhigh",
   "promptSuggestionEnabled": false,
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true
 }
