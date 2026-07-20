@@ -178,19 +178,25 @@ fi
 # stock 20-ethernet.network (Name=eth*) also matches — so this file must sort
 # before it to win, otherwise it's silently shadowed.
 echo "Configuring iPhone USB tethering..."
-sudo rm -f /etc/systemd/network/25-usb-tether.network  # retired earlier name
-printf '%s\n' \
-    '[Match]' \
-    'Driver=ipheth rndis_host cdc_ncm cdc_ether' \
-    '' \
-    '[Network]' \
-    'DHCP=ipv4' \
-    '' \
-    '[DHCPv4]' \
-    'RouteMetric=200' \
-    | sudo tee /etc/systemd/network/15-usb-tether.network >/dev/null
-sudo systemctl reload-or-restart systemd-networkd
-echo "  Installed /etc/systemd/network/15-usb-tether.network"
+if systemctl is-active --quiet systemd-networkd || systemctl is-enabled --quiet systemd-networkd; then
+    sudo rm -f /etc/systemd/network/25-usb-tether.network  # retired earlier name
+    printf '%s\n' \
+        '[Match]' \
+        'Driver=ipheth rndis_host cdc_ncm cdc_ether' \
+        '' \
+        '[Network]' \
+        'DHCP=ipv4' \
+        '' \
+        '[DHCPv4]' \
+        'RouteMetric=200' \
+        | sudo tee /etc/systemd/network/15-usb-tether.network >/dev/null
+    sudo systemctl reload-or-restart systemd-networkd
+    echo "  Installed /etc/systemd/network/15-usb-tether.network"
+else
+    # NetworkManager (or another manager) auto-connects a USB tether as a new
+    # Ethernet device — no .network file needed. Skip so we don't drop a dead file.
+    echo "  systemd-networkd not in use; skipping (NetworkManager tethers natively)."
+fi
 
 # --- Pacman hooks ---
 echo "Installing pacman hooks..."

@@ -18,18 +18,42 @@ plus a waybar indicator.
 - **`usbmuxd`** — in `pacman/packages-arch.txt`. Ships the udev rule that autostarts the
   pairing daemon on plug-in.
 
-## Waybar wiring (NOT tracked in this repo)
+## Waybar wiring (NOT stow-tracked — reproduce by hand)
 
-`~/.config/waybar/config.jsonc` + `style.css` are live Omarchy files, not stow-managed.
-The indicator adds a `custom/tether` entry to `modules-right` (between `bluetooth` and
-`network`), a matching module definition (`exec` → this script, `return-type: json`,
-5s interval), and a `#custom-tether` margin rule in `style.css`. Re-apply by hand after
-`omarchy refresh waybar`.
+`~/.config/waybar/config.jsonc` + `style.css` are live Omarchy files (Omarchy
+rewrites them on refresh/update), so the indicator isn't stowed. To reproduce on a
+new machine — or after `omarchy refresh waybar` — apply these three edits:
 
-## First-time use
+1. Add `"custom/tether"` to `modules-right` in `config.jsonc`, between `bluetooth`
+   and `network`.
+2. Add the module definition to `config.jsonc`:
 
-1. `stow tether` (deploys the script)
-2. `sudo pacman -S --needed usbmuxd`
-3. Run `pacman/configure-system` (writes the `.network` file), or drop it by hand.
-4. Unlock iPhone → enable Personal Hotspot → plug in USB → tap **Trust This Computer**.
-   `idevicepair pair` if the trust prompt loops.
+   ```jsonc
+   "custom/tether": {
+     "exec": "$HOME/.local/bin/waybar-iphone-tether",
+     "return-type": "json",
+     "interval": 5,
+     "format": "{}",
+     "tooltip": true
+   },
+   ```
+
+3. Add the spacing rule to `style.css` (mirrors `#bluetooth`/`#network`):
+
+   ```css
+   #custom-tether {
+     margin-right: 17px;
+   }
+   ```
+
+Then `omarchy restart waybar`.
+
+## First-time use (fresh machine)
+
+1. `stow tether` — deploys `waybar-iphone-tether` to `~/.local/bin`.
+2. `sudo pacman -S --needed usbmuxd` (already in `pacman/packages-arch.txt`).
+3. Run `pacman/configure-system` — installs `15-usb-tether.network` **iff**
+   systemd-networkd is in use (NetworkManager systems tether natively, no file).
+4. Apply the waybar wiring above (optional — only for the tray icon).
+5. Unlock iPhone → enable Personal Hotspot → plug in USB → tap **Trust This
+   Computer**. Run `idevicepair pair` if the trust prompt loops.
