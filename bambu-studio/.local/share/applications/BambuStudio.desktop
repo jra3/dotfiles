@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=BambuStudio
-Exec=env GDK_BACKEND=wayland /usr/bin/bambu-studio %U
+Exec=env GDK_BACKEND=wayland GDK_SCALE=2 GDK_DPI_SCALE=0.85 /usr/bin/bambu-studio %U
 Icon=BambuStudio
 Type=Application
 Categories=Utility;
