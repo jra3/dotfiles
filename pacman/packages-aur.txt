@@ -1,5 +1,6 @@
 grpcurl-bin
 helium
+herdr-bin
 pyenv-virtualenv
 telepresence2-bin
 tsui

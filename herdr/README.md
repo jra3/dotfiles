@@ -43,7 +43,8 @@ herdr --default-config > herdr/.config/herdr/config.toml
 
 ## Install
 
-herdr itself is not managed by stow — it's a single static binary at `~/.local/bin/herdr`,
-installed per the [official installer](https://herdr.dev/docs/install/) (`curl -fsSL
-https://herdr.dev/install.sh | sh`) or by downloading the release binary directly.
-Update in place with `herdr update`.
+herdr itself is not managed by stow — it's installed from the AUR as
+[`herdr-bin`](https://aur.archlinux.org/packages/herdr-bin) (a prebuilt static binary at
+`/usr/bin/herdr`), tracked in `pacman/packages-aur.txt`. Install/update with an AUR helper
+(`yay -S herdr-bin`) or via `pacman/install-packages`; regular `yay -Syu` upgrades keep it
+current. Don't use `herdr update` — the binary is pacman-managed now.
