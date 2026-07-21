@@ -60,6 +60,7 @@ This documents the default software stack configured in Omarchy:
 - `sqlite/` - SQLite configuration
 - `starship/` - Starship prompt configuration
 - `tmux/` - tmux terminal multiplexer
+- `herdr/` - herdr terminal workspace manager (annotated default config; binary at `~/.local/bin/herdr`, not stow-managed); see `herdr/README.md`
 - `gh/` - GitHub CLI config and `gh-prs` script
 - `gtr/` - Git worktree runner wrapper
 - `lazygit/` - lazygit TUI config with Graphite (gt) stacked-diff custom commands
