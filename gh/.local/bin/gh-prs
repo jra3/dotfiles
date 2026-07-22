@@ -204,7 +204,7 @@ fetch_prs() {
   IFS=$'\t' read -r OWNER REPO REPO_URL < <(gh repo view --json owner,name,url -q '[.owner.login, .name, .url] | @tsv')
   _FETCHED_GRAPHITE_BASE="https://app.graphite.dev/github/pr/${OWNER}/${REPO}"
 
-  PR_JSON=$(gh pr list --author @me --state open --json number,title,isDraft,reviewDecision,mergeable,headRefName,updatedAt,additions,deletions \
+  PR_JSON=$(gh pr list --author @me --state open --limit 200 --json number,title,isDraft,reviewDecision,mergeable,headRefName,updatedAt,additions,deletions \
     | jq 'sort_by(.updatedAt) | reverse')
 
   pr_aliases=$(_pr_detail_aliases "$PR_JSON")
@@ -371,7 +371,7 @@ fetch_tree() {
   fi
   _FETCHED_GT_ERR=""
 
-  PR_JSON=$(gh pr list --author @me --state open \
+  PR_JSON=$(gh pr list --author @me --state open --limit 200 \
     --json number,title,isDraft,reviewDecision,mergeable,headRefName,updatedAt,additions,deletions)
 
   pr_aliases=$(_pr_detail_aliases "$PR_JSON")
