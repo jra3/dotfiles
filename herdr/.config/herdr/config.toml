@@ -1,3 +1,4 @@
+onboarding = false
 # herdr configuration
 # Place this file at ~/.config/herdr/config.toml
 
@@ -73,22 +74,31 @@ prefix = "backtick"
 # goto = "prefix+g"
 # new_workspace = "prefix+shift+n"
 # new_worktree = "prefix+shift+g"
-# open_worktree = ""    # optional, unset by default
-# remove_worktree = ""  # optional, unset by default; opens confirmation
+open_worktree = "prefix+alt+g"    # unbound by default; adopts an existing worktree as a
+                                  # workspace. Backed by `git worktree list`, NOT by
+                                  # [worktrees] directory — so it sees gtr's sibling
+                                  # <repo>--<branch> trees without any extra config.
+remove_worktree = "prefix+ctrl+g" # unbound by default; opens a confirmation prompt
 # rename_workspace = "prefix+shift+w"
 # close_workspace = "prefix+shift+d"
-# previous_workspace = "" # optional, unset by default
-# next_workspace = ""     # optional, unset by default
-# previous_agent = ""     # optional, unset by default
-# next_agent = ""         # optional, unset by default
-# focus_agent = ""        # optional indexed binding, e.g. "prefix+alt+1..9"
+# Direct (prefix-free) so they repeat — herdr's prefix mode is strictly one-shot and has
+# NO analog to tmux's `bind -r` repeat window (verified: no repeat/sticky/timeout setting
+# exists in the default config). With a prefix binding, the 2nd keypress reaches the shell
+# as a literal char. Same rationale as focus_pane_* below: one modifier up from alt+arrows.
+# ctrl+alt+arrows is free in Hyprland — every Omarchy arrow bind is SUPER-prefixed.
+# For multi-hop navigation prefer navigate mode: prefix+g, then arrows/hjkl repeat freely.
+previous_workspace = "ctrl+alt+left"  # workspace = tmux session
+next_workspace = "ctrl+alt+right"
+previous_agent = "prefix+comma"       # unbound by default; walks the agent attention queue
+next_agent = "prefix+period"          # pairs with [ui] agent_panel_sort = "priority"
+focus_agent = "prefix+alt+1..9"       # jump straight to an agent row
 # remote_image_paste = "ctrl+v" # only active in herdr --remote; empty disables raw-key image paste
 # new_tab = "prefix+c"
 # rename_tab = "prefix+shift+t"
 # previous_tab = "prefix+p"
 # next_tab = "prefix+n"
 # switch_tab = "prefix+1..9"
-# switch_workspace = ""   # optional indexed binding, e.g. "prefix+shift+1..9"
+switch_workspace = "prefix+shift+1..9" # unbound by default; mirrors switch_tab's prefix+1..9
 # close_tab = "prefix+shift+x"
 # rename_pane = "prefix+shift+p"
 # edit_scrollback = "prefix+e"
@@ -135,8 +145,17 @@ split_horizontal = "prefix+minus"    # tmux: bind - split-window -v (stacked)
 # workspaces = "" # e.g. "ctrl+shift" makes ctrl+shift+1..9 switch workspaces directly
 # agents = ""     # e.g. "alt" makes alt+1..9 focus agent rows directly
 
-# [worktrees]
-# directory = "~/.herdr/worktrees"
+[worktrees]
+# Where `new_worktree` (prefix+shift+g) creates trees. herdr appends <repo>/<branch>
+# underneath, so this yields ~/.claude/worktrees/<repo>/<branch>
+#
+# NOTE: herdr cannot place worktrees inside the gitroot (the preferred
+# <gitroot>/.claude/worktrees layout). This value is a base dir, not a template — there
+# are no tokens, and a relative path resolves against $HOME, not the repo root
+# (verified: directory = ".claude/worktrees" produced ~/.claude/worktrees/<repo>/<branch>).
+# So this keeps the .claude/worktrees naming and per-repo nesting, but parented globally.
+# `herdr worktree create --path` still overrides per-invocation for in-repo placement.
+directory = "~/.claude/worktrees"
 
 [ui]
 # Sidebar width (auto-scaled based on workspace names, this sets the default)
@@ -233,7 +252,7 @@ agent_panel_sort = "priority"
 # herdr = show in-app toasts
 # terminal = ask the outer terminal to show a desktop notification
 # system = ask the OS notification service directly
-# delivery = "off"
+delivery = "herdr"
 # delay_seconds = 1
 
 [ui.toast.herdr]
