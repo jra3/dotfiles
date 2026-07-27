@@ -317,6 +317,14 @@ zd() {
 
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
+# Aliases are an interactive-shell convenience. Non-interactive shells — Claude
+# Code's Bash tool, plain scripts — source this rc too, and there the eza `ls`,
+# `rg`-as-`ag`, etc. only surprise tooling (`ls -t` isn't a time sort, `$(ls)`
+# yields an eza table, not filenames). Strip every alias when not interactive so
+# the tool space is plain coreutils; functions (zd, gcd, z) are untouched. Same
+# non-interactive reasoning as the zd override above.
+[[ -o interactive ]] || unalias -m '*' 2>/dev/null
+
 # Add ~/.local/bin to PATH for user binaries
 export PATH="$HOME/.local/bin:$PATH"
 
