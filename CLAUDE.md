@@ -92,6 +92,44 @@ This documents the default software stack configured in Omarchy:
 
 Run `pacman/configure-system` to configure system services (Tailscale operator, Emacs daemon, etc.). The script is idempotent and safe to re-run.
 
+### Multi-tailnet SSH (run once per Tailscale profile)
+
+This host joins more than one tailnet (`work` + `personal`), but only one profile
+is active at a time and `tailscale ip` reports only that one. `configure-system`
+therefore **merges** the active profile's addresses into
+`/etc/ssh/sshd_config.d/10-tailscale-only.conf` and leaves other profiles' entries
+alone. To cover every tailnet, run it once per profile:
+
+```bash
+tailscale switch personal && pacman/configure-system
+tailscale switch work     && pacman/configure-system
+```
+
+Binding an inactive profile's addresses requires `net.*.ip_nonlocal_bind=1`
+(installed to `/etc/sysctl.d/99-nonlocal-bind.conf`). Without it sshd binds only
+the live set and then **silently stops listening after a `tailscale switch`** —
+the socket stays open on an address no longer present on `tailscale0`, so nothing
+reaches it and sshd logs nothing at all.
+
+### Tailnet ingress filter
+
+`tailscale --shields-up` is all-or-nothing (no port granularity, and it overrides
+tailnet ACLs), so it can't express "block everything except SSH". Instead shields
+stay **down** and `pacman/tsfilter.nft` filters tailnet ingress: SSH (22) and
+Ollama (11434) in, everything else dropped — Postgres, LocalStack, Traefik,
+Syncthing. Loaded at boot by `tsfilter.service`.
+
+Two constraints on that file, both load-bearing:
+- It hooks **prerouting** (priority -150), not input. Docker-published ports are
+  DNAT'd to `172.x` and traverse FORWARD, never INPUT — an input hook would leave
+  Postgres and LocalStack wide open behind a rule that looks like it covers them.
+- It is a standalone table with **no `flush ruleset`** (which Arch's stock
+  `/etc/nftables.conf` opens with) — flushing would wipe Docker's and Tailscale's
+  own chains and break container networking.
+
+Shields are per-profile too, so the "run once per profile" rule above applies here
+as well.
+
 ## Git commit signing (per-machine YubiKey)
 
 Commits are signed with a YubiKey-resident SSH key. Config is shared via the `git/`

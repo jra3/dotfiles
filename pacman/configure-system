@@ -20,21 +20,65 @@ fi
 # --- SSH: enable + bind to the Tailscale interface only ---
 # Requires Tailscale to be up (authenticated) so its address is known. On a
 # brand-new machine, run 'tailscale up' first, then re-run this script.
+#
+# MULTI-TAILNET: this host joins more than one tailnet (work + personal), but
+# only one profile is active at a time and `tailscale ip` reports only that one.
+# So each run MERGES the active profile's addresses into the drop-in and leaves
+# earlier profiles' entries alone. To cover every tailnet, run once per profile:
+#   tailscale switch personal && pacman/configure-system
+# Binding an inactive profile's addresses needs net.*.ip_nonlocal_bind=1 (set
+# below); without it sshd binds only the live set and then silently stops
+# listening the moment you `tailscale switch` — the socket stays open on an
+# address that no longer exists on tailscale0, so nothing ever reaches it.
+SSHD_TS_CONF=/etc/ssh/sshd_config.d/10-tailscale-only.conf
 if command -v tailscale &>/dev/null && command -v sshd &>/dev/null; then
     ts_v4="$(tailscale ip -4 2>/dev/null || true)"
     ts_v6="$(tailscale ip -6 2>/dev/null || true)"
     if [ -n "$ts_v4" ]; then
-        echo "Binding sshd to Tailscale addresses ($ts_v4${ts_v6:+, $ts_v6})..."
+        ts_profile="$(tailscale debug prefs 2>/dev/null |
+                        sed -n 's/.*"ProfileName": *"\([^"]*\)".*/\1/p')"
+        : "${ts_profile:=unknown}"
+        echo "Binding sshd to Tailscale addresses ($ts_v4${ts_v6:+, $ts_v6}) [$ts_profile]..."
+
+        sudo rm -f /etc/ssh/sshd_config.d/10-tailscale.conf  # retired earlier name
+
+        # Keep entries from previous runs (other tailnets); append ours if new.
+        ts_lines="$(sudo sed -n '/^ListenAddress /p' "$SSHD_TS_CONF" 2>/dev/null || true)"
+        for addr in $ts_v4 $ts_v6; do
+            case "$ts_lines" in
+                *"ListenAddress $addr"*) ;;
+                *)
+                    if [ -n "$ts_lines" ]; then
+                        ts_lines="$ts_lines
+ListenAddress $addr  # $ts_profile"
+                    else
+                        ts_lines="ListenAddress $addr  # $ts_profile"
+                    fi
+                    ;;
+            esac
+        done
         {
-            echo "# Managed by dotfiles configure-system."
-            echo "# Bind SSH to the Tailscale interface only (see: tailscale ip)."
-            echo "ListenAddress $ts_v4"
-            [ -n "$ts_v6" ] && echo "ListenAddress $ts_v6" || true
-        } | sudo tee /etc/ssh/sshd_config.d/10-tailscale.conf >/dev/null
+            echo "# Managed by dotfiles configure-system. Accumulates one entry per"
+            echo "# tailnet: re-run after 'tailscale switch <profile>' to add another."
+            echo "# Requires net.*.ip_nonlocal_bind=1 (/etc/sysctl.d/99-nonlocal-bind.conf)"
+            echo "# so the inactive profile's addresses still bind."
+            printf '%s\n' "$ts_lines"
+        } | sudo tee "$SSHD_TS_CONF" >/dev/null
+
+        # Bind addresses that aren't on an interface yet (the inactive tailnet's,
+        # and the active one's during the boot race before tailscaled is up).
+        printf '%s\n' \
+            '# Let sshd bind every tailnet address, including profiles that are not' \
+            '# currently active. See /etc/ssh/sshd_config.d/10-tailscale-only.conf.' \
+            'net.ipv4.ip_nonlocal_bind = 1' \
+            'net.ipv6.ip_nonlocal_bind = 1' \
+            | sudo tee /etc/sysctl.d/99-nonlocal-bind.conf >/dev/null
+        sudo sysctl -q --system
 
         # Order sshd after Tailscale and retry, so it can still bind once the
         # Tailscale address is configured on the interface during boot.
         sudo install -d /etc/systemd/system/sshd.service.d
+        sudo rm -f /etc/systemd/system/sshd.service.d/10-after-tailscaled.conf  # retired earlier name
         printf '%s\n' \
             '[Unit]' \
             'After=tailscaled.service' \
@@ -58,6 +102,45 @@ if command -v tailscale &>/dev/null && command -v sshd &>/dev/null; then
     fi
 else
     echo "  sshd or Tailscale not present; skipping SSH setup."
+fi
+
+# --- Tailnet ingress filter (replaces `tailscale --shields-up`) ---
+# Shields-up is all-or-nothing and overrides tailnet ACLs, so it cannot express
+# "block everything except SSH". Instead shields stay DOWN and an nftables table
+# does the filtering — see tsfilter.nft for why it hooks prerouting rather than
+# input (short version: Docker-published ports never traverse INPUT).
+# Shields are per-profile, so this clears them on the ACTIVE profile only; the
+# same "run once per profile" rule as the sshd binding above applies.
+if command -v nft &>/dev/null && command -v tailscale &>/dev/null; then
+    echo "Installing tailnet ingress filter..."
+    TSFILTER_SRC="$(cd "$(dirname "$0")" && pwd)/tsfilter.nft"
+    if [ -f "$TSFILTER_SRC" ]; then
+        sudo install -m 0644 "$TSFILTER_SRC" /etc/tsfilter.nft
+        printf '%s\n' \
+            '[Unit]' \
+            'Description=Tailnet ingress filter (SSH + Ollama only)' \
+            'After=tailscaled.service' \
+            'Wants=tailscaled.service' \
+            '' \
+            '[Service]' \
+            'Type=oneshot' \
+            'RemainAfterExit=yes' \
+            'ExecStart=/usr/bin/nft -f /etc/tsfilter.nft' \
+            'ExecStop=/usr/bin/nft delete table inet tsfilter' \
+            '' \
+            '[Install]' \
+            'WantedBy=multi-user.target' \
+            | sudo tee /etc/systemd/system/tsfilter.service >/dev/null
+        sudo systemctl daemon-reload
+        sudo systemctl enable tsfilter.service
+        sudo systemctl restart tsfilter.service
+        tailscale set --shields-up=false
+        echo "  tsfilter active; shields-up cleared on the active profile."
+    else
+        echo "  tsfilter.nft not found next to this script, skipping."
+    fi
+else
+    echo "  nft or Tailscale not present; skipping tailnet filter."
 fi
 
 # --- SSH client control sockets ---

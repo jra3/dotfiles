@@ -1,0 +1,47 @@
+#!/usr/sbin/nft -f
+# Tailnet ingress policy. Installed to /etc/tsfilter.nft by configure-system.
+#
+# Replaces Tailscale's `--shields-up`, which is all-or-nothing: it drops every
+# inbound tailnet connection with no port granularity and overrides tailnet
+# ACLs, so "shields up but allow SSH" cannot be expressed. Shields stay DOWN and
+# this table does the filtering instead -- SSH and Ollama in, everything else
+# dropped (postgres 5432, localstack 4566, traefik 80/8088, syncthing 22000,
+# LLMNR 5355, tailscale peerapi).
+#
+# Hooked at prerouting priority -150: after conntrack (-200), before nat DNAT
+# (-100), so it matches the ORIGINAL destination port. This placement is load-
+# bearing -- an `input` hook would miss every Docker-published port, since those
+# are DNAT'd to 172.x and traverse FORWARD, never INPUT. Postgres and LocalStack
+# would sit wide open behind a rule that looks like it covers them.
+#
+# Standalone table, and deliberately no `flush ruleset` (which Arch's stock
+# /etc/nftables.conf opens with) -- that would wipe Docker's and Tailscale's own
+# chains and break container networking.
+
+table inet tsfilter {
+  chain prerouting {
+    type filter hook prerouting priority -150; policy accept;
+
+    # Only police tailnet ingress. iifname (not iif) resolves at runtime, so
+    # this file loads cleanly before tailscale0 exists at boot.
+    iifname != "tailscale0" accept
+
+    # Transit traffic -- exit-node and subnet-route forwarding -- isn't destined
+    # for us, so it isn't ours to police. Required: this host advertises
+    # 0.0.0.0/0 ::/0 as an exit node on the personal tailnet, and a blanket drop
+    # here would blackhole every client using it. Container traffic is unaffected
+    # because pre-DNAT its destination is still one of our local addresses.
+    fib daddr type != local accept
+
+    ct state established,related accept
+    ct state invalid drop
+
+    tcp dport 22 accept      # sshd
+    tcp dport 11434 accept   # ollama (OLLAMA_HOST=0.0.0.0:11434, no auth)
+
+    ip protocol icmp accept
+    meta l4proto ipv6-icmp accept
+
+    drop
+  }
+}
