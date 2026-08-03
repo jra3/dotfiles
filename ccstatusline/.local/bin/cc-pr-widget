@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# ccstatusline custom-command widget: show PR number, state, CI, and review comments
+# Receives ccstatusline JSON on stdin (ignored — we use git/gh directly)
+set -euo pipefail
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+[[ "$BRANCH" == "HEAD" || "$BRANCH" == "main" || "$BRANCH" == "master" ]] && exit 0
+
+# Resolve owner/repo from the origin remote rather than hardcoding it, so this
+# works in every checkout. Parsed locally (no `gh repo view` round trip) and it
+# handles both forms: git@github.com:owner/repo.git and
+# https://github.com/owner/repo — commit 8dcefd1 rewrites the former to the
+# latter, but old clones may still have either.
+REMOTE=$(git remote get-url origin 2>/dev/null) || exit 0
+[[ "$REMOTE" == *github.com* ]] || exit 0
+REPO_PATH=${REMOTE##*github.com}
+REPO_PATH=${REPO_PATH#[:/]}
+OWNER_REPO=${REPO_PATH%.git}
+
+# Cache PR info per repo+branch (60s TTL) to avoid slow gh calls on every render.
+# The repo is part of the key because branch names like `main-fix` recur across
+# checkouts and would otherwise serve each other's stale PR numbers.
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/claude-statusline"
+mkdir -p "$CACHE_DIR"
+CACHE_FILE="$CACHE_DIR/${OWNER_REPO//\//_}_${BRANCH//\//_}"
+
+if [[ -f "$CACHE_FILE" ]] && (( $(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0) < 60 )); then
+  read -r PR_NUM PR_STATE IS_DRAFT REVIEW_DECISION CI_STATUS COMMENT_COUNT < "$CACHE_FILE"
+else
+  PR_JSON=$(gh pr view --json number,state,isDraft,reviewDecision,statusCheckRollup 2>/dev/null) || exit 0
+  PR_NUM=$(echo "$PR_JSON" | jq -r '.number // empty')
+  PR_STATE=$(echo "$PR_JSON" | jq -r '.state // empty')
+  IS_DRAFT=$(echo "$PR_JSON" | jq -r '.isDraft // false')
+  REVIEW_DECISION=$(echo "$PR_JSON" | jq -r '.reviewDecision // "NONE"')
+
+  # Derive CI status from completed checks only (ignore queued/null/empty)
+  CI_STATUS=$(echo "$PR_JSON" | jq -r '
+    [(.statusCheckRollup // [])[] | select(.conclusion != null and .conclusion != "")] |
+    if length == 0 then "none"
+    elif any(.[]; .conclusion == "FAILURE") then "fail"
+    elif all(.[]; .conclusion == "SUCCESS") then "pass"
+    else "pending"
+    end
+  ')
+
+  [[ -z "$PR_NUM" ]] && exit 0
+
+  # Inline review comments from humans only (exclude [bot] authors)
+  COMMENT_COUNT=$(gh api "repos/${OWNER_REPO}/pulls/${PR_NUM}/comments" --jq '[.[] | select(.user.login | test("\\[bot\\]$") | not)] | length' 2>/dev/null || echo 0)
+
+  echo "$PR_NUM $PR_STATE $IS_DRAFT $REVIEW_DECISION $CI_STATUS $COMMENT_COUNT" > "$CACHE_FILE"
+fi
+
+[[ -z "${PR_NUM:-}" ]] && exit 0
+
+# ANSI color codes
+GREEN='\e[32m'
+RED='\e[31m'
+YELLOW='\e[33m'
+CYAN='\e[36m'
+MAGENTA='\e[35m'
+DIM='\e[2m'
+RST='\e[0m'
+
+# PR state icon + color
+if [[ "${PR_STATE:-}" == "MERGED" ]]; then
+  PR_ICON="${MAGENTA}*${RST}"
+elif [[ "${PR_STATE:-}" == "CLOSED" ]]; then
+  PR_ICON="${DIM}x${RST}"
+elif [[ "${IS_DRAFT:-false}" == "true" ]]; then
+  PR_ICON="${DIM}o${RST}"
+elif [[ "${REVIEW_DECISION:-}" == "APPROVED" ]]; then
+  PR_ICON="${GREEN}*${RST}"
+elif [[ "${REVIEW_DECISION:-}" == "CHANGES_REQUESTED" ]]; then
+  PR_ICON="${RED}!${RST}"
+else
+  PR_ICON="${YELLOW}*${RST}"
+fi
+
+# CI indicator
+CI_PART=""
+case "${CI_STATUS:-none}" in
+  pass)    CI_PART=" ${GREEN}v${RST}" ;;
+  fail)    CI_PART=" ${RED}x${RST}" ;;
+  pending) CI_PART=" ${YELLOW}~${RST}" ;;
+esac
+
+# Review comment count (omit if 0)
+COMMENT_PART=""
+if [[ "${COMMENT_COUNT:-0}" -gt 0 ]]; then
+  COMMENT_PART=" ${CYAN}${COMMENT_COUNT}c${RST}"
+fi
+
+# Antimetal repos go through Graphite (stacked diffs live there); everything else
+# links to the PR on GitHub, where a Graphite URL would just 404.
+if [[ "$OWNER_REPO" == antimetal/* ]]; then
+  URL="https://app.graphite.dev/github/pr/${OWNER_REPO}/${PR_NUM}"
+else
+  URL="https://github.com/${OWNER_REPO}/pull/${PR_NUM}"
+fi
+
+# OSC 8 hyperlink — ctrl+click in supported terminals
+printf '\e]8;;%s\aPR #%s\e]8;;\a %b%b%b' "$URL" "$PR_NUM" "$PR_ICON" "$CI_PART" "$COMMENT_PART"
