@@ -26,6 +26,18 @@ export TMPDIR="$HOME/tmp"
 export NODE_NO_WARNINGS=1
 export JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1
 
+# mise shims — per-directory node/npm resolution in NON-interactive shells.
+# .zshrc runs `mise activate zsh`, but that only covers interactive shells:
+# editors, git hooks, and Claude Code's WorktreeCreate hook never source it, so
+# they inherit whatever node the launching shell happened to have. That silently
+# ignores a repo's .nvmrc — e.g. overlook pins node 22, and running its pnpm
+# install under the global node 26 fails outright (no better-sqlite3 prebuilt
+# for 26, so it falls back to a source compile that errors).
+# Shims re-resolve per cwd on every exec, so they fix the non-interactive case.
+# Harmless alongside `mise activate`: activate prepends the resolved version's
+# real bindir, which simply wins in interactive shells.
+[[ -d "$XDG_DATA_HOME/mise/shims" ]] && export PATH="$XDG_DATA_HOME/mise/shims:$PATH"
+
 # Ripgrep config
 export RIPGREP_CONFIG_PATH=~/.ripgreprc
 
