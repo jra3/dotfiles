@@ -329,3 +329,9 @@ pane_history = false
 key = "prefix+f"
 type = "shell"
 command = "herdr-fork-focused"
+
+[[keys.command]]
+# New tab at the git root, vs new_tab (prefix+c) which follows the pane cwd.
+key = "prefix+shift+c"
+type = "shell"
+command = "herdr-tab-gitroot"

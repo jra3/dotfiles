@@ -6,8 +6,9 @@ and remote-attach subcommands).
 
 ## What's tracked
 
-Only `.config/herdr/config.toml` — the annotated default emitted by `herdr --default-config`,
-with everything commented out except the settings we actively override:
+`.config/herdr/config.toml` — the annotated default emitted by `herdr --default-config`,
+with everything commented out except the settings we actively override — plus the
+`.local/bin/herdr-*` helper scripts the `[[keys.command]]` bindings shell out to:
 
 - `[ui] agent_panel_sort = "priority"` — order the agent panel by attention queue.
 - `[keys]` — tmux-style bindings mirroring `tmux/.config/tmux/tmux.conf`:
@@ -16,6 +17,17 @@ with everything commented out except the settings we actively override:
     `-` = stacked (matches tmux `bind | split-window -h` / `bind - split-window -v`).
   - `focus_pane_{left,down,up,right} = "alt+{left,down,up,right}"` — Alt+arrows, no prefix
     (tmux `bind -n M-Arrow select-pane`).
+
+- `[[keys.command]]` — custom commands, each backed by a script in `.local/bin/`:
+  - `prefix+f` → `herdr-fork-focused` — fork the focused Claude Code pane into a new tab.
+  - `prefix+shift+c` → `herdr-tab-gitroot` — new tab at the git root. Complements the
+    built-in `new_tab` (`prefix+c`), which follows the pane cwd. Resolves via
+    `git rev-parse --show-toplevel` on the focused pane's `foreground_cwd`, so inside a
+    linked worktree it lands on that **worktree's** root, not the main checkout; outside
+    a git working tree it falls back to the pane cwd.
+
+  Both read the focused pane from `herdr pane list` rather than `$HERDR_PANE_ID` —
+  `type = "shell"` commands run detached and do not inherit the pane environment.
 
   Not mapped (no herdr keybinding equivalent): tmux's `=` copy-mode, `Ctrl-y` paste, and
   `X` kill-session. herdr also has no "double-tap prefix sends a literal backtick" behavior —

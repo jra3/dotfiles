@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Open a new herdr tab at the git root of the focused pane's cwd.
+# In a linked worktree this is the worktree's own root, not the main checkout
+# (git rev-parse --show-toplevel). Outside a git working tree it falls back to
+# the pane's cwd, matching herdr's own [terminal] new_cwd = "follow".
+set -euo pipefail
+
+pane=$(herdr pane list | jq -c 'first(.result.panes[] | select(.focused)) // empty')
+if [[ -z "$pane" ]]; then
+  herdr notification show "herdr-tab-gitroot" --body "no focused pane" 2>/dev/null || true
+  exit 1
+fi
+
+cwd=$(jq -r '.foreground_cwd // .cwd' <<<"$pane")
+ws=$(jq -r '.workspace_id' <<<"$pane")
+
+root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)
+[[ -n "$root" ]] || root="$cwd"
+
+herdr tab create --workspace "$ws" --cwd "$root" --label "$(basename "$root")" --focus >/dev/null
