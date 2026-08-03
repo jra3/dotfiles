@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Fork the focused Claude Code pane into a new herdr tab.
+# Uses the reported session id (--resume <id> --fork-session) when the
+# herdr claude integration has reported one; otherwise falls back to
+# forking the most recent session for that cwd (--continue --fork-session).
+set -euo pipefail
+
+agents=$(herdr agent list)
+entry=$(jq -c '.result.agents[] | select(.focused and .agent == "claude")' <<<"$agents" | head -1)
+if [[ -z "$entry" ]]; then
+  herdr notification show "herdr-fork" --body "focused pane is not a claude agent" 2>/dev/null || true
+  exit 1
+fi
+
+sid=$(jq -r '.agent_session.value // empty' <<<"$entry")
+cwd=$(jq -r '.foreground_cwd // .cwd' <<<"$entry")
+ws=$(jq -r '.workspace_id' <<<"$entry")
+
+new=$(herdr tab create --workspace "$ws" --cwd "$cwd" --label fork --focus)
+pane=$(jq -r '.result.root_pane.pane_id' <<<"$new")
+
+if [[ -n "$sid" ]]; then
+  herdr agent start fork --kind claude --pane "$pane" --timeout 60000 -- \
+    --resume "$sid" --fork-session
+else
+  herdr agent start fork --kind claude --pane "$pane" --timeout 60000 -- \
+    --continue --fork-session
+fi

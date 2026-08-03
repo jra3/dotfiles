@@ -323,3 +323,9 @@ pane_history = false
 # Maximum scrollback buffer size in bytes retained per pane terminal.
 # Matches Ghostty's default scrollback-limit behavior.
 # scrollback_limit_bytes = 10000000
+
+[[keys.command]]
+# Fork the focused Claude Code pane into a new tab (~/.local/bin/herdr-fork-focused)
+key = "prefix+f"
+type = "shell"
+command = "herdr-fork-focused"
