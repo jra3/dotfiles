@@ -1,0 +1,40 @@
+#!/bin/bash
+# SSH_ASKPASS shim: surface OpenSSH's user-presence requests as desktop
+# notifications instead of a silently blinking YubiKey.
+#
+# Why this exists: the signing keys are FIDO2 sk keys that require a touch. With
+# no askpass installed, OpenSSH logs
+#   notify_start: exec(/usr/lib/ssh/ssh-askpass): No such file or directory
+# and gives no visible cue at all — the only signal is the LED on a 5 Nano
+# sitting flush in the USB port. A missed touch then surfaces as the extremely
+# misleading "incorrect passphrase supplied to decrypt private key".
+#
+# OpenSSH calls SSH_ASKPASS for two different jobs and distinguishes them with
+# SSH_ASKPASS_PROMPT (set to "none" for notifications since OpenSSH 8.4):
+#   1. notification  — "Confirm user presence for key ..."; no reply is read
+#   2. real prompt   — passphrase/PIN; the secret is read from our stdout
+#
+# We only handle (1). These keys are touch-only with no auth PIN, so (2) should
+# never fire; if it ever does we notify and exit non-zero to cancel, rather than
+# returning an empty string that would look like a wrong passphrase — which is
+# exactly the confusing failure this script exists to eliminate.
+#
+# Deliberately NOT paired with SSH_ASKPASS_REQUIRE=force: that would route real
+# passphrase prompts here too, and this shim cannot collect input.
+
+set -uo pipefail
+
+msg="${1:-SSH is requesting confirmation}"
+
+if [ "${SSH_ASKPASS_PROMPT:-}" = "none" ]; then
+    notify-send -u critical -a SSH -i security-high \
+        "Touch your YubiKey" "$msg"
+    exit 0
+fi
+
+notify-send -u critical -a SSH -i dialog-error \
+    "SSH needs input" \
+    "$msg
+
+No GUI input helper is configured, so this prompt was cancelled."
+exit 1
