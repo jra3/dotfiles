@@ -3,5 +3,7 @@
 # System-installed shader symlinks (written by Aether into the stowed hypr dir)
 hypr/.config/hypr/shaders/
 
-# Per-machine telepresence client identity (UUID, generated on first run)
-telepresence/.config/telepresence/id
+# herdr runtime state, written into the stowed config dir at run time
+herdr/.config/herdr/*.log
+herdr/.config/herdr/session.json
+herdr/.config/herdr/.plugins.lock
