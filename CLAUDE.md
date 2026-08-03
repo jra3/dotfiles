@@ -25,7 +25,18 @@ stow -n -v <package>
 
 # Re-stow (useful after adding files)
 stow -R <package>
+
+# Deploy a package without directory folding (required for `emacs`)
+stow --no-folding <package>
 ```
+
+**Directory folding gotcha:** when only one package provides a directory, stow
+replaces the whole directory in `$HOME` with a symlink into the repo rather than
+symlinking each file. That breaks systemd drop-ins — systemd silently ignores a
+drop-in directory that is a symlink. The `emacs` package hits this
+(`emacs.service.d/`) and must be stowed with `--no-folding`. Folding only happens
+when the target directory doesn't already exist, so this bites on a fresh machine;
+`pacman/configure-system` detects and repairs a folded drop-in on re-run.
 
 ## Default Software
 
@@ -65,6 +76,7 @@ This documents the default software stack configured in Omarchy:
 - `gtr/` - Git worktree runner wrapper
 - `lazygit/` - lazygit TUI config with Graphite (gt) stacked-diff custom commands
 - `claude/` - Claude Code settings and custom commands
+- `ccstatusline/` - Claude Code status line: the `ccstatusline` layout plus the `cc-pr-widget` PR/CI segment it shells out to; see `ccstatusline/README.md`
 - `slack/` - `slack://` deep-link handler that opens links in the browser (no desktop Slack app); see `slack/README.md`
 - `bitwarden/` - Bitwarden CLI helper script (`get-signature`) for extracting attachments
 - `pacman/` - Arch package lists and `configure-system` for post-install setup
@@ -92,11 +104,22 @@ This documents the default software stack configured in Omarchy:
 
 Run `pacman/configure-system` to configure system services (Tailscale operator, Emacs daemon, etc.). The script is idempotent and safe to re-run.
 
-## Git commit signing (per-machine YubiKey)
+## Git commit signing (per-machine YubiKey, opt-in)
 
-Commits are signed with a YubiKey-resident SSH key. Config is shared via the `git/`
-package (`gpg.format=ssh`, `commit.gpgsign`, `user.signingkey` → a canonical key
-path), but **each machine has its own signing key on its own YubiKey**:
+**Signing is off by default** — `commit.gpgsign = false` in the `git/` package.
+Sign an individual commit with `git commit -S`, or flip `gpgsign` back to `true`
+to sign everything again. Nothing else needs changing: `gpg.format=ssh` and
+`user.signingkey` stay configured either way.
+
+Why off: signing an `sk-` (FIDO2) key needs a touch or an askpass prompt, so it
+fails in any non-interactive context — editors, git hooks, agent-run commands.
+Worse, `git rebase --exec '... -S'` stops mid-rebase on the failure and leaves
+you detached, which reads like lost commits.
+
+The per-machine key setup below still applies whenever you *do* want to sign.
+Config is shared via the `git/` package (`gpg.format=ssh`, `user.signingkey` → a
+canonical key path), but **each machine has its own signing key on its own
+YubiKey**:
 
 1. On a new machine, run `setup-git-signing` (from `git/.local/bin/`, on `$PATH`).
    It generates a resident no-touch/no-PIN `sk-ed25519` key at
@@ -107,5 +130,6 @@ path), but **each machine has its own signing key on its own YubiKey**:
 
 `allowed_signers` accumulates one line per machine. Both identities
 (`github@porcnick.com` personal, `john@antimetal.com` work) share each key.
-Note: `commit.gpgsign` is global, so the signing key must exist before committing —
-run `setup-git-signing` as part of bootstrapping a new machine.
+Since `commit.gpgsign` is now `false`, a new machine can commit before
+`setup-git-signing` has ever run — it is only needed if you want signed commits
+on that machine.

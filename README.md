@@ -41,6 +41,14 @@ Or deploy individual packages:
 stow zsh git ghostty
 ```
 
+> **`emacs` must be stowed with `--no-folding`:** `stow --no-folding emacs`.
+> It ships a systemd drop-in directory (`emacs.service.d/`), and stow's default
+> folding replaces the whole directory with a symlink — which systemd silently
+> ignores, so the override never applies. Stow only folds when the target directory
+> doesn't already exist, so this bites on a **fresh machine**; once the real
+> directory is in place, plain `stow emacs` is harmless. `pacman/configure-system`
+> detects and repairs a folded drop-in on re-run.
+
 ## Packages
 
 | Package | Description |
