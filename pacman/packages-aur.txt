@@ -1,6 +1,6 @@
+graphite-cli
 grpcurl-bin
-helium
+helium-browser-bin
 herdr-bin
 pyenv-virtualenv
-telepresence2-bin
 tsui

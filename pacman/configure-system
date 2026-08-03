@@ -45,6 +45,17 @@ if command -v tailscale &>/dev/null && command -v sshd &>/dev/null; then
             'RestartSec=3' \
             | sudo tee /etc/systemd/system/sshd.service.d/10-tailscale.conf >/dev/null
 
+        # Generate host keys BEFORE validating the config. A freshly installed
+        # machine has no /etc/ssh/ssh_host_* until sshd first starts, and
+        # `sshd -t` hard-fails with "no hostkeys available -- exiting" when they
+        # are absent — so the check below would reject a perfectly valid config
+        # and silently leave sshd disabled. ssh-keygen -A only creates missing
+        # key types, so this is a no-op on an already-provisioned machine.
+        if ! compgen -G '/etc/ssh/ssh_host_*_key' >/dev/null; then
+            echo "  No SSH host keys found; generating..."
+            sudo ssh-keygen -A
+        fi
+
         if sudo sshd -t; then
             sudo systemctl daemon-reload
             sudo systemctl enable sshd
@@ -92,6 +103,32 @@ else
     echo "  ~/.ssh/agent-keys already present; leaving it alone."
 fi
 
+# --- SSH inbound: authorized_keys (host-local) ---
+# sshd is bound to the tailnet above, but it still rejects every login until
+# authorized_keys exists — a rebuild has none, and nothing else creates it.
+#
+# The credential is this machine's own FIDO2 auth key. That reads oddly ("why
+# authorize myself?") but is right: every machine's YubiKey is brokered to the
+# others by ForwardAgent (see ssh/.ssh/config.shared), so an inbound session
+# from am-jallen authenticates with whichever YubiKey you are physically sitting
+# next to. Same key, different chair.
+#
+# Consequence worth knowing: every inbound session costs a touch, so this grants
+# attended access only. Add a separate non-sk key here if you ever need
+# unattended inbound. Never overwritten once present — curate it freely.
+if [ -f "$HOME/.ssh/id_ed25519_sk.pub" ]; then
+    if [ ! -f "$HOME/.ssh/authorized_keys" ]; then
+        echo "Seeding ~/.ssh/authorized_keys with this host's sk auth key..."
+        install -m 600 /dev/null "$HOME/.ssh/authorized_keys"
+        cat "$HOME/.ssh/id_ed25519_sk.pub" >> "$HOME/.ssh/authorized_keys"
+        echo "  seeded. Inbound SSH requires a YubiKey touch."
+    else
+        echo "  ~/.ssh/authorized_keys already present; leaving it alone."
+    fi
+else
+    echo "  No ~/.ssh/id_ed25519_sk.pub; skipping authorized_keys seed."
+fi
+
 # --- SSH agent (user) ---
 # Run OpenSSH's own ssh-agent (FIDO2/sk-capable, unlike gnome-keyring's) and
 # auto-load this machine's YubiKey keys into it at login, so SSH agent
@@ -113,11 +150,73 @@ else
     echo "  ssh-agent not installed, skipping."
 fi
 
+# --- Default browser (Helium) ---
+# Helium isn't in upstream's `omarchy default browser` menu, so we make the same
+# xdg calls it would. The package itself comes from packages-aur.txt via
+# install-packages; this only does the configuration half.
+#
+# The flags file is GENERATED, not copied. Omarchy's chromium-flags.conf uses
+# `--load-extension=~/...`, but Helium's wrapper deliberately escapes both `~`
+# and `$` before eval ("prevent $VAR and ~ expansion"), so a tilde path reaches
+# the browser literally and the extension silently fails to load. Expanding
+# $HOME at write time is the only form that survives, which also means the file
+# is per-machine and must not be stowed.
+if command -v helium-browser &>/dev/null; then
+    echo "Configuring Helium as default browser..."
+    omarchy_cfg="${OMARCHY_PATH:-$HOME/.local/share/omarchy}/config/chromium-flags.conf"
+    flags_file="$HOME/.config/helium-browser-flags.conf"
+    if [ -f "$omarchy_cfg" ]; then
+        install -d "$HOME/.config"
+        sed "s|~/|$HOME/|g" "$omarchy_cfg" > "$flags_file"
+        echo "  Wrote $flags_file (tilde paths expanded)."
+    else
+        echo "  Omarchy chromium-flags.conf not found; skipping flags file."
+    fi
+
+    xdg-settings set default-web-browser helium.desktop
+    for mime in x-scheme-handler/http x-scheme-handler/https text/html; do
+        xdg-mime default helium.desktop "$mime"
+    done
+    echo "  Helium set as default browser for http/https/html."
+else
+    echo "  Helium not installed, skipping browser setup."
+fi
+
 # --- Emacs ---
+# The `emacs` package ships a systemd drop-in (emacs.service.d/override.conf,
+# forcing GDK_BACKEND=wayland for the pgtk build). Plain `stow emacs` FOLDS that
+# directory: no other package provides emacs.service.d, so stow replaces the whole
+# dir with a single symlink into ~/.dotfiles — and systemd silently ignores
+# drop-ins that live in a symlinked drop-in DIRECTORY. The failure is quiet:
+# `systemctl --user show emacs -p DropInPaths` returns empty, `systemctl --user cat
+# emacs` shows only the vendor unit, and NeedDaemonReload stays "yes" even straight
+# after a daemon-reload. Re-stowing with --no-folding makes the directory real and
+# symlinks only override.conf, which systemd loads. Stow only folds when the target
+# directory does not already exist, so this bites on a fresh machine (or if the
+# directory is ever removed) — once it is a real directory, plain `stow emacs` and
+# `stow */` are harmless. The repair below is idempotent either way.
 if command -v emacs &>/dev/null; then
     echo "Configuring Emacs daemon..."
+    dropin_dir="$HOME/.config/systemd/user/emacs.service.d"
+    dotfiles_dir="$(cd "$(dirname "$0")/.." && pwd)"
+
+    if [ -L "$dropin_dir" ] && command -v stow &>/dev/null; then
+        echo "  Drop-in dir is folded (systemd ignores it); re-stowing --no-folding."
+        (cd "$dotfiles_dir" && stow -D emacs && stow --no-folding emacs)
+        systemctl --user daemon-reload
+        systemctl --user try-restart emacs
+    fi
+
     systemctl --user enable --now emacs
     echo "  Emacs daemon enabled."
+
+    if [ ! -d "$dropin_dir" ]; then
+        echo "  Drop-in not deployed; run 'stow --no-folding emacs' and re-run."
+    elif [ -n "$(systemctl --user show emacs -p DropInPaths --value)" ]; then
+        echo "  Emacs drop-in active (GDK_BACKEND=wayland)."
+    else
+        echo "  WARNING: emacs.service.d exists but systemd is not loading it."
+    fi
 else
     echo "  Emacs not installed, skipping."
 fi
