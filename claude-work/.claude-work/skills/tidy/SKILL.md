@@ -5,7 +5,7 @@ description: Clean up merged branches and stale worktrees. Use when the user typ
 
 # tidy — prune merged branches and stale worktrees
 
-A safe-by-default cleanup sweep. It **auto-deletes only what's provably in trunk** — local branches whose PR is MERGED, and worktrees sitting on a merged branch with no uncommitted files. Everything ambiguous — CLOSED-PR branches, no-PR branches Graphite isn't tracking, worktrees with uncommitted work — is **reported, never deleted**. Backup branches and active-but-unsubmitted stack work both look "PR-less," so the bar for automatic deletion is "merged," nothing weaker.
+A safe-by-default cleanup sweep. It **auto-deletes only what's provably in trunk** — local branches whose PR is MERGED, and worktrees sitting on a merged branch with no uncommitted files. Everything ambiguous — CLOSED-PR branches, no-PR branches, worktrees with uncommitted work — is **reported, never deleted**. Backup branches and active-but-unsubmitted work both look "PR-less," so the bar for automatic deletion is "merged," nothing weaker.
 
 Run the passes in order. After each destructive step, report what changed.
 
@@ -22,13 +22,12 @@ Report each `pruned …` line. Surface the `closed, review manually:` lines as a
 
 ## Pass 2 — orphaned no-PR branches (report only)
 
-Pass 1 silently skips branches with **no PR at all**. Some are live stack work not yet submitted (keep); some are abandoned scaffolds or `backup/*` branches (probably delete). Distinguish them by whether Graphite is tracking the branch — tracked = part of an active stack.
+Pass 1 silently skips branches with **no PR at all**. Some are live work not yet pushed (keep); some are abandoned scaffolds or `backup/*` branches (probably delete). There's no reliable local signal to tell them apart, so all of them are report-only.
 
 Run it under `sh` (see [Why `sh`](#why-sh)):
 
 ```bash
 sh <<'SH'
-tracked=$(gt log short 2>/dev/null | grep -oE '[a-z][a-zA-Z0-9._-]*/[a-zA-Z0-9._/-]+')
 cur=$(git symbolic-ref --quiet --short HEAD)
 wt=$(git worktree list --porcelain | sed -n 's#^branch refs/heads/##p')
 for b in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
@@ -36,15 +35,12 @@ for b in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
   printf '%s\n' "$wt" | grep -qxF "$b" && continue   # checked out in a worktree
   st=$(gh pr list --head "$b" --state all --limit 1 --json state --jq '.[0].state' 2>/dev/null)
   [ -n "$st" ] && continue                           # has a PR — pass 1 handled it
-  if printf '%s\n' "$tracked" | grep -qxF "$b"
-  then echo "keep (active gt stack, unsubmitted): $b"
-  else echo "orphan, review manually: $b"
-  fi
+  echo "no PR, review manually: $b"
 done
 SH
 ```
 
-List the `orphan` branches and ask before deleting any. Don't touch the `active gt stack` ones.
+List the `no PR` branches and ask before deleting any.
 
 ## Pass 3 — stale worktrees
 
@@ -82,27 +78,10 @@ Removing a worktree keeps its branch. If that branch's PR was merged, re-run pas
 git prune-merged
 ```
 
-## Pass 4 — restack survivors (opt-in, ask first)
-
-After deletions, surviving stacked branches may need restacking. **Do not auto-run this** — it's the one risky pass:
-
-- `gt restack` rebases onto Graphite's *recorded* parent, not git history — it can silently undo a manual rebase.
-- The repo's `merge=pnpm-lock` driver runs `pnpm install` on every lockfile merge and can deadlock a restack cascade.
-
-Offer it; run only on explicit confirmation. Pass `--no-interactive`:
-
-```bash
-gt sync --no-interactive      # delete merged + restack survivors (Graphite's own sweep)
-gt restack --no-interactive   # restack only
-```
-
-If a restack stalls on `pnpm-lock.yaml`, see the recovery in `[[reference_pnpm_lock_merge_driver_rebase]]`.
-
 ## Important
 
 - **Auto-delete only MERGED.** Branches: MERGED-PR only. Worktrees: merged branch **and** clean tree only. Everything else is report-only.
-- **Never `git branch -D` a no-PR or closed-PR branch** without explicit confirmation — `backup/*` branches and unsubmitted stack work both have no PR.
-- **Pass 4 is opt-in.** Surface the footguns; don't restack silently. See `[[reference_gt_restack_trusts_metadata]]`.
+- **Never `git branch -D` a no-PR or closed-PR branch** without explicit confirmation — `backup/*` branches and unpushed work both have no PR.
 
 ## Why `sh`
 
@@ -110,6 +89,6 @@ Passes 2 and 3 wrap their loops in `sh <<'SH' … SH`. In the user's interactive
 
 ## What this skill does NOT do
 
-- Submit or push branches — that's `gt submit` (`[[feedback_graphite_submit]]`, `[[feedback_gt_no_interactive]]`).
+- Push branches or open PRs — out of scope; it only deletes what's already merged.
 - Exit/remove the *current* worktree — that's `/wtx`, which has the interactive clean/dirty gate.
 - Delete `backup/*` branches or orphaned scaffolds on its own — it only lists them.
