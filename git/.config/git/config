@@ -35,7 +35,7 @@
     mnemonicPrefix = true    # More intuitive refs in diff output
 [commit]
     verbose = true           # Include diff comment in commit message template
-    gpgsign = true           # Sign every commit (SSH key on the YubiKey)
+    gpgsign = false          # Opt-in: sign a commit with `git commit -S`
 [column]
     ui = auto                # Output in columns when possible
 [branch]
