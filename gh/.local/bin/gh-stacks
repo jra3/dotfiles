@@ -1,0 +1,662 @@
+#!/bin/bash
+# gh-stacks - Cross-repo view of your open PRs, grouped by stack.
+#
+# A "stack" is either a lone PR, or 2-N PRs in a linear dependency order.
+# GitHub's native stack (PullRequest.stack / .stackEntry) is ground truth when
+# present; otherwise the chain is inferred from branch topology
+# (A.baseRefName == B.headRefName, same repo).
+#
+#   marker  meaning
+#   ------  ---------------------------------------------------------------
+#   |=      native GitHub stack (GitHub manages rebase/retarget)
+#   |-      inferred from branch topology (yours to babysit)
+#
+# Usage: gh-stacks [--review] [--watch [SECONDS]] [--repo OWNER/NAME]...
+#   --review, -r       PRs awaiting YOUR review instead of ones you authored.
+#                      Stacks are shown at full depth, but layers you were not
+#                      asked to review collapse into a dotted lacuna.
+#   --watch [N]        Refresh every N seconds (default 60)
+#   --repo OWNER/NAME  Override the allowlist for this run; repeatable
+#                      (authored mode only - review mode never filters, since
+#                      missing a review request is worse than an extra row)
+#
+# Repo allowlist: ~/.config/gh-stacks/repos ($GH_STACKS_CONFIG to relocate).
+# One per line, # comments allowed, `owner/name` or a raw qualifier like
+# `org:acme`. With no config file the view is unfiltered - every repo you have
+# an open PR in. The file is intentionally NOT part of this dotfiles repo,
+# which is public; repo names usually are not.
+#
+# Costs 2 GraphQL calls per refresh: ~24 rate-limit points authored, ~26 review
+# (measured). GraphQL bills the *requested* page size, not the rows returned,
+# so first:100 costs double first:50 even at 37 PRs. At the 60s default that is
+# ~1440 points/hour against a 5000/hour limit.
+
+set -uo pipefail
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+
+# Repo allowlist, read from a config file that deliberately lives OUTSIDE this
+# repo - the list is usually private repo names, and this repo is public.
+#
+#   ~/.config/gh-stacks/repos      (override with $GH_STACKS_CONFIG)
+#
+# One entry per line; blank lines and #-comments ignored. A bare `owner/name`
+# becomes a `repo:` qualifier; anything containing a colon passes through
+# verbatim, so `org:acme` covers a whole org.
+#
+# No file, or an empty one, means NO filtering - every repo you have an open PR
+# in. Entries compile to server-side qualifiers, so filtering is free.
+REPOS=()
+GH_STACKS_CONFIG="${GH_STACKS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/gh-stacks/repos}"
+_load_repos() {
+  local line
+  REPOS=()
+  [[ -r "$GH_STACKS_CONFIG" ]] || return 0
+  # `|| [[ -n "$line" ]]` so a final line without a trailing newline is kept.
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="${line//[[:space:]]/}"
+    [[ -n "$line" ]] && REPOS+=("$line")
+  done < "$GH_STACKS_CONFIG"
+  return 0
+}
+_load_repos
+
+# Build the search qualifier string. Empty when nothing is configured, which
+# makes the search unfiltered rather than empty.
+_repo_quals() {
+  local r out=""
+  (( ${#REPOS[@]} == 0 )) && { printf ''; return 0; }
+  for r in "${REPOS[@]}"; do
+    [[ -z "$r" ]] && continue
+    case "$r" in
+      *:*) out+=" ${r}" ;;
+      *)   out+=" repo:${r}" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
+# Reuse gh-prs' rendering vocabulary rather than duplicating it. gh-prs guards
+# its main() behind a BASH_SOURCE check (for its bats suite), so sourcing is
+# side-effect free and works outside a git repo.
+GH_PRS="${GH_PRS:-$HOME/.local/bin/gh-prs}"
+if [[ -r "$GH_PRS" ]]; then
+  # shellcheck disable=SC1090
+  source "$GH_PRS"
+else
+  echo "gh-stacks: cannot source gh-prs at $GH_PRS" >&2
+  exit 1
+fi
+
+# gh-prs' _visible_width counts *characters*; emoji are one character but two
+# display columns, so every row containing one would under-pad. Override it to
+# add 1 per emoji codepoint. ● ◐ ✗ (U+25CF/U+25D0/U+2717) are deliberately
+# outside this range - they are single-column and must stay counted as 1.
+_visible_width() {
+  local stripped wide
+  stripped=$(printf '%s' "$1" | sed -E $'s/\e\\[[0-9;]*[a-zA-Z]//g; s/\e\\]8;;[^\a\e]*(\a|\e\\\\)//g')
+  wide=$(printf '%s' "$stripped" | grep -oP '[\x{1F300}-\x{1FAFF}]' 2>/dev/null | wc -l)
+  printf '%d' $(( ${#stripped} + wide ))
+}
+
+ESC=$'\e'
+MODE=mine
+
+_FETCHED_ROWS=""
+_FETCHED_ERR=""
+
+# ---------------------------------------------------------------------------
+# Fetch
+# ---------------------------------------------------------------------------
+
+# Call 1: everything obtainable from a single cross-repo search.
+# reviewThreads(first:20) is deliberate - the busiest PR has 10 threads, and
+# the page size drives cost hard: at search(first:50), threads first:20 cost 11
+# points where first:100 cost 51 - enough to exhaust the hourly limit under a
+# watch loop. Drop search first:100 to 50 to halve the cost again if the PR
+# count stays well under 50.
+_query_search() {
+  local quals
+  quals=$(_repo_quals)
+  cat <<EOF
+{
+  search(query: "is:pr is:open author:@me${quals}", type: ISSUE, first: 100) {
+    issueCount
+    nodes { ... on PullRequest {
+      number title isDraft additions deletions updatedAt
+      repository { nameWithOwner owner { login } name }
+      headRefName baseRefName isCrossRepository
+      reviewDecision mergeable
+      stack { number size baseRefName }
+      stackEntry { position }
+      reviewThreads(first: 20) {
+        totalCount
+        nodes { isResolved comments(first: 1) { nodes { author { __typename } } } }
+      }
+    } }
+  }
+}
+EOF
+}
+
+# Call 2: statusCheckRollup with per-PR isRequired, which cannot ride along in
+# call 1 - isRequired hard-requires a pullRequestId/pullRequestNumber argument,
+# and GraphQL has no way to reference the enclosing node's own number.
+#
+# Repos MUST be emitted as contiguous blocks; interleaved rows would nest one
+# repo's PR numbers inside another repo's repository() and return NOT_FOUND.
+_query_checks() {
+  local prs_json=$1
+  {
+    printf '{\n'
+    jq -r '.data.search.nodes[] | select(.isCrossRepository|not)
+           | "\(.repository.owner.login)\t\(.repository.name)\t\(.repository.nameWithOwner)\t\(.number)"' <<<"$prs_json" \
+    | sort -t$'\t' -k3,3 -k4,4n \
+    | awk -F'\t' '
+        { if ($3 != prev) { if (NR > 1) printf "  }\n"; printf "  r%d: repository(owner: \"%s\", name: \"%s\") {\n    nameWithOwner\n", ++n, $1, $2; prev = $3 }
+          printf "    p%s: pullRequest(number: %s) { statusCheckRollup { contexts(first: 100) { nodes {\n", $4, $4
+          printf "      __typename\n      ... on CheckRun { name status conclusion isRequired(pullRequestNumber: %s) }\n", $4
+          printf "      ... on StatusContext { context state isRequired(pullRequestNumber: %s) }\n    } } } }\n", $4 }
+        END { if (n > 0) printf "  }\n" }'
+    printf '}\n'
+  }
+}
+
+fetch() {
+  local search_json checks_json tmp
+  _FETCHED_ERR=""
+
+  if [[ $MODE == review ]]; then
+    search_json=$(gh api graphql -f query="$(_query_search_review)" 2>&1)
+  else
+    search_json=$(gh api graphql -f query="$(_query_search)" 2>&1)
+  fi
+  if [[ $? -ne 0 || -z "$search_json" ]] || ! jq -e '.data.search' >/dev/null 2>&1 <<<"$search_json"; then
+    _FETCHED_ERR="search query failed: $(head -c 400 <<<"$search_json")"
+    return 1
+  fi
+
+  # Warn rather than silently undercount if a PR outgrows the thread page size,
+  # or if there are more open PRs than one search page holds. Both would
+  # otherwise look like a complete view.
+  local truncated total returned
+  truncated=$(jq -r '[.data.search.nodes[] | select(.reviewThreads.totalCount > (.reviewThreads.nodes|length)) | .number] | join(", ")' <<<"$search_json")
+  local cap=20; [[ $MODE == review ]] && cap=100
+  [[ -n "$truncated" ]] && echo "gh-stacks: warning: reviewThreads truncated at $cap for PR(s) $truncated; 🤖/🍖 undercount" >&2
+  total=$(jq -r '.data.search.issueCount' <<<"$search_json")
+  returned=$(jq -r '.data.search.nodes | length' <<<"$search_json")
+  (( total > returned )) && echo "gh-stacks: warning: $total open PRs but only $returned fetched; results are incomplete (add pagination)" >&2
+
+  tmp=$(mktemp)
+  _query_checks "$search_json" > "$tmp"
+  checks_json=$(gh api graphql -F query=@"$tmp" 2>/dev/null)
+  rm -f "$tmp"
+  [[ -z "$checks_json" ]] && checks_json='{}'
+
+  if [[ $MODE == review ]]; then
+    _FETCHED_ROWS=$(_group_review "$search_json" "$checks_json")
+    [[ -z "$_FETCHED_ROWS" ]] && { _FETCHED_ERR="nothing is waiting on your review"; return 1; }
+  else
+    _FETCHED_ROWS=$(_group "$search_json" "$checks_json")
+    [[ -z "$_FETCHED_ROWS" ]] && { _FETCHED_ERR="no open PRs in the configured repos"; return 1; }
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Group: native stacks first, then infer chains from branch topology.
+# Emits TSV rows consumed by render():
+#   H  kind  stacknum  repo  trunk  size          (stack header)
+#   R  pos   num  url  ci  review  bot  hum  adds  dels  title
+#   S  ""    num  url  ci  review  bot  hum  adds  dels  title  repo   (singleton)
+# ---------------------------------------------------------------------------
+_group() {
+  local search_json=$1 checks_json=$2 cur
+  # Empty outside a git repo (e.g. run from a scratch dir), which just means
+  # nothing floats and the order is pure recency.
+  cur=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
+  jq -r --argjson checks "$checks_json" --arg cur "$cur" '
+
+  # --- CI: required-check union, computed PER REPO -------------------------
+  # gh-prs takes a single union because it only ever sees one repo. Across
+  # repos the required sets differ, so a global union would mark overlook s
+  # checks required on chikin and misreport CI there.
+  ([ ($checks.data // {}) | to_entries[] | select(.key | test("^r[0-9]+$")) | .value as $rv
+     | ($rv | to_entries[] | select(.key | test("^p[0-9]+$"))
+        | { repo: $rv.nameWithOwner, num: (.key[1:] | tonumber),
+            ctx: (.value.statusCheckRollup.contexts.nodes // []) }) ]) as $checkrows
+
+| ($checkrows | group_by(.repo)
+   | map({ key: .[0].repo,
+           value: ([ .[].ctx[] | select(.isRequired == true) | (.name // .context) ] | unique) })
+   | from_entries) as $required_by_repo
+
+| ($checkrows | map({ key: "\(.repo)|\(.num)", value: .ctx }) | from_entries) as $ctx_by_pr
+
+  # --- normalize PRs -------------------------------------------------------
+| [ .data.search.nodes[]
+    | select(.isCrossRepository | not)          # fork PRs self-loop on head==base
+    | . as $pr
+    | ($required_by_repo[$pr.repository.nameWithOwner] // []) as $req
+    | ($ctx_by_pr["\($pr.repository.nameWithOwner)|\($pr.number)"] // []) as $ctx
+    | ([ $ctx[] | . as $c | select( ($req | index($c.name // $c.context)) != null ) ]) as $rc
+    | {
+        n: $pr.number,
+        repo: $pr.repository.nameWithOwner,
+        title: $pr.title,
+        draft: $pr.isDraft,
+        adds: $pr.additions,
+        dels: $pr.deletions,
+        upd: $pr.updatedAt,
+        h: $pr.headRefName,
+        b: $pr.baseRefName,
+        sn: ($pr.stack.number // null),
+        sbase: ($pr.stack.baseRefName // null),
+        sp: ($pr.stackEntry.position // null),
+        url: "https://github.com/\($pr.repository.nameWithOwner)/pull/\($pr.number)",
+        review: (if $pr.isDraft then "draft"
+                 elif $pr.mergeable == "CONFLICTING" then "conflict"
+                 elif $pr.reviewDecision == "CHANGES_REQUESTED" then "changes"
+                 elif $pr.reviewDecision == "APPROVED" then "approved"
+                 else "pending" end),
+        ci: (if ($rc | length) == 0 then "none"
+             elif any($rc[];
+                 (.__typename == "CheckRun" and (.status == "QUEUED" or .status == "IN_PROGRESS" or .status == "PENDING" or .status == "WAITING" or .status == "REQUESTED"))
+                 or (.__typename == "StatusContext" and (.state == "EXPECTED" or .state == "PENDING"))) then "running"
+             elif any($rc[];
+                 (.__typename == "CheckRun" and (.conclusion == "FAILURE" or .conclusion == "TIMED_OUT" or .conclusion == "CANCELLED" or .conclusion == "ACTION_REQUIRED" or .conclusion == "STARTUP_FAILURE" or .conclusion == "STALE"))
+                 or (.__typename == "StatusContext" and (.state == "FAILURE" or .state == "ERROR"))) then "fail"
+             else "pass" end),
+        # Unresolved review threads, split by who opened the thread. Bots that
+        # only post issue comments (vercel/linear/github-actions) never appear
+        # here, so no denylist is needed. Your own threads count as human.
+        bot: ([ $pr.reviewThreads.nodes[]
+                | select(.isResolved == false and .comments.nodes[0].author.__typename == "Bot") ] | length),
+        hum: ([ $pr.reviewThreads.nodes[]
+                | select(.isResolved == false and .comments.nodes[0].author.__typename != "Bot") ] | length)
+      } ] as $prs
+
+  # --- native stacks are ground truth; they claim their members first ------
+| ($prs | map(select(.sn != null)) | group_by("\(.repo)#\(.sn)")
+   | map({ kind: "native", sid: (.[0].sn | tostring), repo: .[0].repo,
+           trunk: (.[0].sbase // "main"), m: (sort_by(.sp)) })) as $native
+| ([ $native[].m[].n ]) as $claimed
+
+  # --- infer the rest from branch topology ---------------------------------
+  # byhead spans ALL PRs (not just unclaimed) so a free PR can be seen to hang
+  # off a claimed one - that is the fork case, and it terminates the walk.
+| ($prs | map({ key: "\(.repo)|\(.h)", value: .n }) | from_entries) as $byhead
+| ($prs | map(select(.sn == null)) | map(. + { par: ($byhead["\(.repo)|\(.b)"] // null) })) as $free
+| ($free | map(. as $x | select($x.par == null or (($claimed | index($x.par)) != null)))) as $roots
+  # A node has at most one continuation. If a genuine fork ever appears among
+  # unclaimed PRs, the older (lower-numbered) PR continues the chain and the
+  # sibling becomes its own stack showing its attach point.
+| ($free | map(. as $x | select($x.par != null and (($claimed | index($x.par)) == null)))
+   | group_by(.par) | map({ key: (.[0].par | tostring), value: (map(.n) | min) })
+   | from_entries) as $child
+
+| ([ $roots[] | . as $r
+     | { kind: "inferred", sid: "", repo: $r.repo,
+         trunk: (if $r.par == null then $r.b else "#\($r.par)" end),
+         m: ( [$r.n]
+              | until( ($child[(.[-1] | tostring)] // null) == null;
+                       . + [ $child[(.[-1] | tostring)] ] )
+              | map(. as $x | $free[] | select(.n == $x)) ) } ]) as $inferred
+
+| (($native + $inferred) | map(. + { size: (.m | length), upd: ([ .m[].upd ] | max) })) as $stacks
+
+  # --- emit: multi-PR stacks by recency, then singletons ------------------
+  # Recency, then float the repo you are standing in. jq sort is stable, so the
+  # second sort keeps recency order within each group.
+| ( [ $stacks[] | select(.size > 1) ] | sort_by(.upd) | reverse
+    | sort_by(if .repo == $cur then 0 else 1 end)
+    | .[] | ["H", .kind, .sid, .repo, .trunk, (.size | tostring)], (
+        .m | to_entries[] | .value as $p | ["R", ((.key + 1) | tostring),
+          ($p.n | tostring), $p.url, $p.ci, $p.review,
+          ($p.bot | tostring), ($p.hum | tostring),
+          ($p.adds | tostring), ($p.dels | tostring), $p.title ]) )
+, ( [ $stacks[] | select(.size == 1) ] | sort_by(.upd) | reverse
+    | sort_by(if .repo == $cur then 0 else 1 end)
+    | .[] | . as $st | $st.m[0] as $p | ["S", "",
+        ($p.n | tostring), $p.url, $p.ci, $p.review,
+        ($p.bot | tostring), ($p.hum | tostring),
+        ($p.adds | tostring), ($p.dels | tostring), $p.title, $p.repo,
+        # Trunk, so a singleton stranded on top of another PR still shows its
+        # attach point - the headerless "unstacked" section has nowhere else
+        # to put it.
+        $st.trunk ] )
+# Unit separator, not tab: bash treats tab as IFS whitespace and collapses
+# runs of it, which would silently eat the empty fields (sid on inferred
+# stacks, pos on singletons) and shift every column after them.
+| join("\u001f")
+' <<<"$search_json"
+}
+
+# ---------------------------------------------------------------------------
+# Review mode: PRs awaiting *your* review.
+#
+# Differs from the authored view in one important way. There, search returned
+# every PR in every stack because you wrote them all. Here a stack usually
+# belongs to someone else and you are requested on only part of it, so the
+# search returns holes. stack.entries gives full membership, letting us place
+# the PRs you owe a review at their true position and collapse the runs you
+# were not asked about into a lacuna.
+#
+# No repo allowlist here: missing a review request is worse than a noisy row,
+# and a request can arrive from a repo you would never author in.
+# ---------------------------------------------------------------------------
+_query_search_review() {
+  cat <<'EOF'
+{
+  search(query: "is:pr is:open review-requested:@me", type: ISSUE, first: 25) {
+    issueCount
+    nodes { ... on PullRequest {
+      number title isDraft additions deletions updatedAt
+      repository { nameWithOwner owner { login } name }
+      author { login }
+      headRefName baseRefName isCrossRepository
+      reviewDecision mergeable
+      stack {
+        number size baseRefName
+        entries(first: 50) { nodes { position pullRequest { number } } }
+      }
+      stackEntry { position }
+      # 100, not the authored view's 20. A PR you are reviewing is exactly the
+      # one likely to have many threads (#4436 has 24), and an undercount here
+      # misreports how much is outstanding. Affordable because this search
+      # returns a handful of PRs, not your whole backlog.
+      reviewThreads(first: 100) {
+        totalCount
+        nodes { isResolved comments(first: 1) { nodes { author { __typename } } } }
+      }
+    } }
+  }
+}
+EOF
+}
+
+_group_review() {
+  local search_json=$1 checks_json=$2
+  jq -r --argjson checks "$checks_json" '
+
+  ([ ($checks.data // {}) | to_entries[] | select(.key | test("^r[0-9]+$")) | .value as $rv
+     | ($rv | to_entries[] | select(.key | test("^p[0-9]+$"))
+        | { repo: $rv.nameWithOwner, num: (.key[1:] | tonumber),
+            ctx: (.value.statusCheckRollup.contexts.nodes // []) }) ]) as $checkrows
+| ($checkrows | group_by(.repo)
+   | map({ key: .[0].repo,
+           value: ([ .[].ctx[] | select(.isRequired == true) | (.name // .context) ] | unique) })
+   | from_entries) as $required_by_repo
+| ($checkrows | map({ key: "\(.repo)|\(.num)", value: .ctx }) | from_entries) as $ctx_by_pr
+
+| [ .data.search.nodes[]
+    | . as $pr
+    | ($required_by_repo[$pr.repository.nameWithOwner] // []) as $req
+    | ($ctx_by_pr["\($pr.repository.nameWithOwner)|\($pr.number)"] // []) as $ctx
+    | ([ $ctx[] | . as $c | select( ($req | index($c.name // $c.context)) != null ) ]) as $rc
+    | {
+        n: $pr.number, repo: $pr.repository.nameWithOwner, title: $pr.title,
+        who: ($pr.author.login // "?"), draft: $pr.isDraft,
+        adds: $pr.additions, dels: $pr.deletions, upd: $pr.updatedAt,
+        b: $pr.baseRefName,
+        sn: ($pr.stack.number // null), sbase: ($pr.stack.baseRefName // null),
+        ssize: ($pr.stack.size // null), sp: ($pr.stackEntry.position // null),
+        entries: ([ ($pr.stack.entries.nodes // [])[]
+                    | { pos: .position, n: .pullRequest.number } ]),
+        url: "https://github.com/\($pr.repository.nameWithOwner)/pull/\($pr.number)",
+        review: (if $pr.isDraft then "draft"
+                 elif $pr.mergeable == "CONFLICTING" then "conflict"
+                 elif $pr.reviewDecision == "CHANGES_REQUESTED" then "changes"
+                 elif $pr.reviewDecision == "APPROVED" then "approved"
+                 else "pending" end),
+        ci: (if ($rc | length) == 0 then "none"
+             elif any($rc[];
+                 (.__typename == "CheckRun" and (.status == "QUEUED" or .status == "IN_PROGRESS" or .status == "PENDING" or .status == "WAITING" or .status == "REQUESTED"))
+                 or (.__typename == "StatusContext" and (.state == "EXPECTED" or .state == "PENDING"))) then "running"
+             elif any($rc[];
+                 (.__typename == "CheckRun" and (.conclusion == "FAILURE" or .conclusion == "TIMED_OUT" or .conclusion == "CANCELLED" or .conclusion == "ACTION_REQUIRED" or .conclusion == "STARTUP_FAILURE" or .conclusion == "STALE"))
+                 or (.__typename == "StatusContext" and (.state == "FAILURE" or .state == "ERROR"))) then "fail"
+             else "pass" end),
+        bot: ([ $pr.reviewThreads.nodes[]
+                | select(.isResolved == false and .comments.nodes[0].author.__typename == "Bot") ] | length),
+        hum: ([ $pr.reviewThreads.nodes[]
+                | select(.isResolved == false and .comments.nodes[0].author.__typename != "Bot") ] | length)
+      } ] as $prs
+
+  # Stacked requests, grouped by their stack. Ordered by recency of the PRs you
+  # were actually asked about - not the stack as a whole, since activity on
+  # layers you do not review is not your signal.
+| ([ $prs[] | select(.sn != null) ] | group_by("\(.repo)#\(.sn)")
+   | map({ repo: .[0].repo, sid: (.[0].sn | tostring), trunk: (.[0].sbase // "main"),
+           size: (.[0].ssize // (. | length)), entries: .[0].entries,
+           mine: ., upd: ([ .[].upd ] | max) })
+   | sort_by(.upd) | reverse) as $stacks
+
+| ( $stacks[]
+    | . as $st
+    | ($st.mine | map({ key: (.sp | tostring), value: . }) | from_entries) as $byPos
+    | ["H", "native", $st.sid, $st.repo, $st.trunk, ($st.size | tostring),
+       ($st.mine | length | tostring)]
+    , ( [ range(1; $st.size + 1)
+          | . as $p
+          | if $byPos[$p | tostring] then { t: "R", p: $p, pr: $byPos[$p | tostring] }
+            else { t: "G", from: $p, to: $p } end ]
+        # Collapse consecutive unrequested positions into one lacuna.
+        | reduce .[] as $x ([];
+            if ($x.t == "G" and ((.[-1]? // {}).t == "G"))
+            then (.[0:-1] + [{ t: "G", from: .[-1].from, to: $x.to }])
+            else . + [$x] end)
+        | .[]
+        | if .t == "G"
+          then ["L", (.from | tostring), (.to | tostring), ((.to - .from + 1) | tostring)]
+          else .pr as $p
+             | ["R", ($p.sp | tostring), ($p.n | tostring), $p.url, $p.ci, $p.review,
+                ($p.bot | tostring), ($p.hum | tostring),
+                ($p.adds | tostring), ($p.dels | tostring), $p.title, $p.who]
+          end ) )
+
+, ( [ $prs[] | select(.sn == null) ] | sort_by(.upd) | reverse
+    | .[] | ["S", "", (.n | tostring), .url, .ci, .review,
+             (.bot | tostring), (.hum | tostring),
+             (.adds | tostring), (.dels | tostring), .title, .repo, .b, .who] )
+| join("\u001f")
+' <<<"$search_json"
+}
+
+# ---------------------------------------------------------------------------
+# Render
+# ---------------------------------------------------------------------------
+
+# Unresolved-thread cell. Fixed 7 display columns: bot(3) + space + human(3).
+# Counts clamp to a single digit; anything above 9 renders "!" so the column
+# can never widen and knock the rows out of alignment.
+_threads_cell() {
+  local bot=$1 hum=$2 b h
+  if (( bot == 0 )); then b='   '
+  elif (( bot > 9 )); then b="🤖!"
+  else b="🤖${bot}"; fi
+  if (( hum == 0 )); then h='   '
+  elif (( hum > 9 )); then h="🍖!"
+  else h="🍖${hum}"; fi
+  printf '%s %s' "$b" "$h"
+}
+
+# +adds/-dels in a fixed 11 columns, '/' in a stable position (as gh-prs does).
+_diff_cell() {
+  local adds=$1 dels=$2 a="+$1" d="-$2" ap='' dp='' n
+  n=$(( 5 - ${#a} )); (( n > 0 )) && printf -v ap '%*s' "$n" ''
+  n=$(( 5 - ${#d} )); (( n > 0 )) && printf -v dp '%*s' "$n" ''
+  printf '%s%s[32m%s%s[0m/%s[31m%s%s[0m%s' "$ap" "$ESC" "$a" "$ESC" "$ESC" "$d" "$ESC" "$dp"
+}
+
+_ci_glyph() {
+  case $1 in
+    pass)    printf '%s[32m●%s[0m' "$ESC" "$ESC" ;;
+    running) printf '%s[33m◐%s[0m' "$ESC" "$ESC" ;;
+    fail)    printf '%s[31m✗%s[0m' "$ESC" "$ESC" ;;
+    *)       printf ' ' ;;
+  esac
+}
+
+# PR number, right-aligned in 6, colored by review state, OSC8-linked.
+_pr_cell() {
+  local num=$1 review=$2 url=$3 c pad='' n
+  case $review in
+    draft) c=90 ;; approved) c=32 ;; pending) c=33 ;;
+    changes) c=35 ;; conflict) c=31 ;; *) c=0 ;;
+  esac
+  n=$(( 6 - ${#num} - 1 )); (( n > 0 )) && printf -v pad '%*s' "$n" ''
+  printf '%s%s]8;;%s%s\\%s[%sm#%s%s[0m%s]8;;%s\\' \
+    "$pad" "$ESC" "$url" "$ESC" "$ESC" "$c" "$num" "$ESC" "$ESC" "$ESC"
+}
+
+render() {
+  local term title_w line kind sid repo trunk size pos num url ci review bot hum adds dels title
+  local marker head_txt printed_unstacked=0 who foryou aw=0 fixed=41
+  term=$(tput cols 2>/dev/null || echo 120)
+
+  # indent(3) pos(2) gap(2) ci(1) gap(1) pr(6) gap(2) draft(1) gap(1)
+  # threads(7) gap(2) diff(11) gap(2) = 41
+  # Review mode adds author(12) + gap(2): every PR belongs to someone else, so
+  # who is waiting on you has to be on the row itself.
+  if [[ $MODE == review ]]; then aw=12; fixed=55; fi
+  title_w=$(( term - fixed )); (( title_w < 24 )) && title_w=24
+
+  while IFS=$'\x1f' read -r -a f; do
+    case ${f[0]} in
+      H)
+        kind=${f[1]}; sid=${f[2]}; repo=${f[3]}; trunk=${f[4]}; size=${f[5]}
+        foryou=${f[6]:-}
+        if [[ $kind == native ]]; then
+          marker="${ESC}[36m|=${ESC}[0m"
+          head_txt="#${sid}  ${repo} ${ESC}[90m→ ${trunk}${ESC}[0m"
+        else
+          marker="${ESC}[90m|-${ESC}[0m"
+          head_txt="${ESC}[90minferred${ESC}[0m  ${repo} ${ESC}[90m→ ${trunk}${ESC}[0m"
+        fi
+        if [[ -n $foryou ]]; then
+          printf '\n%s %s  %s[90m%s PRs · %s for you%s[0m\n' \
+            "$marker" "$head_txt" "$ESC" "$size" "$foryou" "$ESC"
+        else
+          printf '\n%s %s  %s[90m%s PRs%s[0m\n' "$marker" "$head_txt" "$ESC" "$size" "$ESC"
+        fi
+        ;;
+      L)
+        # Lacuna: a run of stack positions you were not asked to review. Shown
+        # rather than dropped, so the stack's real depth stays legible.
+        local lf=${f[1]} lt=${f[2]} lc=${f[3]} label dots='' noun=PRs w
+        [[ $lc == 1 ]] && noun=PR
+        if [[ $lf == "$lt" ]]; then label="$lf"; else label="${lf}–${lt}"; fi
+        label="┄┄ ${label} · ${lc} ${noun} not requested from you "
+        # A short tail, not a full-width rule - spanning the terminal would read
+        # as a separator *between* stacks rather than a gap *inside* one.
+        w=12; (( term - 6 - ${#label} < w )) && w=3
+        printf -v dots '%*s' "$w" ''; dots=${dots// /┄}
+        printf '      %s[90m%s%s%s[0m\n' "$ESC" "$label" "$dots" "$ESC"
+        ;;
+      R|S)
+        pos=${f[1]}; num=${f[2]}; url=${f[3]}; ci=${f[4]}; review=${f[5]}
+        bot=${f[6]}; hum=${f[7]}; adds=${f[8]}; dels=${f[9]}; title=${f[10]}
+        if [[ ${f[0]} == S ]]; then
+          if (( printed_unstacked == 0 )); then
+            printed_unstacked=1
+            local bar='' w=$(( term - 15 )); (( w < 10 )) && w=10
+            printf -v bar '%*s' "$w" ''; bar=${bar// /─}
+            printf '\n%s[90m── unstacked %s%s[0m\n' "$ESC" "$bar" "$ESC"
+          fi
+          repo=${f[11]}; repo=${repo#*/}
+          local repo_w=18 rp='' trunk=${f[12]} aq=''
+          title=${title:0:$(( title_w - repo_w - 2 ))}
+          # Review mode: unstacked rows still need the author column.
+          if [[ $MODE == review ]]; then
+            who=${f[13]:-?}; printf -v aq '%-*s  ' "$aw" "${who:0:$aw}"
+            trunk=""   # no attach-point marker in review mode
+          fi
+          if [[ $trunk == \#* ]]; then
+            # Stranded on another PR: "repo ⤷#9" inside the same 18 columns.
+            (( ${#repo} > 10 )) && repo=${repo:0:10}
+            printf -v rp '%-10s ⤷%-6s' "$repo" "$trunk"
+          else
+            (( ${#repo} > repo_w )) && repo=${repo:0:$repo_w}
+            printf -v rp '%-*s' "$repo_w" "$repo"
+          fi
+          printf '   %s %s  %s %s  %s  %s%s[90m%s%s[0m  %s\n' \
+            "$(_ci_glyph "$ci")" "$(_pr_cell "$num" "$review" "$url")" \
+            "$( [[ $review == draft ]] && printf '%s[90m⋯%s[0m' "$ESC" "$ESC" || printf ' ' )" \
+            "$(_threads_cell "$bot" "$hum")" "$(_diff_cell "$adds" "$dels")" \
+            "$aq" "$ESC" "$rp" "$ESC" "${title}"
+        else
+          local aqr=''
+          if [[ $MODE == review ]]; then
+            who=${f[11]:-?}
+            printf -v aqr '%s[90m%-*s%s[0m  ' "$ESC" "$aw" "${who:0:$aw}" "$ESC"
+          fi
+          title=${title:0:$title_w}
+          printf '  %2s  %s %s  %s %s  %s  %s%s\n' \
+            "$pos" "$(_ci_glyph "$ci")" "$(_pr_cell "$num" "$review" "$url")" \
+            "$( [[ $review == draft ]] && printf '%s[90m⋯%s[0m' "$ESC" "$ESC" || printf ' ' )" \
+            "$(_threads_cell "$bot" "$hum")" "$(_diff_cell "$adds" "$dels")" "$aqr" "$title"
+        fi
+        ;;
+    esac
+  done <<< "$_FETCHED_ROWS"
+}
+
+# ---------------------------------------------------------------------------
+
+main() {
+  local WATCH=0 INTERVAL=60 override=()
+  MODE=mine
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --watch|-w)
+        WATCH=1
+        if [[ ${2:-} =~ ^[0-9]+$ ]]; then INTERVAL=$2; shift; fi
+        shift ;;
+      --review|-r)
+        MODE=review; shift ;;
+      --repo|-R)
+        [[ -z ${2:-} ]] && { echo "error: --repo requires OWNER/NAME" >&2; return 1; }
+        override+=("$2"); shift 2 ;;
+      -h|--help)
+        sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; return 0 ;;
+      *) shift ;;
+    esac
+  done
+
+  (( ${#override[@]} > 0 )) && REPOS=("${override[@]}")
+
+  if (( WATCH == 0 )); then
+    fetch || { echo "gh-stacks: $_FETCHED_ERR" >&2; return 1; }
+    render
+    return 0
+  fi
+
+  printf '\033[?1049h\033[H'
+  tput civis
+  [[ -t 0 ]] && stty -icanon -echo min 1 time 0 2>/dev/null
+  trap '[[ -t 0 ]] && stty icanon echo 2>/dev/null; tput cnorm; printf "\033[?1049l"; exit 0' INT TERM EXIT
+
+  local out key last=0 now remaining
+  while true; do
+    now=$(date +%s)
+    if (( now - last >= INTERVAL )); then fetch || true; last=$now; fi
+    out=$(render)
+    printf '\033[H\033[2J'
+    printf '%s[90m[%s] every %ss  (q=quit, r=refresh now)%s[0m\n' \
+      "$ESC" "$(date +%H:%M:%S)" "$INTERVAL" "$ESC"
+    [[ -n "$_FETCHED_ERR" ]] && printf '%s[31m%s%s[0m\n' "$ESC" "$_FETCHED_ERR" "$ESC"
+    echo "$out"
+    remaining=$(( INTERVAL - ($(date +%s) - last) )); (( remaining < 1 )) && remaining=1
+    key=""
+    if IFS= read -rsN1 -t "$remaining" key 2>/dev/null; then
+      case "$key" in q|Q) break ;; r|R) last=0 ;; esac
+    fi
+  done
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+  exit $?
+fi
