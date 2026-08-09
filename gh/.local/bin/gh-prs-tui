@@ -25,7 +25,8 @@ FETCH='gh-prs --raw'
 # Columns in --raw output (tab-separated):
 #   {1} PR number (plain)
 #   {2} Linear ID (may be empty)
-#   {3} Repo URL
+#   {3} PR URL base (https://github.com/OWNER/REPO/pull) — not used by any
+#       binding below, which reach the PR via `gh pr ... {1}` instead
 #   {4} Rendered colored display line
 #
 # --with-nth=4.. shows only the rendered line; {1}/{2}/{3} remain addressable
