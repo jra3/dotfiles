@@ -13,7 +13,6 @@
       "Bash(buf *)",
       "Bash(mise *)",
       "Bash(git *)",
-      "Bash(graphite *)",
       "Bash(gh *)",
       "Bash(claude *)",
       "Bash(ls *)",

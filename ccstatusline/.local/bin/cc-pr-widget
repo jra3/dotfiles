@@ -103,8 +103,8 @@ if [[ "${COMMENT_COUNT:-0}" -gt 0 ]]; then
   COMMENT_PART=" ${CYAN}${COMMENT_COUNT}c${RST}"
 fi
 
-# Stacked diffs moved from Graphite to GitHub's native stacks, so every repo now
-# links to the PR on GitHub — a Graphite URL would just 404.
+# Stacked diffs live in GitHub's native stacks, so every repo links to the PR
+# on GitHub.
 URL="https://github.com/${OWNER_REPO}/pull/${PR_NUM}"
 
 # Stack number (omit if this branch isn't in a submitted stack)

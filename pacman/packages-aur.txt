@@ -1,4 +1,3 @@
-graphite-cli
 grpcurl-bin
 helium-browser-bin
 herdr-bin

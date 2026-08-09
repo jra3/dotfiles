@@ -241,22 +241,9 @@ extract() {
 [[ -f ~/.local/share/omarchy/default/bash/fns/worktrees ]] && source ~/.local/share/omarchy/default/bash/fns/worktrees
 [[ -f ~/.local/share/omarchy/default/bash/fns/tmux ]] && source ~/.local/share/omarchy/default/bash/fns/tmux
 
-_gt_yargs_completions()
-{
-  local reply
-  local si=$IFS
-  IFS=$'
-' reply=($(COMP_CWORD="$((CURRENT-1))" COMP_LINE="$BUFFER" COMP_POINT="$CURSOR" graphite --get-yargs-completions "${words[@]}"))
-  IFS=$si
-  _describe 'values' reply
-}
-
 # ============================================================================
 # Aliases
 # ============================================================================
-alias gg='graphite'
-compdef _gt_yargs_completions graphite
-compdef _gt_yargs_completions gg
 alias g='git'
 compdef _git g
 alias ag='rg'

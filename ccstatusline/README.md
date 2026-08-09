@@ -31,9 +31,8 @@ Two rows (ccstatusline's middle row is intentionally empty):
 | `v` `x` `~` | CI passed / failed / pending |
 | `Nc` cyan | N inline review comments, `[bot]` authors excluded |
 
-The PR number is an OSC 8 hyperlink — ctrl+click it. Antimetal repos link to
-Graphite (stacked diffs live there); everything else links to GitHub, where a
-Graphite URL would just 404.
+The PR number is an OSC 8 hyperlink — ctrl+click it. Every repo links to the PR
+on GitHub, which is where stacked diffs live now.
 
 Needs `gh` (authenticated) and `jq`. It stays silent — exit 0, no output — on
 `main`/`master`, on a detached HEAD, on a non-GitHub remote, or when the branch
