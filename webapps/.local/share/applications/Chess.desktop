@@ -5,5 +5,5 @@ Comment=Chess.com
 Exec=omarchy-launch-webapp https://chess.com/home
 Terminal=false
 Type=Application
-Icon=/home/john/.local/share/applications/icons/Chess.png
+Icon=chess-webapp
 StartupNotify=true

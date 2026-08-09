@@ -1,0 +1,12 @@
+#!/bin/sh
+# Chrome with the DevTools protocol open on 9222, in a throwaway profile so it
+# never shares state with a normal Chrome session. See the `chrome-debug` skill.
+#
+# This lives in a script rather than inline in google-chrome.desktop because
+# .desktop Exec lines do not expand $HOME — and this repo is shared across
+# machines whose usernames differ, so a hardcoded /home/<user> breaks one of them.
+exec /usr/bin/google-chrome-stable \
+    --remote-debugging-port=9222 \
+    --remote-allow-origins='*' \
+    --user-data-dir="$HOME/.config/google-chrome-debug" \
+    "$@"

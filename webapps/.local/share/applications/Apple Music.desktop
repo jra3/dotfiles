@@ -5,5 +5,5 @@ Comment=Apple Music
 Exec=setsid uwsm-app -- chromium --app=https://music.apple.com
 Terminal=false
 Type=Application
-Icon=/home/john/.local/share/applications/icons/Apple Music.png
+Icon=apple-music
 StartupNotify=true

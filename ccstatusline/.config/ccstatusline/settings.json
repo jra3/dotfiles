@@ -14,7 +14,7 @@
       {
         "id": "pr-graphite",
         "type": "custom-command",
-        "commandPath": "/home/john/.local/bin/cc-pr-widget",
+        "commandPath": "/usr/local/bin/cc-pr-widget",
         "color": "cyan",
         "preserveColors": true,
         "timeout": 2000

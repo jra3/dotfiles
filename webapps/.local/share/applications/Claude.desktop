@@ -5,5 +5,5 @@ Comment=Claude
 Exec=omarchy-launch-webapp https://claude.ai
 Terminal=false
 Type=Application
-Icon=/home/john/.local/share/applications/icons/Claude.png
+Icon=claude-webapp
 StartupNotify=true

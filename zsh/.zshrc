@@ -337,4 +337,4 @@ if command -v zoxide &>/dev/null; then
     _zsh_cached_source zoxide zoxide-init init zsh
 fi
 
-[ -f "/home/john/.config/am-dev-tools/pup.env" ] && . "/home/john/.config/am-dev-tools/pup.env"  # am-dev-tools pup creds
+[ -f "$HOME/.config/am-dev-tools/pup.env" ] && . "$HOME/.config/am-dev-tools/pup.env"  # am-dev-tools pup creds

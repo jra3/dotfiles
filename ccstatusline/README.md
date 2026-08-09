@@ -45,10 +45,12 @@ checkouts and would otherwise serve each other's stale PR numbers.
 
 ## Gotchas
 
-- **`commandPath` must be absolute.** ccstatusline does not expand `~`, so
-  `settings.json` hardcodes `/home/john/.local/bin/cc-pr-widget`. That holds on
-  every machine sharing this repo (all use `/home/john`), but it is the one line
-  to fix if a machine ever uses a different username.
+- **`commandPath` must be absolute.** ccstatusline expands neither `~` nor
+  `$HOME`, and this one `settings.json` is shared verbatim by machines whose
+  usernames differ — so it cannot name a `/home/<user>` path at all. It points at
+  `/usr/local/bin/cc-pr-widget`, which `pacman/configure-system` symlinks to
+  `$HOME/.local/bin/cc-pr-widget` on each machine. Stow this package before
+  running `configure-system`, or the symlink step skips itself.
 - **Directory folding is wanted here** — the opposite of the `emacs` package.
   `~/.config/ccstatusline` becomes a symlink to this package's directory, so when
   ccstatusline's own config TUI rewrites `settings.json` the write lands in the

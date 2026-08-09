@@ -5,5 +5,5 @@ Comment=Chessly
 Exec=omarchy-launch-webapp https://chessly.com/home
 Terminal=false
 Type=Application
-Icon=/home/john/.local/share/applications/icons/Chessly.png
+Icon=chessly-webapp
 StartupNotify=true
