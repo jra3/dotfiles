@@ -1,49 +1,60 @@
 # lazygit config
-# Graphite (gt) stacked-diff actions. All use `output: terminal` so gt takes
-# over the terminal — interactive prompts (PR title/body, branch pickers) work
-# normally. Keys are capitals to avoid clobbering common built-ins; press `?`
-# in a panel to see them (the `description` is the label shown in that menu).
+# GitHub native stacked-diff actions (`gh stack`, the gh CLI extension). All use
+# `output: terminal` so the command takes over the terminal — its interactive
+# editors and pickers (submit editor, branch picker) work normally.
+#
+# Keys are capitals, but note that capitals are NOT automatically free:
+#   - `G` here shadows lazygit's built-in openPullRequestInBrowser (branches).
+#   - `A` is deliberately NOT bound below: lazygit's built-in amendLastCommit is
+#     already `A` in the files panel and does exactly what `gt modify` did, so
+#     the old custom command was shadowing an identical built-in.
+# Press `?` in a panel to see the bindings (`description` is the menu label).
 customCommands:
-  # ── Submit the stack as drafts (--draft applies to NEW PRs only; already-
-  #    published PRs keep their state, so promote-to-published is safe). ──
+  # ── Submit the stack as drafts. --auto skips the interactive editor and
+  #    auto-generates titles; new PRs are created as drafts unless --open.
+  #    Drop --auto to get the editor and write titles/descriptions by hand. ──
   - key: "S"
     context: "localBranches"
-    description: "Graphite: submit stack as drafts"
-    command: "gt submit --stack --draft"
+    description: "Stack: submit as drafts"
+    command: "gh stack submit --auto"
     output: terminal
 
-  # ── Restack: rebase the stack onto moved parents ──
+  # ── Cascading rebase across the stack, so each branch sits on the tip of
+  #    the layer below it. (Graphite called this `restack`.) ──
   - key: "E"
     context: "localBranches"
-    description: "Graphite: restack onto parents"
-    command: "gt restack"
+    description: "Stack: rebase onto parents"
+    command: "gh stack rebase"
     output: terminal
 
-  # ── Sync: pull trunk, delete merged branches, restack survivors ──
+  # ── Sync: fetch, reconcile with the remote stack, fast-forward trunk,
+  #    cascade-rebase, then push atomically with --force-with-lease. ──
   - key: "Y"
     context: "localBranches"
-    description: "Graphite: sync (pull trunk, prune merged)"
-    command: "gt sync"
+    description: "Stack: sync with remote"
+    command: "gh stack sync"
     output: terminal
 
-  # ── Peek at the stack (gt's own view, full screen; press q to return) ──
+  # ── Peek at the stack, one line per branch (press q to return) ──
   - key: "W"
     context: "localBranches"
-    description: "Graphite: view stack log"
-    command: "gt log short"
+    description: "Stack: view stack"
+    command: "gh stack view --short"
     output: terminal
 
-  # ── Interactive checkout: gt's stack picker ──
+  # ── Interactive picker over the branches in the current stack.
+  #    NOTE: shadows the built-in openPullRequestInBrowser on this panel. ──
   - key: "G"
     context: "localBranches"
-    description: "Graphite: checkout branch (picker)"
-    command: "gt checkout"
+    description: "Stack: switch branch (picker)"
+    command: "gh stack switch"
     output: terminal
 
-  # ── Create a new stacked branch from staged changes ──
+  # ── Create a new stacked branch from staged changes. Blank branch name lets
+  #    gh stack derive one from the commit message. ──
   - key: "N"
     context: "files"
-    description: "Graphite: create stacked branch"
+    description: "Stack: add stacked branch"
     prompts:
       - type: "input"
         title: "Branch name (blank = derive from message)"
@@ -51,12 +62,5 @@ customCommands:
       - type: "input"
         title: "Commit message"
         key: "Message"
-    command: 'gt create {{if .Form.Branch}}{{.Form.Branch}} {{end}}-m "{{.Form.Message}}"'
-    output: terminal
-
-  # ── Amend staged changes into the current branch's commit ──
-  - key: "A"
-    context: "files"
-    description: "Graphite: amend into current commit"
-    command: "gt modify"
+    command: 'gh stack add {{if .Form.Branch}}{{.Form.Branch}} {{end}}-m "{{.Form.Message}}"'
     output: terminal

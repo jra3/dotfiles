@@ -297,6 +297,22 @@ else
     echo "  systemd-networkd not in use; skipping (NetworkManager tethers natively)."
 fi
 
+# --- gh extensions ---
+# The lazygit package's custom commands are all `gh stack ...`, so without this
+# extension every one of those keybindings fails. Needs gh >= 2.90.
+echo "Configuring gh extensions..."
+if command -v gh >/dev/null 2>&1; then
+    if gh extension list 2>/dev/null | grep -q 'github/gh-stack'; then
+        echo "  gh-stack already installed."
+    elif gh extension install github/gh-stack >/dev/null 2>&1; then
+        echo "  installed gh-stack."
+    else
+        echo "  could not install gh-stack (needs network and gh >= 2.90); skipping."
+    fi
+else
+    echo "  gh not installed; skipping."
+fi
+
 # --- Pacman hooks ---
 echo "Installing pacman hooks..."
 HOOKS_DIR="$(cd "$(dirname "$0")" && pwd)/hooks"

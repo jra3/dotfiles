@@ -74,7 +74,8 @@ This documents the default software stack configured in Omarchy:
 - `herdr/` - herdr terminal workspace manager (annotated default config; binary at `~/.local/bin/herdr`, not stow-managed); see `herdr/README.md`
 - `gh/` - GitHub CLI config and `gh-prs` script
 - `gtr/` - Git worktree runner wrapper
-- `lazygit/` - lazygit TUI config with Graphite (gt) stacked-diff custom commands
+- `lazygit/` - lazygit TUI config with `gh stack` stacked-diff custom commands
+  (needs the `github/gh-stack` gh extension; `gh extension install github/gh-stack`)
 - `claude/` - Claude Code settings and custom commands
 - `ccstatusline/` - Claude Code status line: the `ccstatusline` layout plus the `cc-pr-widget` PR/CI segment it shells out to; see `ccstatusline/README.md`
 - `slack/` - `slack://` deep-link handler that opens links in the browser (no desktop Slack app); see `slack/README.md`
