@@ -45,12 +45,17 @@ checkouts and would otherwise serve each other's stale PR numbers.
 
 ## Gotchas
 
-- **`commandPath` must be absolute.** ccstatusline expands neither `~` nor
-  `$HOME`, and this one `settings.json` is shared verbatim by machines whose
-  usernames differ — so it cannot name a `/home/<user>` path at all. It points at
-  `/usr/local/bin/cc-pr-widget`, which `pacman/configure-system` symlinks to
-  `$HOME/.local/bin/cc-pr-widget` on each machine. Stow this package before
-  running `configure-system`, or the symlink step skips itself.
+- **`commandPath` is a bare command name, resolved via `PATH`.** ccstatusline
+  expands neither `~` nor `$HOME`, and this one `settings.json` is shared
+  verbatim by machines whose usernames differ — so it cannot name a
+  `/home/<user>` path at all. It does not need to: ccstatusline spawns the
+  command through Node, which searches `PATH`, so a bare `cc-pr-widget` resolves
+  to whatever `~/.local/bin/cc-pr-widget` this machine stowed. Verified by
+  pointing `commandPath` at bare `hostname` and at `/usr/bin/hostname` — both
+  render identically. The only requirement is that `~/.local/bin` is on `PATH`,
+  which `zsh/.zshrc` sets and uwsm's env preloader exports into the Hyprland
+  session — the same mechanism the bare `.desktop` `Exec=` lines in the
+  `google-chrome` and `slack` packages already depend on.
 - **Directory folding is wanted here** — the opposite of the `emacs` package.
   `~/.config/ccstatusline` becomes a symlink to this package's directory, so when
   ccstatusline's own config TUI rewrites `settings.json` the write lands in the

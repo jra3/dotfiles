@@ -297,19 +297,6 @@ else
     echo "  systemd-networkd not in use; skipping (NetworkManager tethers natively)."
 fi
 
-# --- ccstatusline: stable absolute path for the PR widget ---
-# ccstatusline's settings.json needs an ABSOLUTE commandPath (it expands neither
-# `~` nor `$HOME`), but that file is shared verbatim across machines whose
-# usernames differ — so it cannot name any /home/<user> path. Point it at
-# /usr/local/bin instead and let each machine link that to its own home.
-if [ -x "$HOME/.local/bin/cc-pr-widget" ]; then
-    echo "Configuring ccstatusline PR widget..."
-    sudo ln -sfn "$HOME/.local/bin/cc-pr-widget" /usr/local/bin/cc-pr-widget
-    echo "  /usr/local/bin/cc-pr-widget -> $HOME/.local/bin/cc-pr-widget"
-else
-    echo "  cc-pr-widget not stowed; run 'stow ccstatusline' and re-run."
-fi
-
 # --- Pacman hooks ---
 echo "Installing pacman hooks..."
 HOOKS_DIR="$(cd "$(dirname "$0")" && pwd)/hooks"
