@@ -229,7 +229,9 @@ def query_vox_active() -> bool | None:
 
     `voxtype status --format json` returns one JSON object per state. Without
     --follow it should print the current state once. The "class" field is
-    something like "idle", "recording", "transcribing".
+    "idle", "recording", "transcribing" — or "stopped" when the voxtype
+    service is not running, which must NOT read as active or the LED sits
+    lit whenever the daemon is down.
     """
     try:
         out = subprocess.check_output(
@@ -247,7 +249,7 @@ def query_vox_active() -> bool | None:
         cls = json.loads(first).get("class", "")
     except (ValueError, json.JSONDecodeError):
         return None
-    return cls != "idle" and cls != ""
+    return cls in ("recording", "transcribing")
 
 
 # ---------------------------------------------------------------------------
