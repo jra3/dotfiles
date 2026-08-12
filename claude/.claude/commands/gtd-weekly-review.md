@@ -1,67 +1,36 @@
 ---
-description: Guided GTD weekly review
-argument-hint: ""
+description: Guided GTD weekly review of the Linear system
 ---
 
-Walk through a complete GTD weekly review using Vikunja MCP tools.
+Walk John through the weekly review. It is the ritual that keeps the system trusted — skipping it is how the last one went stale and stopped being believed.
 
-## Instructions
+Read the **GTD Operating Manual** team doc at `~/jra3/linear/teams/GTD/docs/` first; its weekly-review section is canonical.
 
-Read `skills/brainbox/references/gtd-structure.md` to get all project and label IDs. If IDs are unpopulated (TODO), use `mcp__vikunja__vikunja_projects` with `subcommand: "list"` and `mcp__vikunja__vikunja_labels` with `subcommand: "list"` to look them up by name.
+## Run the mechanical checks first, before asking John anything
 
-## Phase 1: Get Clear
+Three of Allen's Get Current checks are scriptable. Do them yourself and bring results, not questions:
 
-### Process Inbox
-1. List all tasks in the Inbox project using `mcp__vikunja__vikunja_task_crud` with `operation: "list"`
-2. If inbox is not empty, offer to process items (same workflow as `/gtd-inbox-process`)
-3. After processing, remind user to also check:
-   - Email inbox
-   - Obsidian `00-inbox/` folder
-   - Physical inbox / notes apps
-   - Voicemails, texts, browser tabs
+1. **Stalled projects** — run `~/.claude/skills/gtd/scripts/gtd-stalled` (also on PATH as `gtd-stalled`). Do not re-derive this by counting; the script is verified against the API and runs in ~30ms. Allen names this as the thing the review exists to do.
+2. **`Capture` not empty** — if anything is there, offer `/gtd-inbox-process` before going further. Reviewing around an unprocessed inbox is reviewing a lie.
+3. **Orphan actions** — an issue in `Next` whose project is `Completed` or `Canceled`.
 
-## Phase 2: Get Current
+## Then the parts needing John
 
-### Review Next Actions
-1. List all tasks in Next Actions using `mcp__vikunja__vikunja_task_crud` with `operation: "list"`
-2. Present each task and ask: "Still relevant? Done? Needs updating?"
-3. Mark done, update, or leave as-is based on user response
+Work these in order, one at a time:
 
-### Review Waiting For
-1. List all tasks in Waiting For
-2. For each: "Any response? Follow up needed?"
-3. Mark done if resolved, move to Next Actions if user needs to act, or leave
+- **`Waiting`** — read each aloud with its age. Which need chasing? A `Waiting` item nobody has chased in a month is usually a `Next` action in disguise.
+- **`Next`** — is every item still a physical action you could start? Anything that has quietly become an outcome gets turned into a project.
+- **`Someday`** — promote, drop, or leave. Ask about each; the commitment question is the whole point of the list.
+- **Projects** — is each still wanted? A project you would not start today belongs in `Backlog` status or gone.
+- **Areas** — reread the `## Standard` block on each Area's Notion page. Is reality still meeting it? This is the layer that quietly rots because nothing forces you to look.
+- **Calendar** — look backward one week and forward two. Anything that happened needing follow-up? Anything coming that needs preparation now?
 
-### Review Projects
-1. List child projects under the Projects parent using `mcp__vikunja__vikunja_projects` with `subcommand: "get-children"` and `projectId` of the Projects parent
-2. For each active project, list its tasks
-3. Ask: "Does this project have a defined next action? Is it stalled?"
-4. Create next actions as needed
+## Close
 
-### Review Calendar
-Remind the user to check:
-- Past week: anything to follow up on?
-- Next 2 weeks: any prep needed?
+Summarise what changed: items moved, projects opened or closed, what John committed to for the week. Keep it short enough to reread.
 
-## Phase 3: Get Creative
+## Judgement notes
 
-### Review Someday Maybe
-1. List all tasks in Someday Maybe
-2. Ask: "Promote any of these to active?"
-3. Move promoted items to Next Actions or create as new Projects
-
-### Areas of Responsibility
-Remind user to review their areas in Obsidian `20-areas/`:
-- Is anything being neglected?
-- Any new projects needed?
-
-### Open Capture
-Ask: "Anything else on your mind to capture?" Add items to Inbox if so.
-
-## Summary
-
-After all phases, report:
-- Tasks completed during review
-- Tasks added during review
-- Current counts: Inbox, Next Actions, Waiting For, Active Projects, Someday Maybe
-- Any overdue tasks
+- **Never mutate without John.** The review proposes; he decides. That is the standing rule of this system.
+- If John is short on time, run the three mechanical checks and `Waiting`, and say plainly what you skipped. A partial review that happened beats a full one that did not.
+- Do not congratulate. Report what is true.

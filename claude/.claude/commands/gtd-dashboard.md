@@ -1,51 +1,28 @@
 ---
-description: Show a summary dashboard of your GTD system
-argument-hint: "[@context filter, e.g. @computer]"
+description: Show a summary of the GTD system in Linear
 ---
 
-Display a quick status overview of the GTD system from Vikunja.
+Show John where his system stands. Read-only — change nothing.
 
-## Instructions
+Read the **GTD Operating Manual** team doc at `~/jra3/linear/teams/GTD/docs/` for what each state means before interpreting anything.
 
-Read `skills/brainbox/references/gtd-structure.md` to get all project and label IDs. If IDs are unpopulated (TODO), use `mcp__vikunja__vikunja_projects` with `subcommand: "list"` and `mcp__vikunja__vikunja_labels` with `subcommand: "list"` to look them up by name.
+## What to show
 
-### 1. Gather data
-
-Fetch task lists for each GTD project using `mcp__vikunja__vikunja_task_crud` with `operation: "list"`:
-- Inbox (count of not-done tasks)
-- Next Actions (count of not-done tasks)
-- Waiting For (count of not-done tasks)
-- Someday Maybe (count of not-done tasks)
-
-Fetch active projects count using `mcp__vikunja__vikunja_projects` with `subcommand: "get-children"` and `projectId` of the Projects parent.
-
-Identify overdue tasks (due date < today) and tasks due today across all projects.
-
-### 2. Apply context filter
-
-If `$ARGUMENTS` contains a context (e.g., `@computer`), filter Next Actions to show only tasks with that label.
-
-### 3. Display dashboard
-
-Format output as:
+Read from the mount — it is faster than the API and needs no key:
 
 ```
-GTD Dashboard — {today's date}
-
-Inbox:           {count} items {add "(needs processing!)" if > 0}
-Next Actions:    {count} items
-Waiting For:     {count} items
-Active Projects: {count}
-Someday Maybe:   {count} items
-
-Due Today:  {count} tasks
-Overdue:    {count} tasks
-
-{If context filter applied:}
-Next Actions (@computer): {count} items
-  - {task title 1}
-  - {task title 2}
-  ...
+ls ~/jra3/linear/teams/GTD/by/status/{Capture,Next,Doing,Waiting,Someday}/
 ```
 
-If there are overdue tasks, list them with their due dates.
+1. **Counts per state**, `Capture` first.
+2. **Next Actions in full** — identifier, title, project, and any context label. This is the list John actually works from, so it earns the space.
+3. **Doing** in full. If it is more than three or four, say so plainly; a long `Doing` list means nothing is finishing.
+4. **Waiting** in full, with how long each has sat. Anything over two weeks is worth chasing.
+5. **Stalled projects** — run `gtd-stalled` (or `~/.claude/skills/gtd/scripts/gtd-stalled`). The check most worth running and the one most often skipped.
+6. `Someday` and `Capture` as counts only, unless asked.
+
+## Tone
+
+Report, do not nag. State what is true — "Capture has 14 items", "three projects have no next action" — and stop. John decides what that means. A dashboard that editorialises stops getting opened.
+
+Close with the single most useful next move if one is obvious: a non-empty `Capture` means run `/gtd-inbox-process`; stalled projects mean run `/gtd-weekly-review`.

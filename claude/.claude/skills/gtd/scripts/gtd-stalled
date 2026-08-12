@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# gtd-stalled — GTD projects with no issue in an active state.
+# A project with nothing in Next/Doing/Waiting/Todo has nothing to work on: it is stuck.
+# Allen names this as the check the weekly review exists to perform.
+set -uo pipefail
+
+TEAM="${1:-GTD}"
+MOUNT="${LINEARFS_MOUNT:-$HOME/jra3/linear}/teams/$TEAM"
+ACTIVE=(Next Doing Waiting Todo)
+
+[ -d "$MOUNT" ] || { echo "no such team: $MOUNT" >&2; exit 1; }
+
+# every issue currently sitting in an active state
+active=$(for s in "${ACTIVE[@]}"; do
+           [ -d "$MOUNT/by/status/$s" ] && ls "$MOUNT/by/status/$s" 2>/dev/null
+         done | sort -u)
+
+found=0
+for dir in "$MOUNT"/projects/*/; do
+    [ -d "$dir" ] || continue
+    slug=$(basename "$dir")
+    name=$(sed -n 's/^name: *//p' "$dir/project.md" 2>/dev/null | head -1 | tr -d '"')
+    name=${name:-$slug}
+
+    issues=$(ls "$dir" 2>/dev/null | grep -E '^[A-Z]+-[0-9]+$' | sort -u)
+
+    if [ -z "$issues" ]; then
+        printf '%-28s  no issues at all\n' "$name"; found=1; continue
+    fi
+    if [ -z "$(comm -12 <(printf '%s\n' "$issues") <(printf '%s\n' "$active"))" ]; then
+        printf '%-28s  %d issue(s), none active\n' "$name" "$(printf '%s\n' "$issues" | wc -l)"
+        found=1
+    fi
+done
+
+[ "$found" -eq 0 ] && echo "No stalled projects."
+exit 0
