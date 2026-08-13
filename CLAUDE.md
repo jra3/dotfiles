@@ -81,7 +81,7 @@ This documents the default software stack configured in Omarchy:
 - `slack/` - `slack://` deep-link handler that opens links in the browser (no desktop Slack app); see `slack/README.md`
 - `bitwarden/` - Bitwarden CLI helper script (`get-signature`) for extracting attachments
 - `pacman/` - Arch package lists and `configure-system` for post-install setup
-- `qmk/` - Optional: `qmk-mic-led-sync.py` daemon syncing mic/DND/voxtype/pomodoro state to a Framework 16 ANSI keyboard via raw HID
+- `qmk/` - Optional: host side of a Framework 16 ANSI keymap — the `qmk-mic-led-sync.py` daemon syncing mic/DND/voxtype/pomodoro state over raw HID, and `qmk-flash.py` for reflashing. The firmware half is a separate repo, `jra3/qmk_firmware` branch `fw16-john` at `~/jra3/qmk_firmware`; see `qmk/README.md`
 - `tether/` - `waybar-iphone-tether` status script for the waybar iPhone USB-tethering indicator; see `tether/README.md`. The `.network` file and `usbmuxd` are handled by `pacman/configure-system` + `packages-arch.txt`
 
 **XDG compliance** - Configs use XDG Base Directory paths:
