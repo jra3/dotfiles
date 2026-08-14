@@ -227,13 +227,18 @@ agent_panel_sort = "spaces"
 # Expanded agent rows. Built-ins are state_icon, state_text, workspace, tab, pane, agent,
 # terminal_title, and terminal_title_stripped.
 # Custom values reported through pane metadata use a $name token.
-# [ui.sidebar.agents]
-# Blank rows between agent entries. Set to 1 to restore the previous spacing.
-# row_gap = 0
-# rows = [["state_icon", "workspace", "tab"], ["agent"]]
+# Default is [["state_icon", "workspace", "tab"], ["agent"]]; the "agent" line is
+# dropped because every pane here is claude, so it carried no information.
+# For a second line with actual content, swap in ["terminal_title_stripped"]
+# (Claude Code's OSC title, minus its leading spinner glyph).
+# $ctx comes from ~/.claude/hooks/herdr-blocked-reason.sh. $model is reported
+# too but not rendered: every pane is opus, so it carried no information.
+[ui.sidebar.agents]
+row_gap = 0
+rows = [["state_icon", "workspace", "tab", "$ctx"]]
 # Optional canonical agent IDs replace the default rows for matching agents.
 # [ui.sidebar.agents.rows_by_agent]
-# claude = [["state_icon", "workspace", "tab"], ["terminal_title_stripped"], ["agent"]]
+# claude = [["state_icon", "workspace", "tab"], ["terminal_title_stripped"]]
 
 # Expanded space rows. Built-ins are state_icon, state_text, workspace, branch, and git_status.
 # Custom values reported through workspace metadata use a $name token, for example $jj_status.
@@ -335,3 +340,11 @@ command = "herdr-fork-focused"
 key = "prefix+shift+c"
 type = "shell"
 command = "herdr-tab-gitroot"
+
+[[keys.command]]
+# Bulk-adopt every open worktree checkout, vs open_worktree (prefix+alt+g) which
+# picks one interactively. Idempotent, and skips any repo whose main checkout is
+# not open, so it never invents a workspace. Reports via notification.
+key = "prefix+shift+a"
+type = "shell"
+command = "herdr-adopt-worktrees"

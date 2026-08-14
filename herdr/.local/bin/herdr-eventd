@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""Route Herdr agent state changes to the desktop.
+
+First behavior (SPY-8): a pane going `blocked` raises a mako notification
+carrying the blocked-reason label that the SPY-5 hook publishes, so the ask is
+readable without switching to the pane. Clicking it focuses that pane.
+
+Notes on the shape of this, all of which were measured rather than assumed:
+
+* There is no global agent-status subscription — `pane.agent_status_changed`
+  and `events.wait` both demand a specific pane_id. `pane.updated` is global and
+  happens to *contain* agent_status, but it is emitted for titles, scroll and
+  cwd, NOT on status change, so watching it misses transitions entirely: a pane
+  that goes blocked and then sits still emits nothing at all.
+  So: subscribe per-pane to `pane.agent_status_changed`, for every pane, in one
+  request. That event also carries `state_labels`, which means no `pane get` is
+  needed to read the SPY-5 label.
+* A connection accepts exactly ONE events.subscribe. A second request on the
+  same socket resets it. Many subscriptions inside that one request are fine.
+  Hence `pane.agent_detected` forces a reconnect: it is the only way to widen
+  the subscription set to cover a pane that did not exist at connect time.
+  That event also fires for agents being released and for panes already gone
+  from `pane list`, which can never enter the subscription set — so those are
+  filtered, and every id reacted to is remembered, or the reconnect never
+  settles.
+* Notification click actions come from `notify-send -A`, not from mako config.
+  Omarchy's mako config is a symlink into the *theme* directory, so any
+  `[summary~=...] on-button-left` rule there would be lost on the next theme
+  switch. `-A` is per-notification and survives that.
+* `-u critical` means the popup never auto-expires (core.ini sets
+  default-timeout=0 for critical), so it lives exactly as long as the pane is
+  blocked: raised on the transition in, dismissed on the transition out.
+
+Delivery goes through omarchy-notification-send to inherit the house glyph and
+body-indent convention. Herdr's own `[ui.toast] delivery` stays "herdr" — this
+owns the desktop channel, and flipping that too would double every popup.
+"""
+
+import json
+import os
+import signal
+import socket
+import subprocess
+import sys
+import threading
+import time
+
+SOCKET_PATH = os.environ.get("HERDR_SOCKET_PATH") or os.path.expanduser(
+    "~/.config/herdr/herdr.sock"
+)
+# Omarchy ships this one, so the Nerd Font is guaranteed to have it, and an
+# hourglass is what a pane waiting on a human actually is.
+GLYPH = "󰔛"
+NOTIFY_SEND = "omarchy-notification-send"
+NOTIFY_DISMISS = "omarchy-notification-dismiss"
+BODY_LIMIT = 120
+RECONNECT_MIN_S = 1
+RECONNECT_MAX_S = 30
+RESUBSCRIBE_MIN_S = 2  # floor between subscription rebuilds; spin insurance
+GLOBAL_SUBSCRIPTIONS = [
+    # Deliberately pane.agent_detected rather than pane.created: most new panes
+    # are plain shells that will never block, and a workspace that churns panes
+    # (a notifier, say) would otherwise force a reconnect for each one. This
+    # fires exactly when a pane becomes something that can block.
+    {"type": "pane.agent_detected"},
+    {"type": "pane.closed"},
+    {"type": "pane.exited"},
+]
+
+
+class Resubscribe(Exception):
+    """A pane appeared, so the subscription set needs rebuilding."""
+
+
+def log(message):
+    print(message, file=sys.stderr, flush=True)
+
+
+def herdr_json(args):
+    try:
+        out = subprocess.run(
+            ["herdr", *args], check=False, timeout=5,
+            capture_output=True, text=True,
+        ).stdout
+        return json.loads(out) if out.strip() else None
+    except Exception:
+        return None
+
+
+def label_for(kind, ident, fallback):
+    """Workspace/tab display name, falling back to the raw id."""
+    payload = herdr_json([kind, "get", ident])
+    if isinstance(payload, dict):
+        obj = (payload.get("result") or {}).get(kind) or {}
+        label = obj.get("label")
+        if isinstance(label, str) and label.strip():
+            return label.strip()
+    return fallback
+
+
+class Notifications:
+    """One live popup per blocked pane, cleared when the pane unblocks."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._open = {}  # pane_id -> (Popen, summary)
+
+    def raise_for(self, pane_id, summary, body):
+        with self._lock:
+            if pane_id in self._open:
+                return
+        args = [NOTIFY_SEND, GLYPH, summary, body, "-u", "critical",
+                "-A", "focus=Focus"]
+        try:
+            proc = subprocess.Popen(
+                args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+            )
+        except FileNotFoundError:
+            log(f"{NOTIFY_SEND} not on PATH; cannot notify")
+            return
+        with self._lock:
+            self._open[pane_id] = (proc, summary)
+        threading.Thread(
+            target=self._await_click, args=(pane_id, proc), daemon=True
+        ).start()
+
+    def _await_click(self, pane_id, proc):
+        # -A implies --wait, so this blocks until the popup is clicked or
+        # dismissed. Only a click writes the action name to stdout.
+        try:
+            stdout, _ = proc.communicate()
+        except Exception:
+            stdout = ""
+        if (stdout or "").strip() == "focus":
+            subprocess.run(
+                ["herdr", "agent", "focus", pane_id], check=False, timeout=5,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        with self._lock:
+            entry = self._open.get(pane_id)
+            if entry and entry[0] is proc:
+                del self._open[pane_id]
+
+    def clear(self, pane_id):
+        with self._lock:
+            entry = self._open.pop(pane_id, None)
+        if not entry:
+            return
+        proc, summary = entry
+        # Killing the client would not close the popup — it is already on the
+        # bus. makoctl is what actually retires it, and the notify-send process
+        # then exits on its own because its --wait is satisfied.
+        subprocess.run(
+            [NOTIFY_DISMISS, summary], check=False, timeout=5,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        try:
+            proc.wait(timeout=2)
+        except Exception:
+            proc.kill()
+
+
+class Watcher:
+    def __init__(self):
+        self.status = {}
+        self.subscribed = set()
+        self.attempted = set()
+        self.notifications = Notifications()
+
+    def blocked_body(self, pane):
+        labels = pane.get("state_labels")
+        if isinstance(labels, dict):
+            text = labels.get("blocked")
+            if isinstance(text, str) and text.strip():
+                return text.strip()[:BODY_LIMIT]
+        # No SPY-5 label: better the pane's own title than an empty popup.
+        title = (pane.get("terminal_title_stripped") or pane.get("title")
+                 or pane.get("terminal_title") or "")
+        return " ".join(str(title).split())[:BODY_LIMIT] or "waiting for you"
+
+    def summary_for(self, pane):
+        workspace = label_for("workspace", pane.get("workspace_id") or "",
+                              pane.get("workspace_id") or "?")
+        # The status event has no tab_id, so resolve it from the pane. One
+        # subprocess per blocked transition, which is a rare event.
+        tab_id = pane.get("tab_id")
+        if not tab_id:
+            payload = herdr_json(["pane", "get", pane.get("pane_id") or ""])
+            tab_id = ((payload or {}).get("result") or {}).get("pane", {}).get("tab_id")
+        tab = label_for("tab", tab_id or "", tab_id or "?")
+        return f"{workspace} · {tab}"
+
+    def observe(self, pane):
+        """`pane` is either a pane object or a pane_agent_status_changed body.
+
+        Both carry pane_id, workspace_id, agent_status, agent and state_labels,
+        which is everything the notification needs.
+        """
+        pane_id = pane.get("pane_id")
+        if not pane_id:
+            return
+        status = pane.get("agent_status")
+        previous = self.status.get(pane_id)
+        if status == previous:
+            return
+        self.status[pane_id] = status
+        if status == "blocked":
+            # Only a recognized agent can be blocked *on* anything.
+            if not (pane.get("agent") or pane.get("display_agent")):
+                return
+            self.notifications.raise_for(
+                pane_id, self.summary_for(pane), self.blocked_body(pane)
+            )
+        elif previous == "blocked":
+            self.notifications.clear(pane_id)
+
+    def forget(self, pane_id):
+        if not pane_id:
+            return
+        self.status.pop(pane_id, None)
+        self.attempted.discard(pane_id)
+        self.notifications.clear(pane_id)
+
+    def handle(self, message):
+        # Herdr names the same event two ways depending on how it reaches you:
+        # subscription deliveries are dotted (pane.agent_status_changed, from
+        # SubscriptionEventKind) while hub events are underscored
+        # (pane_agent_detected, from EventKind). Matching only one silently
+        # drops half the stream.
+        event = str(message.get("event") or "").replace(".", "_")
+        data = message.get("data") or {}
+        if event == "pane_agent_status_changed":
+            self.observe(data)
+        elif event in ("pane_closed", "pane_exited"):
+            self.forget(data.get("pane_id"))
+        elif event == "pane_agent_detected":
+            # This event covers three cases: a pane gaining an agent, an agent
+            # being released, and detection clearing to nothing. Only the first
+            # widens what we need to watch.
+            if data.get("released") or not data.get("agent"):
+                return
+            # Payload shapes differ per event: pane.created nests the pane while
+            # this one and pane.closed/pane.exited carry pane_id at the top
+            # level. Reading the wrong key yields None, which is in no
+            # subscription set, which resubscribes on every event — that was a
+            # tight reconnect loop rather than a quiet no-op.
+            pane_id = data.get("pane_id") or (data.get("pane") or {}).get("pane_id")
+            if not pane_id or pane_id in self.subscribed:
+                return
+            # Panes that are already gone keep emitting this, and they will
+            # never appear in `pane list`, so `subscribed` can never satisfy the
+            # check above. Remember every id we have already reacted to.
+            if pane_id in self.attempted:
+                return
+            self.attempted.add(pane_id)
+            # Nothing is subscribed for this pane yet and this connection
+            # cannot take another subscribe, so start a fresh one.
+            raise Resubscribe
+
+    def panes(self):
+        payload = herdr_json(["pane", "list"])
+        return [
+            pane for pane in ((payload or {}).get("result") or {}).get("panes") or []
+            if isinstance(pane, dict) and pane.get("pane_id")
+        ]
+
+    def seed(self, panes):
+        """Announce panes that are already blocked when we attach.
+
+        A restart during a blocked pane would otherwise stay silent until that
+        pane happened to change state again, which could be never.
+        """
+        for pane in panes:
+            self.observe(pane)
+
+
+def stream(watcher, pane_ids):
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.settimeout(10)
+    client.connect(SOCKET_PATH)
+    subscriptions = list(GLOBAL_SUBSCRIPTIONS) + [
+        {"type": "pane.agent_status_changed", "pane_id": pane_id}
+        for pane_id in pane_ids
+    ]
+    request = {
+        "id": "herdr-eventd:subscribe",
+        "method": "events.subscribe",
+        "params": {"subscriptions": subscriptions},
+    }
+    client.sendall((json.dumps(request) + "\n").encode())
+    client.settimeout(None)
+    log(f"watching {len(pane_ids)} pane(s) on {SOCKET_PATH}")
+
+    buffer = b""
+    with client:
+        while True:
+            chunk = client.recv(65536)
+            if not chunk:
+                return  # server went away; caller reconnects
+            buffer += chunk
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                if not line.strip():
+                    continue
+                try:
+                    message = json.loads(line)
+                except Exception:
+                    continue
+                if message.get("error"):
+                    log(f"subscribe rejected: {message['error']}")
+                    return
+                watcher.handle(message)
+
+
+def main():
+    watcher = Watcher()
+    install_exit_cleanup(watcher)
+    backoff = RECONNECT_MIN_S
+    last_resubscribe = 0.0
+    while True:
+        try:
+            panes = watcher.panes()
+            watcher.seed(panes)
+            backoff = RECONNECT_MIN_S
+            watcher.subscribed = {pane["pane_id"] for pane in panes}
+            stream(watcher, sorted(watcher.subscribed))
+            log("herdr closed the stream")
+        except Resubscribe:
+            # A new pane exists. Keep the popups and the known statuses, just
+            # rebuild the subscription set. Floored to one per RESUBSCRIBE_MIN_S
+            # so that a misread payload can never turn this into a spin — it
+            # already did once, at ~82 reconnects a second.
+            delay = RESUBSCRIBE_MIN_S - (time.monotonic() - last_resubscribe)
+            if delay > 0:
+                time.sleep(delay)
+            last_resubscribe = time.monotonic()
+            continue
+        except FileNotFoundError:
+            log(f"no socket at {SOCKET_PATH}")
+        except ConnectionError as err:
+            log(f"connection lost: {err}")
+        except Exception as err:  # keep the unit alive across anything transient
+            log(f"unexpected: {err!r}")
+        # Herdr restarting takes every pane with it, so drop the popups too
+        # rather than leave criticals pinned to panes that may not come back.
+        for pane_id in list(watcher.status):
+            watcher.notifications.clear(pane_id)
+        watcher.status.clear()
+        time.sleep(backoff)
+        backoff = min(backoff * 2, RECONNECT_MAX_S)
+
+
+def install_exit_cleanup(watcher):
+    """Retire our popups when the daemon goes away.
+
+    mako holds the notification, not us, so a popup outlives the notify-send
+    child that carries its Focus action. Dying without cleaning up leaves a
+    critical popup on screen that renders fine and does nothing when clicked.
+    """
+    def handler(signum, _frame):
+        for pane_id in list(watcher.notifications._open):
+            watcher.notifications.clear(pane_id)
+        raise SystemExit(0)
+
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        try:
+            signal.signal(sig, handler)
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

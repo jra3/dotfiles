@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Attach worktree provenance to workspaces that are sitting in a git worktree
+# checkout but were opened by hand, so they are worktrees by convention only —
+# hand-typed label, cwd that happens to be a checkout, nothing for automation
+# to hang off. After this they carry real membership and emit worktree.opened.
+#
+# herdr's own `worktree open` is the adoption primitive: when a workspace is
+# already at that checkout it reuses that workspace and only records
+# membership, and re-recording unchanged membership is a no-op. So this is
+# safe to rerun, and quiet when there is nothing to do.
+#
+# Scope is deliberately narrow — only checkouts that already have a workspace
+# on screen. Opening the rest would spawn workspaces nobody asked for. Repos
+# whose *main* checkout has no workspace are skipped entirely, because
+# `worktree open` creates the source workspace when one is missing.
+#
+# Labels are never passed: --label renames the workspace, and the hand-typed
+# names are the whole point of keeping these workspaces rather than recreating
+# them.
+set -euo pipefail
+
+dry_run=0
+if [[ "${1:-}" == "--dry-run" ]]; then
+  dry_run=1
+  shift
+fi
+if [[ $# -gt 0 ]]; then
+  echo "usage: herdr-adopt-worktrees [--dry-run]" >&2
+  exit 2
+fi
+
+# Every repo the fleet currently has a pane in. --git-common-dir resolves to the
+# *main* checkout's .git even from inside a linked worktree, which is exactly
+# the source repo `worktree list` wants.
+mapfile -t repos < <(
+  herdr pane list \
+    | jq -r '.result.panes[] | .foreground_cwd // .cwd // empty' \
+    | sort -u \
+    | while IFS= read -r cwd; do
+        common=$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || continue
+        dirname "$common"
+      done \
+    | sort -u
+)
+
+if [[ ${#repos[@]} -eq 0 ]]; then
+  echo "no git repos among the open panes"
+  exit 0
+fi
+
+adopted=0
+already=0
+skipped=0
+
+for repo in "${repos[@]}"; do
+  listing=$(herdr worktree list --cwd "$repo" 2>/dev/null) || continue
+
+  # No workspace for the main checkout means `worktree open` would create one.
+  # That is a layout change, not an adoption, so leave the whole repo alone.
+  if [[ $(jq -r '.result.source.source_workspace_id // empty' <<<"$listing") == "" ]]; then
+    echo "skip $(basename "$repo"): main checkout is not open in a workspace"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  while IFS=$'\t' read -r path ws branch; do
+    [[ -n "$path" ]] || continue
+
+    # `worktree list` only says a workspace is sitting at this checkout.
+    # Membership itself shows up as the workspace's own `worktree` field, so
+    # that is what distinguishes adopted from merely-parked.
+    current=$(herdr workspace get "$ws" 2>/dev/null \
+      | jq -r '.result.workspace.worktree.checkout_path // empty')
+    if [[ "$current" == "$path" ]]; then
+      already=$((already + 1))
+      continue
+    fi
+
+    if [[ $dry_run -eq 1 ]]; then
+      echo "would adopt $ws  $path  ($branch)"
+    else
+      herdr worktree open --cwd "$repo" --path "$path" --no-focus >/dev/null
+      echo "adopted $ws  $path  ($branch)"
+    fi
+    adopted=$((adopted + 1))
+  done < <(
+    jq -r '
+      .result.worktrees[]
+      | select(.open_workspace_id != null and .is_prunable == false and .is_bare == false)
+      | [.path, .open_workspace_id, (.branch // "detached")]
+      | @tsv
+    ' <<<"$listing"
+  )
+done
+
+summary="${adopted} adopted, ${already} already, ${skipped} repo(s) skipped"
+echo "$summary"
+
+# Bound to prefix+shift+a as type = "shell", which runs detached with nowhere
+# for stdout to go, so say it again where it will actually be seen.
+if [[ ! -t 1 ]]; then
+  herdr notification show "herdr-adopt-worktrees" --body "$summary" >/dev/null 2>&1 || true
+fi

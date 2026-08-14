@@ -7,3 +7,9 @@ hypr/.config/hypr/shaders/
 herdr/.config/herdr/*.log
 herdr/.config/herdr/session.json
 herdr/.config/herdr/.plugins.lock
+
+# Python bytecode (py_compile on the stowed scripts)
+__pycache__/
+
+# Emacs lock files
+.#*

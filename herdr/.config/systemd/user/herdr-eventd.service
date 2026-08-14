@@ -1,0 +1,24 @@
+[Unit]
+Description=Herdr event daemon - routes agent state changes to the desktop
+# mako and the session dbus have to exist before a notification can land.
+After=graphical-session.target
+PartOf=graphical-session.target
+# Herdr's socket comes and goes with the server; the daemon reconnects on its
+# own, so this is a soft ordering rather than a dependency.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/herdr-eventd
+# Not Restart=always: the daemon already has its own reconnect loop, so systemd
+# restarting it would only ever be for a genuine crash.
+Restart=on-failure
+RestartSec=5
+SyslogIdentifier=herdr-eventd
+# Same reasoning as linearfs: journald's per-service rate limiter will silently
+# eat the reconnect chatter this thing produces when herdr restarts.
+LogRateLimitIntervalSec=0
+
+[Install]
+WantedBy=graphical-session.target

@@ -26,8 +26,37 @@ with everything commented out except the settings we actively override — plus 
     linked worktree it lands on that **worktree's** root, not the main checkout; outside
     a git working tree it falls back to the pane cwd.
 
-  Both read the focused pane from `herdr pane list` rather than `$HERDR_PANE_ID` —
+  - `prefix+shift+a` → `herdr-adopt-worktrees` — bulk-attach worktree provenance to
+    workspaces that are sitting in a worktree checkout but were opened by hand, so they
+    are worktrees by convention only. Complements the built-in `open_worktree`
+    (`prefix+alt+g`), which picks one interactively. Idempotent, and skips any repo whose
+    *main* checkout has no workspace, so it never invents one.
+
+  All three read the focused pane from `herdr pane list` rather than `$HERDR_PANE_ID` —
   `type = "shell"` commands run detached and do not inherit the pane environment.
+
+- `[ui.sidebar.agents]` — one-line agent rows, `["state_icon", "workspace", "tab", "$ctx"]`.
+  The default second line (`agent`) is dropped because every pane here is claude, so it
+  carried no information. `$ctx` (and `$model`, reported but not rendered) come from
+  `claude/.claude/hooks/herdr-blocked-reason.sh`, which also publishes *why* a pane is
+  blocked so the ask is readable from the sidebar.
+
+## herdr-eventd
+
+`.local/bin/herdr-eventd` + `.config/systemd/user/herdr-eventd.service` — a user daemon
+that routes herdr agent state changes to the desktop. A pane going `blocked` raises a mako
+notification carrying the blocked-reason label from the hook above; clicking it focuses
+that pane.
+
+It subscribes per-pane to `pane.agent_status_changed` (there is no global agent-status
+subscription, and the global `pane.updated` is not emitted on status change), and
+reconnects on `pane.agent_detected` to widen the subscription set — a connection accepts
+exactly one `events.subscribe`. The script's header comment records the rest of the
+measured constraints.
+
+```bash
+systemctl --user enable --now herdr-eventd.service
+```
 
   Not mapped (no herdr keybinding equivalent): tmux's `=` copy-mode, `Ctrl-y` paste, and
   `X` kill-session. herdr also has no "double-tap prefix sends a literal backtick" behavior —
