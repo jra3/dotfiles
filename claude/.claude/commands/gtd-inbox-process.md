@@ -4,70 +4,54 @@ description: Process the GTD Capture queue in Linear, one item at a time
 
 Empty `Capture` by clarifying each item with John. **You propose; he decides.**
 
+Steps 1–3 are **dry**: every decision gets made with nothing written to Linear. Step 4 is the **commit** — one batch, all of it. An API round-trip per item is the digital equivalent of walking to the filing cabinet after every piece of paper, and it destroys the rhythm that makes processing fast.
+
 ## Before you start
 
-Read the **GTD Operating Manual** — the team doc in Linear, at `~/jra3/linear/teams/GTD/docs/`. It is canonical: the state semantics, the `Next` test, the project rule, and the clarify tree all live there, and it changes without this file changing. Read it every run rather than trusting your memory of it.
-
-Then read the queue:
-
-```
-ls ~/jra3/linear/teams/GTD/by/status/Capture/
-```
+Read the **GTD Operating Manual** — the team doc at `~/jra3/linear/teams/GTD/docs/`. It is canonical: the state semantics, the `Next` test, the project rule, the clarify tree and the clarify discipline all live there, and it changes without this file changing. Read it every run rather than trusting your memory of it.
 
 ## Steps
 
-### 1. Show John the queue
+### 1. Read everything, once
 
-List it, oldest first, with a count. If it is empty, say so and stop.
+One pass collecting everything needed to decide, so nothing has to be looked up mid-queue:
 
-### 2. Scan the whole queue for dispatchable work, and fire it in one batch
+* the `Capture` queue, oldest first, **with full descriptions**
+* existing projects and the Areas they sit under
+* workflow state IDs and label IDs
 
-Before clarifying anything, read every item and ask of each: **can an agent do this end-to-end, and does it produce something John reviews rather than something the world sees?**
+Read through the mount (`~/jra3/linear/teams/GTD/`) — reads are reliable there.
 
-Bring John the whole list at once — item, and the specific work you would dispatch for it. **He approves the batch before anything is sent.** Dispatch is supervised, not automatic. Then fire all approved dispatches in parallel, set each issue to `Doing`, and comment on it with what was sent and when.
+Then show John the queue, oldest first, **with a count**. If it is empty, say so and stop. That count is the bar for steps 2 and 3.
 
-Doing this first is the point: the agents work while you and John clarify the rest of the queue by hand, so the results are back before the items that need them come up.
+### 2. Decide, one item at a time
 
-This is the two-minute rule recalibrated. The rule was never about two minutes — it is a proxy for *cheaper to do than to track*. Agents move that threshold a long way, but the binding constraint stops being time and becomes **reversibility and review burden**.
+**Dry.** The only tool calls permitted here are two-minute-rule executions (below). Nothing else is read; nothing at all is written.
 
-**May dispatch:** research, drafting, verification, file transformation, checking things that are already public.
+Walk the manual's clarify tree and bring John a **proposal**, not a question with no answer in it: what you think it is, where it should go, and — if it is an action — the retitled physical action you would use. The retitle is usually the substance of the decision, so propose it explicitly.
 
-**May never dispatch:** anything outward-facing (publishing, posting, emailing, submitting), anything that spends money, anything that creates an account or identity, anything that changes system config with lockout risk.
+**Say what would make you wrong.** "This looks like a one-step errand, but if framing and shipping are involved it is a project" is worth more than a confident guess.
 
-**These are instructions to the agent, not a sandbox.** A dispatched agent has run `elephant generate config` against the may-never list before now. Two mitigations, and neither is a guarantee:
+**The two-minute rule means two minutes.** If you can genuinely do it that fast — a DNS lookup, a quick fetch — do it, record the item as `Done`, and go straight back to deciding.
 
-* **Use the read-only agent type for research dispatches.** `Explore` has no Edit/Write/NotebookEdit. It still has Bash, so a shell command can still mutate — it removes the easy path, not the path. Reserve full-tool agents for dispatches that genuinely must write, and worktree-isolate those when they touch a repo.
-* **Require a mutation report.** Every dispatched agent must end by listing every file it created, modified or deleted, or stating plainly that it made none. Read that report before closing the item. The `elephant` writes were only recoverable because the agent volunteered them; make that a contract rather than a habit.
+Done when every item in the count has a recorded decision.
 
-Dispatching does not clarify the item. It comes back as a draft with a decision attached, and John clarifies it then — with better information than it had in `Capture`.
+### 3. Show the batch
 
-**The failure mode to design against:** a dispatched item sits in `Doing` forever because the agent died, and because `Doing` is type `started` it also falsely un-stalls its project. The issue comment is the audit trail; the close-the-loop step is the backstop.
+Still dry. One reviewable block, one line per item, covering every retitle, state, project, label, and any new project to be created. Every item in the count appears in it.
 
-### 3. Work one item at a time, and never put it back
+**John's review of the batch is the approval.** Amend whatever he corrects. Do not ask for a second confirmation on something he has just read line by line.
 
-For each, walk the clarify tree from the manual and bring John a **proposal**, not a question with no answer in it: what you think it is, where it should go, and — if it is an action — the retitled physical action you would use.
+### 4. Commit, once
 
-Capture text is raw. Clarifying almost always means **retitling**. Propose the new title explicitly; that is usually the substance of the decision.
+Apply the whole batch in dependency order — create projects before the issues that reference them. When an item becomes a project, create the project first, then set the captured issue as its first action in `Next`, so the project has one from birth.
 
-Say what would make you wrong. "This looks like a one-step errand, but if framing and shipping are involved it is a project" is worth more than a confident guess.
+Write through the API rather than the mount, and **verify every write against the API response.**
 
-### 4. Apply what John decides
-
-Retitle, set state, set project, add a context label **only** if it genuinely constrains. Use the API, not the mount — failed mount writes return exit 0 (jra3/linear-fuse#455) and truncating writes corrupt descriptions (#454).
-
-When an item becomes a project: create the Linear project first, then set the captured issue as its first action in `Next`. **A project with nothing in `Next`/`Doing`/`Waiting` is stalled on arrival** — do not leave one that way.
-
-### 5. Close the loop
-
-Report what moved where, in one short block. Then say what `Capture` holds now — ideally nothing.
-
-**Report anything still in `Doing`** from a dispatch this run, and say plainly whether it returned. An unreported dispatch is worse than no dispatch.
+Then close the loop in one short block: what moved where, anything that failed — say so plainly — and what `Capture` holds now, ideally nothing.
 
 ## Judgement notes
 
-- **Under two minutes → offer to do it now.** If it is something you can actually do, do it and mark it `Done`.
-- **Under two minutes *for an agent* is a different threshold.** See step 3 — dispatch it and keep processing rather than making John wait.
-- **`Next` means physical and startable.** If your proposed title still needs a decision before John could begin, it is a project, not an action.
-- **`Someday` means uncommitted**, not "later". Ask which it is when unclear; do not infer commitment from enthusiasm.
-- **Not every action needs a project.** A loose one-step errand is fine.
-- Anything genuinely not actionable is reference — Drive for files, Notion for prose — or it gets deleted. Deleting is a real outcome; offer it.
+- **Containers are free. Schema is not.** Creating a new project, Area or label *is* clarifying — do it on the spot, without ceremony. Allen's own filing rule is that if making a new home takes more than about a minute, you stop filing and the system dies. But **changing what the containers mean** — inventing a workflow state, redefining an existing one, splitting or merging projects wholesale — changes every item already filed, and belongs to the weekly review rather than the middle of a pass.
+- **When a schema gap genuinely blocks a decision, close it — minimally — and get back to the queue.** Sometimes an item has no correct home and that is real information: `Todo` was created mid-pass because a committed-but-not-startable item had nowhere to go, and the system was wrong until it existed. That was the right call. What went wrong was what followed — an hour of restructuring, a doc rewrite and a state merge, with the queue still full. Make the smallest change that unblocks the item, note the rest for later, and carry on.
+- Anything genuinely not actionable is reference — Drive for files, Notion for prose — or it gets deleted. **Deleting is a real outcome; offer it.**
