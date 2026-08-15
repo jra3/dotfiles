@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Read(~/linear/**)",
       "Bash(npm *)",
       "Bash(npx *)",
       "Bash(pnpm *)",
@@ -90,13 +89,6 @@
       "Bash(for *)",
       "WebSearch",
       "WebFetch",
-      "mcp__linear-server__create_issue",
-      "mcp__linear-server__list_teams",
-      "mcp__linear-server__list_issues",
-      "mcp__linear-server__get_issue",
-      "mcp__linear-server__get_user",
-      "mcp__linear-server__update_issue",
-      "mcp__linear-server__create_comment",
       "mcp__claude-in-chrome__tabs_context_mcp",
       "mcp__claude-in-chrome__tabs_create_mcp",
       "mcp__claude-in-chrome__navigate",
@@ -138,10 +130,7 @@
     ],
     "deny": [
       "AskUserQuestion",
-      "mcp__claude_ai_Gmail",
-      "mcp__claude_ai_Google_Calendar",
-      "mcp__claude_ai_Google_Drive",
-      "mcp__claude_ai_Instacart"
+      "mcp__claude_ai_Linear"
     ],
     "defaultMode": "auto"
   },
@@ -157,6 +146,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/home/john/.claude/hooks/herdr-agent-state.sh' session",
+            "timeout": 10
+          }
+        ]
       }
     ]
   },
@@ -166,10 +165,7 @@
     "padding": 0
   },
   "enabledPlugins": {
-    "am-dev-tools@internal-antimetal": true,
-    "clangd-lsp@claude-plugins-official": true,
-    "gopls-lsp@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true
+    "mattpocock-skills@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "internal-antimetal": {
