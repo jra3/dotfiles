@@ -20,7 +20,7 @@ cd "$DOTFILES_DIR"
 
 # Work on both Arch and macOS.
 PACKAGES_COMMON=(
-    zsh git tmux starship ripgrep sqlite gh ghostty
+    zsh readline git tmux starship ripgrep sqlite gh ghostty
     claude ccstatusline lazygit gtr bitwarden herdr ssh
 )
 
