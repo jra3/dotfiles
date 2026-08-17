@@ -2,20 +2,28 @@
 
 export BROWSER='open'
 
+# HOMEBREW_PREFIX is exported by `brew shellenv` in .zshenv. The fallback only
+# matters if Homebrew isn't installed at all, in which case every guard below
+# simply fails closed. Hardcoding /opt/homebrew would break on Intel Macs.
+: "${HOMEBREW_PREFIX:=/opt/homebrew}"
+
 # Homebrew completions
-if [[ -d /opt/homebrew/share/zsh/site-functions ]]; then
-    fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+if [[ -d "$HOMEBREW_PREFIX/share/zsh/site-functions" ]]; then
+    fpath=("$HOMEBREW_PREFIX/share/zsh/site-functions" $fpath)
 fi
 
-# Editor
-export EDITOR='/opt/homebrew/bin/emacs -nw'
-export VISUAL='/opt/homebrew/bin/emacs -nw'
-e() { /opt/homebrew/bin/emacs -nw "$@"; }
+# Editor. Arch runs an Emacs daemon via systemd and talks to it with
+# emacsclient; there's no such unit here, so call the binary directly.
+if [[ -x "$HOMEBREW_PREFIX/bin/emacs" ]]; then
+    export EDITOR="$HOMEBREW_PREFIX/bin/emacs -nw"
+    export VISUAL="$EDITOR"
+    e() { "$HOMEBREW_PREFIX/bin/emacs" -nw "$@"; }
+fi
 
 # fzf
 if command -v fzf &>/dev/null; then
-    source "/opt/homebrew/opt/fzf/shell/completion.zsh" 2>/dev/null
-    source "/opt/homebrew/opt/fzf/shell/key-bindings.zsh" 2>/dev/null
+    source "$HOMEBREW_PREFIX/opt/fzf/shell/completion.zsh" 2>/dev/null
+    source "$HOMEBREW_PREFIX/opt/fzf/shell/key-bindings.zsh" 2>/dev/null
 
     export FZF_CTRL_R_OPTS="
         --preview 'echo {}'
@@ -25,11 +33,19 @@ if command -v fzf &>/dev/null; then
     "
 fi
 
-# SSH agent (1Password or macOS keychain)
-export SSH_AUTH_SOCK=~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
-if [[ ! -S "$SSH_AUTH_SOCK" ]]; then
-    export SSH_AUTH_SOCK=$(launchctl getenv SSH_AUTH_SOCK 2>/dev/null)
-fi
+# SSH agent: use macOS's own launchd agent.
+# This used to hardcode SSH_AUTH_SOCK to 1Password's socket first, which was
+# doubly wrong once 1Password went away: it clobbered the perfectly good launchd
+# socket macOS already puts in the environment, and if `launchctl getenv` then
+# returned nothing you were left with SSH_AUTH_SOCK="" — no agent at all, which
+# breaks the ForwardAgent brokering in ssh/.ssh/config.shared. Only ever assign
+# a socket that actually exists.
+() {
+    [[ -S "$SSH_AUTH_SOCK" ]] && return
+
+    local from_launchd="$(launchctl getenv SSH_AUTH_SOCK 2>/dev/null)"
+    [[ -S "$from_launchd" ]] && export SSH_AUTH_SOCK="$from_launchd"
+}
 
 # Unix timestamp (BSD date)
 ut() {
@@ -40,6 +56,8 @@ ut() {
     fi
 }
 
-# PATH additions
-path=(/opt/homebrew/opt/postgresql@16/bin $path)
+# PATH additions. Keg-only formulae aren't linked into the Homebrew bin dir, so
+# they need an explicit entry — but only if actually installed, otherwise this
+# leaves a dead path element in every shell.
+[[ -d "$HOMEBREW_PREFIX/opt/postgresql@16/bin" ]] && path=("$HOMEBREW_PREFIX/opt/postgresql@16/bin" $path)
 

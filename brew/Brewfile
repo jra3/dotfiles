@@ -1,0 +1,85 @@
+# Homebrew bundle — the macOS counterpart to pacman/packages-arch.txt.
+#
+# Install:  brew/install-packages
+# Check:    brew bundle check --file=brew/Brewfile --verbose
+#
+# Only list what the stowed configs actually depend on, plus the apps that make
+# a machine usable. If a package here exists solely for a Linux-only stow
+# package (hypr, waybar, voxtype, ...), it does not belong in this file.
+
+tap "d12frosted/emacs-plus"
+
+# --- Core utilities ---
+brew "git"
+brew "curl"
+brew "wget"
+brew "tree"
+brew "htop"
+brew "jq"
+brew "watch"
+brew "stow"          # deploys every package in this repo
+
+# --- Modern CLI replacements (referenced by zsh/.zshrc aliases + FZF_*_COMMAND) ---
+brew "ripgrep"       # rg; `ag` alias in .zshrc
+brew "fd"            # FZF_DEFAULT_COMMAND / FZF_ALT_C_COMMAND both shell out to fd
+brew "bat"
+brew "eza"
+brew "zoxide"        # .zshrc sources `zoxide init` at the very end
+brew "git-delta"     # git/config sets core.pager = delta and interactive.diffFilter
+
+# --- Terminal + editor ---
+brew "tmux"
+brew "neovim"
+brew "d12frosted/emacs-plus/emacs-plus@30"
+brew "herdr"         # terminal workspace manager; config in the herdr/ stow package
+
+# --- Development toolchains ---
+brew "node"
+brew "python"
+brew "go"
+brew "rust"
+brew "cmake"
+brew "qemu"
+brew "uv"
+brew "libtool"
+brew "mise"          # .zshenv wires up mise shims; .zshrc runs `mise activate zsh`
+brew "pyenv"         # .zshrc runs `pyenv init -` and `pyenv virtualenv-init -`
+brew "pyenv-virtualenv"
+brew "direnv"        # .zshrc hooks direnv when present
+
+# --- CLI productivity ---
+brew "fzf"           # zsh/.config/zsh/darwin.zsh sources its completion + key-bindings
+brew "gh"            # git/config credential helper + gh/ stow package
+brew "lazygit"       # lazygit/ stow package
+brew "tldr"
+brew "starship"      # starship/ stow package
+brew "bitwarden-cli" # bitwarden/get-signature calls `bw`
+
+# --- Applications ---
+cask "ghostty"       # ghostty/ stow package
+cask "claude"
+cask "docker-desktop"   # renamed upstream from "docker"; the old name reinstalls a duplicate
+cask "visual-studio-code"
+cask "discord"
+cask "syncthing-app"    # renamed upstream from "syncthing"
+cask "obsidian"         # matches the obsidian/ stow package
+cask "google-chrome"    # matches the google-chrome/ stow package
+# ssh/config.shared canonicalizes bare hostnames into the tailnet, so the
+# `ssh am-jallen` shortcuts need this. Renamed upstream from "tailscale".
+# Heads up: it installs via a .pkg and so needs an interactive sudo — `brew
+# bundle` will abort the whole run if it can't prompt. Install it on its own
+# from a real terminal if a non-interactive bootstrap trips over it.
+cask "tailscale-app"
+cask "slack"            # the slack/ stow package routes slack:// to the browser on
+                        # Linux, where there is no desktop client; on macOS the
+                        # native app is installed and handles its own scheme.
+
+# --- Fonts (CaskaydiaMono matches the Ghostty config's font-family) ---
+cask "font-caskaydia-mono-nerd-font"
+cask "font-jetbrains-mono"
+cask "font-fira-code"
+cask "font-cascadia-code"
+
+# --- Mac App Store CLI ---
+brew "mas"
+# mas "Xcode", id: 497799835

@@ -1,0 +1,128 @@
+#!/bin/bash
+# Deploy the right set of stow packages for this platform.
+#
+#   ./bootstrap              # stow (restow) everything this platform supports
+#   ./bootstrap --dry-run    # show what would happen, touch nothing
+#   ./bootstrap --list       # print the package sets and exit
+#
+# Most packages are portable. The ones that are not fall into two buckets:
+# Linux-only (systemd units, .desktop files, Hyprland/waybar config) and
+# macOS-only (`macos`). Package dirs that are tooling rather than dotfiles —
+# `pacman`, `brew`, `tests` — are never stowed; stowing them would drop
+# install-packages and friends straight into $HOME.
+
+set -euo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$DOTFILES_DIR"
+
+# --- Package sets -----------------------------------------------------------
+
+# Work on both Arch and macOS.
+PACKAGES_COMMON=(
+    zsh git tmux starship ripgrep sqlite gh ghostty
+    claude ccstatusline lazygit gtr bitwarden herdr ssh
+)
+
+# Need systemd, Hyprland/Wayland, XDG .desktop files, or Arch-only hardware.
+PACKAGES_LINUX=(
+    hypr emacs power obsidian webapps bambu-studio google-chrome
+    slack tether voxtype qmk captive-browser scripts
+)
+
+# macOS system preferences.
+PACKAGES_MACOS=(
+    macos
+)
+
+# On macOS these subtrees are inert — nothing reads systemd units or
+# environment.d — so skip them rather than symlinking dead directories into
+# ~/.config. Matched by basename; stow's built-in ignores (.git, README.*, ...)
+# still apply on top of these.
+MACOS_IGNORES=(--ignore='systemd' --ignore='environment\.d')
+
+# --- Options ----------------------------------------------------------------
+
+STOW_FLAGS=(--target="$HOME" --restow --verbose)
+DRY_RUN=0
+LIST_ONLY=0
+
+for arg in "$@"; do
+    case "$arg" in
+        -n|--dry-run) DRY_RUN=1; STOW_FLAGS+=(--no) ;;
+        -l|--list)    LIST_ONLY=1 ;;
+        -h|--help)    sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *)            echo "Unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+
+# --- Platform detection -----------------------------------------------------
+
+case "$(uname -s)" in
+    Darwin)
+        PLATFORM=macos
+        PACKAGES=("${PACKAGES_COMMON[@]}" "${PACKAGES_MACOS[@]}")
+        EXTRA_IGNORES=("${MACOS_IGNORES[@]}")
+        SKIPPED=("${PACKAGES_LINUX[@]}")
+        ;;
+    Linux)
+        PLATFORM=linux
+        PACKAGES=("${PACKAGES_COMMON[@]}" "${PACKAGES_LINUX[@]}")
+        EXTRA_IGNORES=()
+        SKIPPED=("${PACKAGES_MACOS[@]}")
+        ;;
+    *)
+        echo "Unsupported platform: $(uname -s)" >&2
+        exit 1
+        ;;
+esac
+
+if [ "$LIST_ONLY" = 1 ]; then
+    echo "Platform: $PLATFORM"
+    echo "Stow:  ${PACKAGES[*]}"
+    echo "Skip:  ${SKIPPED[*]}"
+    exit 0
+fi
+
+echo "Platform: $PLATFORM"
+[ "$DRY_RUN" = 1 ] && echo "(dry run — nothing will be modified)"
+echo ""
+
+# --- Deploy -----------------------------------------------------------------
+
+failed=()
+for pkg in "${PACKAGES[@]}"; do
+    if [ ! -d "$DOTFILES_DIR/$pkg" ]; then
+        echo "  skip (missing): $pkg"
+        continue
+    fi
+
+    # The emacs package ships a systemd drop-in directory. Plain stow FOLDS it
+    # into a symlink, and systemd silently ignores drop-ins inside a symlinked
+    # drop-in dir — see the long note in pacman/configure-system.
+    flags=("${STOW_FLAGS[@]}" "${EXTRA_IGNORES[@]+"${EXTRA_IGNORES[@]}"}")
+    [ "$pkg" = emacs ] && flags+=(--no-folding)
+
+    echo "  stow: $pkg"
+    if ! stow "${flags[@]}" "$pkg" 2>&1 | sed 's/^/      /'; then
+        failed+=("$pkg")
+    fi
+done
+
+echo ""
+if [ ${#failed[@]} -gt 0 ]; then
+    echo "Failed: ${failed[*]}" >&2
+    echo "Resolve the conflicts above (usually a real file where a symlink should go)," >&2
+    echo "then re-run. Nothing else was left half-applied." >&2
+    exit 1
+fi
+
+echo "Stowed ${#PACKAGES[@]} package(s). Skipped (wrong platform): ${SKIPPED[*]}"
+echo ""
+if [ "$DRY_RUN" = 0 ]; then
+    if [ "$PLATFORM" = macos ]; then
+        echo "Next:  brew/install-packages && brew/configure-system"
+    else
+        echo "Next:  pacman/install-packages && pacman/configure-system"
+    fi
+fi

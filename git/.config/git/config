@@ -68,12 +68,15 @@
 
 [includeIf "gitdir:~/am/"]
     path = config-work
+# `gh auth setup-git` writes an absolute /usr/bin/gh here, which only exists on
+# Arch — on macOS gh lives in /opt/homebrew/bin, so the absolute form makes every
+# HTTPS fetch fail with "helper not found". Resolve it off PATH instead.
 [credential "https://github.com"]
-	helper = 
-	helper = !/usr/bin/gh auth git-credential
+	helper =
+	helper = !gh auth git-credential
 [credential "https://gist.github.com"]
-	helper = 
-	helper = !/usr/bin/gh auth git-credential
+	helper =
+	helper = !gh auth git-credential
 [url "https://github.com/"]
 	insteadOf = git@github.com:
 	insteadOf = ssh://git@github.com/

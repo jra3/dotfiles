@@ -1,0 +1,7 @@
+# Read by stow when run from this directory. Options here apply to plain
+# `stow <pkg>` invocations as well as ./bootstrap.
+#
+# stow's built-in ignore list already covers .git, README.*, LICENSE.*, and
+# editor backups, but not our other in-package docs — without this, `stow tmux`
+# cheerfully symlinks ~/ARCHITECTURE.md into $HOME.
+--ignore=ARCHITECTURE\.md

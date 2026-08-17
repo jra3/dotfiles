@@ -125,8 +125,7 @@
       "Bash(poetry *)",
       "Bash(direnv *)",
       "Bash(ssh-keygen *)",
-      "Bash(lsusb *)",
-      "Read(//home/jallen/.config/**)"
+      "Bash(lsusb *)"
     ],
     "deny": [
       "AskUserQuestion"

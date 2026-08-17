@@ -4,7 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is a GNU Stow-managed dotfiles repository for an Omarchy system (DHH's Arch Linux + Hyprland distribution). Each top-level directory is a "stow package" that mirrors the home directory structure.
+This is a GNU Stow-managed dotfiles repository targeting **two platforms**: an
+Omarchy system (DHH's Arch Linux + Hyprland distribution) and **macOS**. Each
+top-level directory is a "stow package" that mirrors the home directory
+structure.
+
+Most packages are shared. `./bootstrap` knows which are Linux-only (systemd
+units, `.desktop` files, Hyprland) and which are macOS-only, and stows only what
+applies — run `./bootstrap --list` to see the split for the current machine.
+**When adding a package, add it to one of the three lists at the top of
+`bootstrap`**, or it will never be deployed.
+
+Platform-specific tooling lives in two non-stowed directories that mirror each
+other: `pacman/` (`install-packages`, `configure-system`, package lists) and
+`brew/` (`install-packages`, `configure-system`, `Brewfile`).
 
 **Claude skill:** Use `/omarchy` for help with Hyprland config, keybindings, monitors, themes, input devices, or any `~/.config/hypr/` files. Omarchy 4 also ships its own skill at `$OMARCHY_PATH/default/agents/skills/omarchy/`, which tracks the current release — prefer it when the two disagree.
 
@@ -124,6 +137,11 @@ setup. Adding another extension means adding one `id|description` line to the
 ## Common Commands
 
 ```bash
+# Deploy everything appropriate for THIS platform (preferred entry point)
+./bootstrap
+./bootstrap --list      # show the stow/skip split, change nothing
+./bootstrap --dry-run   # full preview
+
 # Deploy a package (creates symlinks in $HOME)
 stow <package>
 
@@ -287,7 +305,9 @@ This documents the default software stack configured in Omarchy:
   rather than deleted, so the key stays dead instead of reviving Omarchy's
   1Password binding. To be replaced rather than ported; `rbw` itself is fine and
   the pure helpers still have coverage in `tests/bw-pick.bats`
-- `pacman/` - Arch package lists and `configure-system` for post-install setup
+- `pacman/` - Arch package lists and `configure-system` for post-install setup (not stowed)
+- `brew/` - macOS `Brewfile`, `install-packages`, and `configure-system` (not stowed)
+- `macos/` - macOS system preferences (`macos-defaults`); macOS-only stow package
 - `voxtype/` - Dictation. Only `meeting-toggle` is stowed: **`config.toml` is
   deliberately host-local** — `model` is a per-machine answer and voxtype rewrites the
   file itself (`voxtype setup`, `voxtype config set`). The binary is
@@ -334,7 +354,32 @@ This documents the default software stack configured in Omarchy:
 
 ## Post-Install Setup
 
-Run `pacman/configure-system` to configure system services (Tailscale operator, Emacs daemon, etc.). The script is idempotent and safe to re-run.
+Run the `configure-system` for the current platform. Both are idempotent and safe to re-run.
+
+- **Arch:** `pacman/configure-system` — system services (Tailscale operator, Emacs daemon, sshd on the tailnet, power policy, pacman hooks).
+- **macOS:** `brew/configure-system` — `~/tmp` (for the `TMPDIR` set in `.zshenv`), `~/.ssh/sockets`, the `~/.ssh/config` → `config.shared` include, the `git-worktree-runner` clone that `gtr` wraps, and the `gh-stack` extension.
+
+The macOS script deliberately does *not* emulate the Arch-only half (systemd units, sshd binding, UPower, xdg-mime). System preference tweaks live separately in `macos-defaults`, which is not called automatically because it restarts Dock and Finder.
+
+## macOS gotchas
+
+**Homebrew must be initialized twice.** `brew shellenv` runs in both `zsh/.zshenv` and `zsh/.zprofile`, and both are load-bearing:
+
+- `.zshenv` is the only one non-login shells read — scripts, git hooks, editors, and Claude Code's Bash tool. Without it they get a `PATH` with no Homebrew at all, which breaks `git`, `tmux`, `rg`, `starship`, and `stow`.
+- `.zprofile` is needed because `/etc/zprofile` runs `path_helper` *after* `.zshenv`. `path_helper` rebuilds `PATH` with the system directories first, demoting `/opt/homebrew/bin` below `/usr/bin` so every formula that shadows a system binary silently loses. Re-running `shellenv` from `~/.zprofile` (which zsh reads after `/etc/zprofile`) restores precedence.
+
+Version-manager shims (pyenv, mise) are prepended later in `.zshrc`, so they still land ahead of Homebrew. If you touch `PATH` setup, verify all three invariants:
+
+```bash
+/bin/zsh -i -l -c 'echo $PATH | tr ":" "\n" | grep -n "pyenv/shims\|^/opt/homebrew/bin$\|^/usr/bin$"'
+# expected order: pyenv shims < /opt/homebrew/bin < /usr/bin
+```
+
+**Never hardcode `/opt/homebrew`.** That path is Apple Silicon only; Intel Macs use `/usr/local`. Use `$HOMEBREW_PREFIX` (exported by `shellenv`), as `darwin.zsh` does.
+
+**Ghostty has no OS conditionals**, but it registers Linux-only keys (`gtk-toolbar-style`, `async-backend`) as known fields on every platform, so they validate clean and are ignored on macOS. The config is deliberately *not* split. Check changes with `ghostty +validate-config --config-file=...`. Note Ghostty does **not** support trailing `#` comments — a comment after a value becomes part of the value.
+
+**Tailscale** installs from a `.pkg` requiring interactive `sudo`, so it aborts a non-interactive `brew bundle`. Install it on its own from a real terminal.
 
 ## Git commit signing (per-machine YubiKey, on)
 
