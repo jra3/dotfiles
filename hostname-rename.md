@@ -24,9 +24,15 @@ sentence, and this is the only desktop. Do it with a keyboard in front of you.
   **This provider is dead until the rename lands** — that is the one thing the
   prep leaves broken on purpose.
 - **`tailscale serve`** — reset. It was proxying
-  `https://am-jallen.corgi-hammerhead.ts.net` to `127.0.0.1:13305`, and nothing
-  had been listening on 13305 for some time. Dead weight, removed rather than
-  carried to the new name.
+  `https://am-jallen.corgi-hammerhead.ts.net` to `127.0.0.1:13305`. Nothing was
+  listening, but that is because **13305 is Lemonade** (`lemond`, AUR
+  `lemonade-server-git`) and the service is stopped — not because the serve was
+  abandoned. Removed rather than carried to the new name; if Lemonade comes back
+  and wants a tailnet URL again:
+
+  ```sh
+  sudo tailscale serve --bg 13305      # -> https://paperweight.corgi-hammerhead.ts.net
+  ```
 
 ## Reference values
 
