@@ -141,9 +141,9 @@ bindkey '^W' backward-kill-word
 _fbr_widget() { fbr; zle reset-prompt; }
 zle -N _fbr_widget
 bindkey '^Xb' _fbr_widget
-_fgtr_widget() { fgtr; zle reset-prompt; }
-zle -N _fgtr_widget
-bindkey '^Xg' _fgtr_widget
+_fwt_widget() { fwt; zle reset-prompt; }
+zle -N _fwt_widget
+bindkey '^Xg' _fwt_widget
 
 # ============================================================================
 # Cached eval helper: regenerates only when binary is newer than cache
@@ -213,19 +213,6 @@ fbr() {
 }
 fwt() { cd "$(git worktree list | fzf +m | awk '{print $1}')"; }
 
-# fzf-powered git worktree manager with gtr integration
-# Main logic in ~/.local/bin/fgtr script; this wrapper handles cd/editor/ai
-fgtr() {
-  local result
-  result=$(command fgtr) || return $?
-  case "$result" in
-    EDITOR:*) git gtr editor "${result#EDITOR:}" ;;
-    AI:*)     git gtr ai "${result#AI:}" ;;
-    "")       ;;
-    *)        builtin cd "$result" ;;
-  esac
-}
-
 extract() {
     [[ -f "$1" ]] || { echo "'$1' is not a valid file"; return 1; }
     case "$1" in
@@ -250,12 +237,6 @@ alias ag='rg'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias watch='watch --color'
-alias gtr='git gtr'
-compdef _gtr gtr
-
-# git-worktree-runner: cd into a worktree
-gcd() { cd "$(git gtr go "$1")" }
-compdef '_gtr_all_targets' gcd
 
 # ============================================================================
 # Tool Completions

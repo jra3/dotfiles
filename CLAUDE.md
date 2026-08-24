@@ -116,7 +116,7 @@ This documents the default software stack configured in Omarchy:
 | Shell | **zsh** | Default shell with XDG-compliant config |
 | Prompt | **Starship** | Cross-shell prompt with git integration |
 | Terminal | **Ghostty** | GPU-accelerated terminal (CaskaydiaMono Nerd Font). Omarchy 4 defaults to foot; `ghostty/.config/xdg-terminals.list` is what keeps `SUPER+ENTER` on Ghostty |
-| Multiplexer | **tmux** | Terminal multiplexer. Config only — worktrees are `gtr`, workspaces are `herdr` |
+| Multiplexer | **tmux** | Terminal multiplexer. Config only — worktrees are Omarchy's `ga`/`gd`, workspaces are `herdr` |
 | Compositor | **Hyprland** | Wayland tiling compositor, configured in **Lua** |
 | Desktop shell | **Omarchy shell** | One Quickshell process: bar, notifications, launcher, OSD, lock, idle. Replaced waybar, mako, walker, swayosd, hyprlock, hypridle |
 | Browser | **Helium** | Web browser |
@@ -125,7 +125,7 @@ This documents the default software stack configured in Omarchy:
 | VCS | **Git** | Version control with custom aliases |
 | GitHub | **gh** | GitHub CLI with `gh prs` for PR listing |
 | Search | **ripgrep** | Fast recursive grep |
-| Worktrees | **gtr** | Git worktree runner for parallel development |
+| Worktrees | **Omarchy `ga`/`gd`** | Shell fns from `$OMARCHY_PATH/default/bash/fns/worktrees`, sourced in `.zshrc`. `ga <branch>` creates `../<repo>--<branch>` and cds in; `gd` removes the current one. Replaced `gtr` on 2026-08-24 |
 | Database | **SQLite** | Database with custom config |
 | Passwords | **Bitwarden** | Password manager with CLI (`bw`), via `bw-pick`. 1Password and KeePassXC are deliberately **not** installed (removed 2026-08-23) |
 | Dictation | **voxtype** | Push-to-talk voice-to-text; `large-v3-turbo` on Vulkan |
@@ -145,10 +145,9 @@ This documents the default software stack configured in Omarchy:
 - `sqlite/` - SQLite configuration
 - `starship/` - Starship prompt configuration
 - `tmux/` - tmux terminal multiplexer (config only; the `tn`/`twt` session scripts
-  were removed 2026-08-24, unused since Dec 2025 and superseded by `gtr`/`herdr`)
+  were removed 2026-08-24, unused since Dec 2025 and superseded by `ga`/`herdr`)
 - `herdr/` - herdr terminal workspace manager (annotated default config; binary at `~/.local/bin/herdr`, not stow-managed); see `herdr/README.md`
 - `gh/` - GitHub CLI config and `gh-prs` script
-- `gtr/` - Git worktree runner wrapper
 - `lazygit/` - lazygit TUI config with `gh stack` stacked-diff custom commands
   (needs the `github/gh-stack` gh extension; `gh extension install github/gh-stack`)
 - `claude/` - Claude Code settings and custom commands

@@ -78,8 +78,9 @@ prefix = "backtick"
 # new_worktree = "prefix+shift+g"
 open_worktree = "prefix+alt+g"    # unbound by default; adopts an existing worktree as a
                                   # workspace. Backed by `git worktree list`, NOT by
-                                  # [worktrees] directory — so it sees gtr's sibling
-                                  # <repo>--<branch> trees without any extra config.
+                                  # [worktrees] directory — so it sees the sibling
+                                  # <repo>--<branch> trees Omarchy's `ga` creates
+                                  # without any extra config.
 remove_worktree = "prefix+ctrl+g" # unbound by default; opens a confirmation prompt
 # rename_workspace = "prefix+shift+w"
 # close_workspace = "prefix+shift+d"
