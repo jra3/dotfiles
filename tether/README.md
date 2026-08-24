@@ -1,7 +1,30 @@
 # tether
 
 iPhone USB tethering on this `iwd` + `systemd-networkd` machine (no NetworkManager),
-plus a waybar indicator.
+plus a bar indicator.
+
+> **TODO — the indicator is broken on Omarchy 4 (Quattro).** Waybar no longer exists;
+> the bar is one Quickshell process at `$OMARCHY_PATH/shell`. The networking half below
+> (the `.network` file, `usbmuxd`, and the detection logic in `waybar-iphone-tether`)
+> is unaffected and still correct — only the presentation layer is gone.
+>
+> Two ways out, in preference order:
+>
+> 1. **Find an existing Omarchy shell plugin** for USB tethering or generic network
+>    interfaces. Check `$OMARCHY_PATH/shell/plugins/bar/indicators/` and the omarchy
+>    plugin ecosystem before writing anything.
+> 2. **Write a Quickshell indicator.** `$OMARCHY_PATH/shell/plugins/bar/indicators/Dictation.qml`
+>    is the smallest working example: a `BarIndicator` running a `Process` whose stdout
+>    is parsed by a `SplitParser`, with `active` driving visibility. Two mismatches to
+>    bridge: this script prints **once and exits**, whereas `Dictation.qml` expects a
+>    process that *streams* (compare `omarchy-voxtype-status`, which execs
+>    `voxtype status --follow`) — so either poll it on a `Timer` or add a follow loop.
+>    And it emits `text`/`class`/`tooltip` but no `alt`, while `Dictation.qml` reads
+>    `alt || class`; `class` is `connected` / `pending` / absent, which is what the
+>    indicator's `active` should key off.
+>
+> Note that indicators are hidden while inactive unless hovered, or given `alwaysShow`
+> on `omarchy.indicators` in `~/.config/omarchy/shell.json`.
 
 ## What's where
 
@@ -18,7 +41,10 @@ plus a waybar indicator.
 - **`usbmuxd`** — in `pacman/packages-arch.txt`. Ships the udev rule that autostarts the
   pairing daemon on plug-in.
 
-## Waybar wiring (NOT stow-tracked — reproduce by hand)
+## Waybar wiring (OBSOLETE — waybar removed in Omarchy 4)
+
+Kept for reference until the Quickshell indicator above replaces it. None of the
+files below exist on a Quattro machine.
 
 `~/.config/waybar/config.jsonc` + `style.css` are live Omarchy files (Omarchy
 rewrites them on refresh/update), so the indicator isn't stowed. To reproduce on a

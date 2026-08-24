@@ -6,7 +6,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a GNU Stow-managed dotfiles repository for an Omarchy system (DHH's Arch Linux + Hyprland distribution). Each top-level directory is a "stow package" that mirrors the home directory structure.
 
-**Claude skill:** Use `/omarchy` for help with Hyprland config, keybindings, monitors, themes, input devices, or any `~/.config/hypr/` files.
+**Claude skill:** Use `/omarchy` for help with Hyprland config, keybindings, monitors, themes, input devices, or any `~/.config/hypr/` files. Omarchy 4 also ships its own skill at `$OMARCHY_PATH/default/agents/skills/omarchy/`, which tracks the current release — prefer it when the two disagree.
+
+**This system runs Omarchy 4 ("Quattro"), upgraded 2026-08-23.** See the section below: pre-4 habits actively mislead.
+
+## Omarchy 4 (Quattro)
+
+**Omarchy is a pacman package now.** It lives at `/usr/share/omarchy`, root-owned —
+not a git clone you can `git pull`. `~/.local/share/omarchy` is a compat symlink, so
+old paths still resolve, but prefer `$OMARCHY_PATH` (Hyprland exports it). Per-machine
+state moved from `~/.config/omarchy/` to `~/.local/state/omarchy/`, the current theme
+included.
+
+**Hyprland is configured in Lua.** `~/.config/hypr/hyprland.lua` is the entry point;
+a `.conf` is read only when no `.lua` exists. Every Omarchy default under
+`$OMARCHY_PATH/default/hypr/` is `.lua`. The `hypr/` package was converted
+2026-08-23 — the old `.conf` files are in git history.
+
+- API stubs, authoritative: `/usr/share/hypr/stubs/hl.meta.lua`
+- Omarchy's `o.*` helpers: `$OMARCHY_PATH/default/hypr/helpers.lua`
+- Validate every change: `hyprctl reload && hyprctl configerrors`
+
+**Binding an already-bound key does not override it — both bindings fire.** Call
+`hl.unbind(...)` first. `hl.unbind` matches the modifier string *literally* while
+`o.bind` normalizes it, so `"SUPER + ALT + SHIFT + E"` will not unbind a key Omarchy
+registered as `"SUPER + SHIFT + ALT + E"`; you get two live bindings and no error.
+List what is actually bound with `omarchy menu keybindings --print`.
+
+**`hyprctl dispatch` takes a Lua dispatcher.** `hyprctl dispatch togglespecialworkspace foo`
+is a parse error; write `hyprctl dispatch 'hl.dsp.workspace.toggle_special("foo")'`.
+Likewise `focuswindow` becomes `hl.dsp.focus({ window = "class:^(emacs)$" })`.
+
+**waybar, mako, walker, swayosd, hyprlock and hypridle are all gone**, replaced by a
+single Quickshell process (`quickshell -p $OMARCHY_PATH/shell`) covering bar,
+notifications, launcher, OSD, lock and idle. Bar layout is `~/.config/omarchy/shell.json`.
+Indicators are hidden while inactive unless hovered or given `alwaysShow` on
+`omarchy.indicators`.
+
+### Omarchy tools rewrite stowed files in place
+
+Several Omarchy commands persist a setting with `sed -i` on a file in `~/.config`.
+`sed -i` replaces a symlink with a regular file, so the file silently drops out of
+stow and the repo stops being the source of truth. Seen during the Quattro upgrade:
+
+| File | Written by |
+|---|---|
+| `~/.config/tmux/tmux.conf` | upgrade migration |
+| `~/.config/hypr/monitors.lua` | display menu (`omarchy-hyprland-monitor-scaling`) |
+| `~/.config/xdg-terminals.list` | terminal picker |
+
+After changing anything through an Omarchy menu, check the file with `ls -l` and
+`stow -R <package>` if it became a regular file. `monitors.lua` deliberately keeps
+Omarchy's `local omarchy_monitor_scale` / `local omarchy_gdk_scale` names and bare
+numeric literals so the display menu can still write to it — rename them and a scale
+change applies live, then vanishes on the next reload.
 
 ## Common Commands
 
@@ -46,9 +99,10 @@ This documents the default software stack configured in Omarchy:
 |----------|----------|-------------|
 | Shell | **zsh** | Default shell with XDG-compliant config |
 | Prompt | **Starship** | Cross-shell prompt with git integration |
-| Terminal | **Ghostty** | GPU-accelerated terminal (CaskaydiaMono Nerd Font) |
+| Terminal | **Ghostty** | GPU-accelerated terminal (CaskaydiaMono Nerd Font). Omarchy 4 defaults to foot; `ghostty/.config/xdg-terminals.list` is what keeps `SUPER+ENTER` on Ghostty |
 | Multiplexer | **tmux** | Terminal multiplexer with worktree integration |
-| Compositor | **Hyprland** | Wayland tiling compositor |
+| Compositor | **Hyprland** | Wayland tiling compositor, configured in **Lua** |
+| Desktop shell | **Omarchy shell** | One Quickshell process: bar, notifications, launcher, OSD, lock, idle. Replaced waybar, mako, walker, swayosd, hyprlock, hypridle |
 | Browser | **Helium** | Web browser |
 | Editor | **Emacs** | Text editor (emacsclient for fast startup) |
 | AI | **Claude Code** | AI-powered coding assistant |
@@ -57,7 +111,8 @@ This documents the default software stack configured in Omarchy:
 | Search | **ripgrep** | Fast recursive grep |
 | Worktrees | **gtr** | Git worktree runner for parallel development |
 | Database | **SQLite** | Database with custom config |
-| Passwords | **Bitwarden** | Password manager with CLI (`bw`) |
+| Passwords | **Bitwarden** | Password manager with CLI (`bw`), via `bw-pick`. 1Password and KeePassXC are deliberately **not** installed (removed 2026-08-23) |
+| Dictation | **voxtype** | Push-to-talk voice-to-text; `large-v3-turbo` on Vulkan |
 | Packages | **pacman/yay** | Arch package manager (package lists tracked) |
 
 ## Architecture
@@ -65,8 +120,11 @@ This documents the default software stack configured in Omarchy:
 **Stow packages** - Each directory is independent and can be deployed separately:
 - `zsh/` - Shell configuration (XDG-compliant)
 - `git/` - Git config, global ignore patterns, SSH commit signing (`allowed_signers` + `setup-git-signing`)
-- `ghostty/` - Ghostty terminal emulator
-- `hypr/` - Hyprland compositor (monitors, keybindings, autostart, etc.)
+- `ghostty/` - Ghostty terminal emulator, plus `xdg-terminals.list` — the file `xdg-terminal-exec` reads to pick Ghostty over Omarchy 4's foot default
+- `hypr/` - Hyprland compositor. `.lua` since Quattro (`hyprland`, `monitors`, `input`,
+  `bindings`, `looknfeel`, `autostart`), plus the two `.conf` files read by *other*
+  processes and so untouched by `hyprctl`: `hyprsunset.conf` (apply with
+  `omarchy restart hyprsunset`) and `xdph.conf` (applies on portal restart)
 - `ripgrep/` - ripgrep configuration
 - `sqlite/` - SQLite configuration
 - `starship/` - Starship prompt configuration
@@ -81,8 +139,20 @@ This documents the default software stack configured in Omarchy:
 - `slack/` - `slack://` deep-link handler that opens links in the browser (no desktop Slack app); see `slack/README.md`
 - `bitwarden/` - Bitwarden CLI helper script (`get-signature`) for extracting attachments
 - `pacman/` - Arch package lists and `configure-system` for post-install setup
+- `voxtype/` - Dictation config (`large-v3-turbo`, meeting capture) and `meeting-toggle`.
+  The daemon and its `voxtype.service` are installed by `voxtype setup systemd`, not stowed
+- `webapps/` - `.desktop` entries: `Hidden=true` stubs that suppress Omarchy's
+  preinstalled web apps, plus real entries for our own. Omarchy upgrades reinstate
+  the ones we hide, so re-stow after an upgrade
 - `qmk/` - Optional: host side of a Framework 16 ANSI keymap — the `qmk-mic-led-sync.py` daemon syncing mic/DND/voxtype/pomodoro state over raw HID, and `qmk-flash.py` for reflashing. The firmware half is a separate repo, `jra3/qmk_firmware` branch `fw16-john` at `~/jra3/qmk_firmware`; see `qmk/README.md`
-- `tether/` - `waybar-iphone-tether` status script for the waybar iPhone USB-tethering indicator; see `tether/README.md`. The `.network` file and `usbmuxd` are handled by `pacman/configure-system` + `packages-arch.txt`
+- `tether/` - **TODO: broken by Omarchy 4.** `waybar-iphone-tether` writes waybar JSON,
+  and waybar no longer exists. Needs either an existing Omarchy shell plugin for
+  USB tethering or a Quickshell one written against
+  `$OMARCHY_PATH/shell/plugins/bar/indicators/` (see `Dictation.qml` for the shape:
+  a `BarIndicator` polling a script that streams bar-friendly JSON). The script
+  itself still detects the tether correctly — only the presentation layer is gone.
+  See `tether/README.md`. The `.network` file and `usbmuxd` are handled by
+  `pacman/configure-system` + `packages-arch.txt`
 
 **XDG compliance** - Configs use XDG Base Directory paths:
 - Config files go in `<package>/.config/<app>/`
