@@ -73,7 +73,6 @@
       "Bash(kubectl *)",
       "Bash(aws *)",
       "Bash(tmux *)",
-      "Bash(tmuxp *)",
       "Bash(hyprctl *)",
       "Bash(ghostty *)",
       "Bash(for *)",

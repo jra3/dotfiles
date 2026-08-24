@@ -224,9 +224,16 @@ extract() {
     esac
 }
 
-# Omarchy shell helpers (worktree ga/gd, tmux tdl/tdlm/tsl) — Arch only
-[[ -f ~/.local/share/omarchy/default/bash/fns/worktrees ]] && source ~/.local/share/omarchy/default/bash/fns/worktrees
-[[ -f ~/.local/share/omarchy/default/bash/fns/tmux ]] && source ~/.local/share/omarchy/default/bash/fns/tmux
+# Omarchy worktree helpers: ga <branch> creates ../<repo>--<branch> and cds in,
+# gd removes the one you are standing in. This is the worktree tooling now that
+# gtr is gone; herdr's open_worktree reads `git worktree list`, so it picks these
+# up with no extra config. Arch only.
+#
+# OMARCHY_PATH is exported by Hyprland, so it is unset in a plain tty or an SSH
+# session -- hence the fallback rather than a bare "$OMARCHY_PATH".
+omarchy_fns="${OMARCHY_PATH:-/usr/share/omarchy}/default/bash/fns/worktrees"
+[[ -f $omarchy_fns ]] && source "$omarchy_fns"
+unset omarchy_fns
 
 # ============================================================================
 # Aliases
