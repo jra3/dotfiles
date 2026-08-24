@@ -12,7 +12,7 @@
 export EDITOR="emacsclient -nw"
 e() {
     emacsclient -n "$@"
-    hyprctl dispatch focuswindow "class:^(emacs)$"
+    hyprctl dispatch 'hl.dsp.focus({ window = "class:^(emacs)$" })'
 }
 
 # fzf
