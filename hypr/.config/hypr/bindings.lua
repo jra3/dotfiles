@@ -47,8 +47,8 @@ hl.unbind("SUPER + SHIFT + P")         -- was: Google Photos
 -- Applications
 --------------------------------------------------------------------------------
 
-o.bind("SUPER + SHIFT + E", "Emacsclient", o.launch('env GDK_BACKEND=wayland emacsclient -c -a ""'))
-o.bind("SUPER + SHIFT + ALT + E", "Emacs", o.launch("env GDK_BACKEND=wayland emacs"))
+-- GDK_BACKEND=wayland: the pgtk build picks X11 through XWayland otherwise.
+o.bind("SUPER + SHIFT + E", "Emacs", o.launch("env GDK_BACKEND=wayland emacs"))
 o.bind("SUPER + SHIFT + T", "Activity", { tui = "btop" })
 o.bind("SUPER + SHIFT + W", "Typora", o.launch("typora --enable-wayland-ime"))
 o.bind("SUPER + SHIFT + SLASH", "Passwords", o.launch("bw-pick"))

@@ -182,43 +182,22 @@ else
     echo "  Helium not installed, skipping browser setup."
 fi
 
-# --- Emacs ---
-# The `emacs` package ships a systemd drop-in (emacs.service.d/override.conf,
-# forcing GDK_BACKEND=wayland for the pgtk build). Plain `stow emacs` FOLDS that
-# directory: no other package provides emacs.service.d, so stow replaces the whole
-# dir with a single symlink into ~/.dotfiles — and systemd silently ignores
-# drop-ins that live in a symlinked drop-in DIRECTORY. The failure is quiet:
-# `systemctl --user show emacs -p DropInPaths` returns empty, `systemctl --user cat
-# emacs` shows only the vendor unit, and NeedDaemonReload stays "yes" even straight
-# after a daemon-reload. Re-stowing with --no-folding makes the directory real and
-# symlinks only override.conf, which systemd loads. Stow only folds when the target
-# directory does not already exist, so this bites on a fresh machine (or if the
-# directory is ever removed) — once it is a real directory, plain `stow emacs` and
-# `stow */` are harmless. The repair below is idempotent either way.
-if command -v emacs &>/dev/null; then
-    echo "Configuring Emacs daemon..."
+# --- Emacs: retire the daemon ---
+# We used to run emacs.service with a stowed drop-in. Emacs is now launched
+# per-invocation (terminal from the shell, GUI from SUPER+SHIFT+E), so tear down
+# whatever an older run of this script left enabled. Delete this stanza once every
+# machine has been through it.
+if systemctl --user list-unit-files emacs.service &>/dev/null; then
+    if [ "$(systemctl --user is-enabled emacs 2>/dev/null)" != "disabled" ]; then
+        echo "Retiring the Emacs daemon..."
+        systemctl --user disable --now emacs 2>/dev/null
+    fi
     dropin_dir="$HOME/.config/systemd/user/emacs.service.d"
-    dotfiles_dir="$(cd "$(dirname "$0")/.." && pwd)"
-
-    if [ -L "$dropin_dir" ] && command -v stow &>/dev/null; then
-        echo "  Drop-in dir is folded (systemd ignores it); re-stowing --no-folding."
-        (cd "$dotfiles_dir" && stow -D emacs && stow --no-folding emacs)
+    if [ -e "$dropin_dir" ]; then
+        rm -rf "$dropin_dir"
         systemctl --user daemon-reload
-        systemctl --user try-restart emacs
+        echo "  Removed the stale emacs.service.d drop-in."
     fi
-
-    systemctl --user enable --now emacs
-    echo "  Emacs daemon enabled."
-
-    if [ ! -d "$dropin_dir" ]; then
-        echo "  Drop-in not deployed; run 'stow --no-folding emacs' and re-run."
-    elif [ -n "$(systemctl --user show emacs -p DropInPaths --value)" ]; then
-        echo "  Emacs drop-in active (GDK_BACKEND=wayland)."
-    else
-        echo "  WARNING: emacs.service.d exists but systemd is not loading it."
-    fi
-else
-    echo "  Emacs not installed, skipping."
 fi
 
 # --- Power: hibernation + low-battery policy ---

@@ -9,11 +9,12 @@
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
 # Editor
-export EDITOR="emacsclient -nw"
-e() {
-    emacsclient -n "$@"
-    hyprctl dispatch 'hl.dsp.focus({ window = "class:^(emacs)$" })'
-}
+# Emacs runs in the terminal; the GUI frame is SUPER+SHIFT+E in Hyprland.
+# e() calls `command emacs` because zsh expands aliases when it *defines* a
+# function, so a bare `emacs -nw` in the body would become `emacs -nw -nw`.
+export EDITOR="emacs -nw"
+alias emacs='emacs -nw'
+e() { command emacs -nw "$@"; }
 
 # fzf
 if command -v fzf &>/dev/null; then

@@ -61,6 +61,21 @@ Omarchy's `local omarchy_monitor_scale` / `local omarchy_gdk_scale` names and ba
 numeric literals so the display menu can still write to it — rename them and a scale
 change applies live, then vanishes on the next reload.
 
+### `omarchy-emacs-setup` moves `~/.emacs.d` aside — say no
+
+The personal Emacs config is a literate `config.org` in `~/.emacs.d`, its own repo
+(`github.com/jra3/dot-emacs`). It is **not** stow-managed and not in this repo.
+
+`omarchy-emacs-setup` wants Emacs to read `~/.config/emacs/`, and `~/.emacs.d` takes
+precedence over that, so it prompts `Move ~/.emacs.d to ~/.emacs.d.bak? [y/N]`.
+Answering `y` — as happened during the Quattro upgrade on 2026-08-23 — leaves Emacs
+booting Omarchy's 9-line default init and every personal binding silently gone. The
+config is not deleted, just renamed; move it back. **Answer `N`.** An Omarchy upgrade
+can re-run this, so re-check `~/.emacs.d` after one.
+
+The cost of declining is only Omarchy's theme/font syncing. To have both, load
+`/usr/share/omarchy-emacs/config/omarchy.el` from the personal config instead.
+
 ## Common Commands
 
 ```bash
@@ -79,17 +94,18 @@ stow -n -v <package>
 # Re-stow (useful after adding files)
 stow -R <package>
 
-# Deploy a package without directory folding (required for `emacs`)
+# Deploy a package without directory folding
 stow --no-folding <package>
 ```
 
 **Directory folding gotcha:** when only one package provides a directory, stow
 replaces the whole directory in `$HOME` with a symlink into the repo rather than
 symlinking each file. That breaks systemd drop-ins — systemd silently ignores a
-drop-in directory that is a symlink. The `emacs` package hits this
-(`emacs.service.d/`) and must be stowed with `--no-folding`. Folding only happens
-when the target directory doesn't already exist, so this bites on a fresh machine;
-`pacman/configure-system` detects and repairs a folded drop-in on re-run.
+drop-in directory that is a symlink, and the failure is quiet (`systemctl --user
+show <unit> -p DropInPaths` comes back empty). Folding only happens when the target
+directory doesn't already exist, so it bites on a fresh machine. No package
+currently ships a drop-in; the `emacs` one did until 2026-08-24. Any future one
+needs `--no-folding`.
 
 ## Default Software
 
@@ -104,7 +120,7 @@ This documents the default software stack configured in Omarchy:
 | Compositor | **Hyprland** | Wayland tiling compositor, configured in **Lua** |
 | Desktop shell | **Omarchy shell** | One Quickshell process: bar, notifications, launcher, OSD, lock, idle. Replaced waybar, mako, walker, swayosd, hyprlock, hypridle |
 | Browser | **Helium** | Web browser |
-| Editor | **Emacs** | Text editor (emacsclient for fast startup) |
+| Editor | **Emacs** | Text editor. No daemon: `emacs` is aliased to `emacs -nw` in the shell, `SUPER+SHIFT+E` opens a GUI frame |
 | AI | **Claude Code** | AI-powered coding assistant |
 | VCS | **Git** | Version control with custom aliases |
 | GitHub | **gh** | GitHub CLI with `gh prs` for PR listing |
