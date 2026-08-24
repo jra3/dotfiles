@@ -49,7 +49,9 @@ auto_switch = false
 # channel = "stable"
 
 # Check herdr.dev for new Herdr versions in the background.
-# version_check = true
+# Off: herdr comes from Omarchy's repos (~1 month behind), so the upstream
+# version banner would always be on. Updates arrive via pacman instead.
+version_check = false
 
 # Check herdr.dev for remote agent-detection manifest updates in the background.
 # manifest_check = true
