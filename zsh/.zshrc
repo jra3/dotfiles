@@ -325,3 +325,8 @@ if command -v zoxide &>/dev/null; then
 fi
 
 [ -f "$HOME/.config/am-dev-tools/pup.env" ] && . "$HOME/.config/am-dev-tools/pup.env"  # am-dev-tools pup creds
+
+# Hermes: durable lazy-install target, outside the pacman-managed /opt venv.
+# Must be exported BEFORE python starts — hermes_bootstrap activates the
+# sys.path entry at first import, before ~/.hermes/.env is read.
+export HERMES_LAZY_INSTALL_TARGET="$HOME/.hermes/lazy-packages"
