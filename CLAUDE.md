@@ -175,19 +175,34 @@ This documents the default software stack configured in Omarchy:
 
 Run `pacman/configure-system` to configure system services (Tailscale operator, Emacs daemon, etc.). The script is idempotent and safe to re-run.
 
-## Git commit signing (per-machine YubiKey, opt-in)
+## Git commit signing (per-machine YubiKey, on)
 
-**Signing is off by default** — `commit.gpgsign = false` in the `git/` package.
-Sign an individual commit with `git commit -S`, or flip `gpgsign` back to `true`
-to sign everything again. Nothing else needs changing: `gpg.format=ssh` and
-`user.signingkey` stay configured either way.
+**Signing is on** — `commit.gpgsign = true` in the `git/` package. Skip it for one
+commit with `git -c commit.gpgsign=false commit`.
 
-Why off: signing an `sk-` (FIDO2) key needs a touch or an askpass prompt, so it
-fails in any non-interactive context — editors, git hooks, agent-run commands.
-Worse, `git rebase --exec '... -S'` stops mid-rebase on the failure and leaves
-you detached, which reads like lost commits.
+It was off from 2026-08-02 (`aaf5553`) to 2026-08-21, because an `sk-` (FIDO2)
+key that wants a touch fails in any non-interactive context. **Whether it wants
+one is per-machine, and the two machines measured disagree:**
 
-The per-machine key setup below still applies whenever you *do* want to sign.
+| Machine | gitsign flags | Signs unattended? | Measured |
+|---|---|---|---|
+| chonky | `0x21` | no, prompts `Confirm user presence` | 2026-07-28, `yubikey-ssh.md` |
+| am-jallen | `0x20` | yes, `git commit -S` with stdin closed exits 0 and verifies `G` | 2026-08-21, GTD-38 |
+
+`setup-git-signing` asks for no-touch/no-PIN, and am-jallen's key kept it.
+chonky's did not, because a `-K` recovery hands back a `0x21` stub and silently
+reintroduces the touch. Read the flags byte on each machine; do not trust either
+this file or the key's provenance. `yubikey-ssh.md` has the decoding recipe.
+
+So: on a `0x20` machine, signing costs nothing and agents are fine. On a `0x21`
+machine, an unattended session hangs on every commit, and `git rebase --exec`
+stops mid-rebase and leaves you detached, which reads like lost commits. Fix the
+flags byte rather than turning signing off globally.
+
+Either way the token has to be in the port. A container, or a machine with the
+Nano pulled, fails at signing time.
+
+The per-machine key setup below applies to every machine that signs.
 Config is shared via the `git/` package (`gpg.format=ssh`, `user.signingkey` → a
 canonical key path), but **each machine has its own signing key on its own
 YubiKey**:
@@ -201,6 +216,6 @@ YubiKey**:
 
 `allowed_signers` accumulates one line per machine. Both identities
 (`github@porcnick.com` personal, `john@antimetal.com` work) share each key.
-Since `commit.gpgsign` is now `false`, a new machine can commit before
-`setup-git-signing` has ever run — it is only needed if you want signed commits
-on that machine.
+Since `commit.gpgsign` is `true`, run `setup-git-signing` before committing on a
+new machine, or every `git commit` fails with no signing key. Until then, commit
+with `git -c commit.gpgsign=false commit`.

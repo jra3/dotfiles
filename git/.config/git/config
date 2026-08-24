@@ -35,7 +35,7 @@
     mnemonicPrefix = true    # More intuitive refs in diff output
 [commit]
     verbose = true           # Include diff comment in commit message template
-    gpgsign = false          # Opt-in: sign a commit with `git commit -S`
+    gpgsign = true           # GTD-38: on, to measure what reaches main. `-c commit.gpgsign=false` to skip.
 [column]
     ui = auto                # Output in columns when possible
 [branch]
@@ -77,3 +77,6 @@
 [url "https://github.com/"]
 	insteadOf = git@github.com:
 	insteadOf = ssh://git@github.com/
+[credential "http://truenas.corgi-hammerhead.ts.net:30008"]
+	helper = 
+	helper = !tea login helper

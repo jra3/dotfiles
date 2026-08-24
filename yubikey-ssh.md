@@ -200,10 +200,13 @@ The rebuild path, in the order that actually works.
   rebuilt machine will hand back a `0x21` stub and silently reintroduce the
   touch. Re-check the flags byte after any `-K`, and patch it back to `0x20`
   rather than assuming the credential changed.
-- **`commit.gpgsign = true` is global, so every commit needs a touch.** Combined
-  with the gotcha above, this is the remaining blocker for unattended sessions:
-  commit `8dcefd1` made *transport* touchless, but **committing is not**. An
-  agent session with nobody present to tap the key will hang on commit.
+- **`commit.gpgsign = true` is global again (2026-08-21, GTD-38), so whether a
+  commit needs a touch is decided by each machine's flags byte.** Commit
+  `8dcefd1` made *transport* touchless; committing is touchless only where the
+  gitsign stub is `0x20`. On chonky it is `0x21`, so an agent session with nobody
+  present to tap the key hangs on commit. On am-jallen it is `0x20`, and
+  `git commit -S` with stdin closed exits 0 and verifies `G` (measured
+  2026-08-21). Check the byte before assuming either.
 - **A timed-out touch reports as a passphrase error.** `Couldn't sign message:
   incorrect passphrase supplied to decrypt private key` on an sk key almost
   always means "nobody touched it in time," not a bad passphrase.
