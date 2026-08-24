@@ -160,7 +160,10 @@ This documents the default software stack configured in Omarchy:
   The daemon and its `voxtype.service` are installed by `voxtype setup systemd`, not stowed
 - `webapps/` - `.desktop` entries: `Hidden=true` stubs that suppress Omarchy's
   preinstalled web apps, plus real entries for our own. Omarchy upgrades reinstate
-  the ones we hide, so re-stow after an upgrade
+  the ones we hide, so re-stow after an upgrade. The stubs also shadow unwanted
+  entries from *pacman* packages, which is the only way to suppress a root-owned
+  `/usr/share/applications/` file that an upgrade would otherwise restore — the
+  three `emacs*` stubs leave `emacs.desktop` as the sole Emacs launcher entry
 - `qmk/` - Optional: host side of a Framework 16 ANSI keymap — the `qmk-mic-led-sync.py` daemon syncing mic/DND/voxtype/pomodoro state over raw HID, and `qmk-flash.py` for reflashing. The firmware half is a separate repo, `jra3/qmk_firmware` branch `fw16-john` at `~/jra3/qmk_firmware`; see `qmk/README.md`
 - `tether/` - **TODO: broken by Omarchy 4.** `waybar-iphone-tether` writes waybar JSON,
   and waybar no longer exists. Needs either an existing Omarchy shell plugin for
