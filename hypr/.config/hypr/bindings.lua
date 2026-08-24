@@ -29,6 +29,9 @@ hl.unbind("SUPER + SHIFT + E")         -- was: Email (HEY)
 -- NOTE: hl.unbind matches the modifier string literally, while o.bind
 -- normalizes it. Spell these exactly as Omarchy does or the unbind silently
 -- does nothing and both bindings fire.
+-- SUPER+SHIFT+ALT+E is meant to do nothing. This unbind is load-bearing, not
+-- leftover: Omarchy claims the key for HEY compose, so deleting the line revives
+-- that binding rather than freeing the key.
 hl.unbind("SUPER + SHIFT + ALT + E")   -- was: New email (HEY)
 hl.unbind("SUPER + SHIFT + W")         -- was: Omawrite
 hl.unbind("SUPER + SHIFT + SLASH")     -- was: Passwords (1Password)
