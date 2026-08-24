@@ -58,7 +58,7 @@ stow zsh git ghostty
 | `ripgrep` | ripgrep configuration |
 | `sqlite` | SQLite configuration |
 | `starship` | Starship prompt configuration |
-| `tmux` | Tmux configuration and session scripts (tn, twt) |
+| `tmux` | Tmux configuration |
 | `zsh` | Zsh shell configuration with XDG compliance |
 
 ## Usage

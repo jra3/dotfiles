@@ -116,7 +116,7 @@ This documents the default software stack configured in Omarchy:
 | Shell | **zsh** | Default shell with XDG-compliant config |
 | Prompt | **Starship** | Cross-shell prompt with git integration |
 | Terminal | **Ghostty** | GPU-accelerated terminal (CaskaydiaMono Nerd Font). Omarchy 4 defaults to foot; `ghostty/.config/xdg-terminals.list` is what keeps `SUPER+ENTER` on Ghostty |
-| Multiplexer | **tmux** | Terminal multiplexer with worktree integration |
+| Multiplexer | **tmux** | Terminal multiplexer. Config only — worktrees are `gtr`, workspaces are `herdr` |
 | Compositor | **Hyprland** | Wayland tiling compositor, configured in **Lua** |
 | Desktop shell | **Omarchy shell** | One Quickshell process: bar, notifications, launcher, OSD, lock, idle. Replaced waybar, mako, walker, swayosd, hyprlock, hypridle |
 | Browser | **Helium** | Web browser |
@@ -144,7 +144,8 @@ This documents the default software stack configured in Omarchy:
 - `ripgrep/` - ripgrep configuration
 - `sqlite/` - SQLite configuration
 - `starship/` - Starship prompt configuration
-- `tmux/` - tmux terminal multiplexer
+- `tmux/` - tmux terminal multiplexer (config only; the `tn`/`twt` session scripts
+  were removed 2026-08-24, unused since Dec 2025 and superseded by `gtr`/`herdr`)
 - `herdr/` - herdr terminal workspace manager (annotated default config; binary at `~/.local/bin/herdr`, not stow-managed); see `herdr/README.md`
 - `gh/` - GitHub CLI config and `gh-prs` script
 - `gtr/` - Git worktree runner wrapper

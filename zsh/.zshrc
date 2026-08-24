@@ -249,8 +249,6 @@ compdef _git g
 alias ag='rg'
 alias ..='cd ..'
 alias ...='cd ../..'
-alias tn='tmux-new-session'
-alias twt='tmux-worktree'
 alias watch='watch --color'
 alias gtr='git gtr'
 compdef _gtr gtr
