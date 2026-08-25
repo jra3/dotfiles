@@ -185,20 +185,6 @@ if command -v direnv &>/dev/null; then
 fi
 
 # ============================================================================
-# pyenv
-# ============================================================================
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-if command -v pyenv &>/dev/null; then
-    # Clear stale rehash lock left by a killed pyenv-rehash (e.g. terminal closed mid-rehash).
-    if [[ -f "$PYENV_ROOT/shims/.pyenv-shim" ]] && ! pgrep -f pyenv-rehash &>/dev/null; then
-        rm -f "$PYENV_ROOT/shims/.pyenv-shim"
-    fi
-    eval "$(pyenv init -)"
-    eval "$(pyenv virtualenv-init -)"
-fi
-
-# ============================================================================
 # Shared Functions
 # ============================================================================
 fe()  { local f; IFS=$'\n' f=($(fzf --query="$1" --multi)); [[ -n "$f" ]] && ${EDITOR:-vim} "${f[@]}"; }
@@ -258,8 +244,28 @@ command -v gh &>/dev/null && _zsh_cached_source gh gh-completion completion -s z
 path=($HOME/bin $HOME/.local/bin $HOME/go/bin /usr/local/bin $path)
 
 # ============================================================================
-# mise (version manager for Node, etc.)
+# mise -- the version manager for everything (Node, Python, Go, ...)
 # ============================================================================
+# Python used to go through pyenv + pyenv-virtualenv; both were dropped
+# 2026-08-25. Two managers meant two shim layers racing for `python` on PATH,
+# with the winner decided by load order (.zshenv adds mise shims, this file
+# used to pyenv-init ahead of them) rather than by intent.
+#
+# The pyenv-virtualenv replacement is per-project, in the repo's mise.toml:
+#
+#   [tools]
+#   python = "3.12"
+#
+#   [env]
+#   _.python.venv = { path = ".venv", create = true }
+#
+# cd in and the venv is created and activated. mise also reads .python-version,
+# so repos still pinned for pyenv keep working. What does NOT carry over is
+# pyenv's *named, central* envs (`pyenv virtualenv 3.11 scratch`); mise's venvs
+# are project-local. Use `uv venv` for a throwaway that isn't tied to a dir.
+#
+# See also .zshenv, which puts mise's shims on PATH for NON-interactive shells --
+# `mise activate` below only covers interactive ones.
 if command -v mise &>/dev/null; then
    eval "$(mise activate zsh)"
 fi

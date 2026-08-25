@@ -118,7 +118,6 @@
       "Bash(pipx *)",
       "Bash(uv *)",
       "Bash(poetry *)",
-      "Bash(pyenv *)",
       "Bash(direnv *)",
       "Bash(ssh-keygen *)",
       "Bash(lsusb *)",

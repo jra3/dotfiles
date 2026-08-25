@@ -22,6 +22,7 @@ iptables-nft
 kubectl
 lazygit
 libfido2
+mise
 nano
 neovim
 nodejs-lts-jod
@@ -31,7 +32,6 @@ omarchy-keyring
 openssh
 pandoc-cli
 pnpm
-pyenv
 rbw
 steam
 stow
