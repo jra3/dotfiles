@@ -52,14 +52,17 @@ stow and the repo stops being the source of truth. Seen during the Quattro upgra
 | File | Written by |
 |---|---|
 | `~/.config/tmux/tmux.conf` | upgrade migration |
-| `~/.config/hypr/monitors.lua` | display menu (`omarchy-hyprland-monitor-scaling`) |
 | `~/.config/xdg-terminals.list` | terminal picker |
 
 After changing anything through an Omarchy menu, check the file with `ls -l` and
-`stow -R <package>` if it became a regular file. `monitors.lua` deliberately keeps
-Omarchy's `local omarchy_monitor_scale` / `local omarchy_gdk_scale` names and bare
-numeric literals so the display menu can still write to it — rename them and a scale
-change applies live, then vanishes on the next reload.
+`stow -R <package>` if it became a regular file.
+
+`~/.config/hypr/monitors.lua` used to be on that list — the display menu
+(`omarchy-hyprland-monitor-scaling`) rewrites it. It was un-stowed on 2026-08-25 and is
+now host-local by design: displays and scale are per-machine, and a single shared file
+could only hold one scale. There is no longer a symlink there to clobber, so the menu
+is free to write it. See `hypr/README.md` for what the shared version knew — including
+why a hardcoded mode on `eDP-1` segfaults Hyprland at startup.
 
 ### `omarchy-emacs-setup` moves `~/.emacs.d` aside — say no
 
@@ -137,10 +140,12 @@ This documents the default software stack configured in Omarchy:
 - `zsh/` - Shell configuration (XDG-compliant)
 - `git/` - Git config, global ignore patterns, SSH commit signing (`allowed_signers` + `setup-git-signing`)
 - `ghostty/` - Ghostty terminal emulator, plus `xdg-terminals.list` — the file `xdg-terminal-exec` reads to pick Ghostty over Omarchy 4's foot default
-- `hypr/` - Hyprland compositor. `.lua` since Quattro (`hyprland`, `monitors`, `input`,
+- `hypr/` - Hyprland compositor. `.lua` since Quattro (`hyprland`, `input`,
   `bindings`, `looknfeel`, `autostart`), plus the two `.conf` files read by *other*
   processes and so untouched by `hyprctl`: `hyprsunset.conf` (apply with
-  `omarchy restart hyprsunset`) and `xdph.conf` (applies on portal restart)
+  `omarchy restart hyprsunset`) and `xdph.conf` (applies on portal restart).
+  **`monitors.lua` is deliberately not here** — displays are host-local; see
+  `hypr/README.md`
 - `ripgrep/` - ripgrep configuration
 - `sqlite/` - SQLite configuration
 - `starship/` - Starship prompt configuration
