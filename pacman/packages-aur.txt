@@ -1,5 +1,4 @@
 grpcurl-bin
 helium-browser-bin
-herdr-bin
 pyenv-virtualenv
 tsui

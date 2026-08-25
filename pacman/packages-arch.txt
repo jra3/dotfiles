@@ -17,6 +17,7 @@ git-delta
 github-cli
 glow
 go
+herdr
 iptables-nft
 kubectl
 lazygit

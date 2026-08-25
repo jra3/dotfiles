@@ -84,8 +84,16 @@ herdr --default-config > herdr/.config/herdr/config.toml
 
 ## Install
 
-herdr itself is not managed by stow — it's installed from the AUR as
-[`herdr-bin`](https://aur.archlinux.org/packages/herdr-bin) (a prebuilt static binary at
-`/usr/bin/herdr`), tracked in `pacman/packages-aur.txt`. Install/update with an AUR helper
-(`yay -S herdr-bin`) or via `pacman/install-packages`; regular `yay -Syu` upgrades keep it
-current. Don't use `herdr update` — the binary is pacman-managed now.
+herdr itself is not managed by stow. **It comes from Omarchy's own pacman repo** —
+`omarchy/herdr`, a prebuilt binary at `/usr/bin/herdr` — tracked in
+`pacman/packages-arch.txt`. Install/update with `sudo pacman -S herdr` or via
+`pacman/install-packages`; a regular `pacman -Syu` keeps it current.
+
+**Do not install the AUR `herdr-bin`.** It is the same upstream binary at the same
+version and `Provides: herdr`, so an AUR helper offers to tear out the repo package and
+rebuild it — pure churn, and it takes herdr off Omarchy's upgrade path. This repo
+tracked `herdr-bin` until 2026-08-25, when a fresh Omarchy 4.0.1 install turned out to
+ship `herdr` in the `omarchy` repo already; the AUR entry was dropped from
+`packages-aur.txt` that day so `pacman/install-packages` stops offering the swap.
+
+Don't use `herdr update` either — the binary is pacman-managed.

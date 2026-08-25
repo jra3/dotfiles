@@ -146,7 +146,11 @@ This documents the default software stack configured in Omarchy:
 - `starship/` - Starship prompt configuration
 - `tmux/` - tmux terminal multiplexer (config only; the `tn`/`twt` session scripts
   were removed 2026-08-24, unused since Dec 2025 and superseded by `ga`/`herdr`)
-- `herdr/` - herdr terminal workspace manager (annotated default config; binary at `~/.local/bin/herdr`, not stow-managed); see `herdr/README.md`
+- `herdr/` - herdr terminal workspace manager (annotated default config). The binary
+  is not stow-managed: it is the `herdr` package from **Omarchy's own pacman repo**
+  at `/usr/bin/herdr`. Never the AUR `herdr-bin` — same binary, same version,
+  `Provides: herdr`, so it only offers to replace the repo package and drops herdr
+  off Omarchy's upgrade path. See `herdr/README.md`
 - `gh/` - GitHub CLI config and `gh-prs` script
 - `lazygit/` - lazygit TUI config with `gh stack` stacked-diff custom commands
   (needs the `github/gh-stack` gh extension; `gh extension install github/gh-stack`)
