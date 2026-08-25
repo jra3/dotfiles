@@ -110,6 +110,15 @@ directory doesn't already exist, so it bites on a fresh machine. No package
 currently ships a drop-in; the `emacs` one did until 2026-08-24. Any future one
 needs `--no-folding`.
 
+**Drop-ins are not the only victim.** Folding also means any tool that writes into
+that directory writes *into the repo*, with nothing in `ls -l` to reveal it — the
+file is genuinely a regular file, because the symlink is one level up. On 2026-08-25
+`voxtype setup` rewrote the stowed `~/.config/voxtype/config.toml` this way: `model`
+reverted to `base.en` and the whole `[meeting]` block vanished, silently, in the
+tracked file. Unfolded it would have replaced the *symlink* instead, leaving the repo
+intact and the drift visible. So `--no-folding` applies to any directory an external
+tool writes to, not just drop-in dirs.
+
 ## Default Software
 
 This documents the default software stack configured in Omarchy:
@@ -170,8 +179,11 @@ This documents the default software stack configured in Omarchy:
   1Password binding. To be replaced rather than ported; `rbw` itself is fine and
   the pure helpers still have coverage in `tests/bw-pick.bats`
 - `pacman/` - Arch package lists and `configure-system` for post-install setup
-- `voxtype/` - Dictation config (`large-v3-turbo`, meeting capture) and `meeting-toggle`.
-  The daemon and its `voxtype.service` are installed by `voxtype setup systemd`, not stowed
+- `voxtype/` - Dictation. Only `meeting-toggle` is stowed: **`config.toml` is
+  deliberately host-local** — `model` is a per-machine answer and voxtype rewrites the
+  file itself (`voxtype setup`, `voxtype config set`). The binary is
+  `omarchy/voxtype-bin`; the daemon and `voxtype.service` come from
+  `voxtype setup systemd`, not stow. See `voxtype/README.md` for the reference config
 - `webapps/` - `.desktop` entries: `Hidden=true` stubs that suppress Omarchy's
   preinstalled web apps, plus real entries for our own. Omarchy upgrades reinstate
   the ones we hide, so re-stow after an upgrade. The stubs also shadow unwanted
