@@ -216,11 +216,25 @@ one is per-machine, and the two machines measured disagree:**
 |---|---|---|---|
 | chonky | `0x21` | no, prompts `Confirm user presence` | 2026-07-28, `yubikey-ssh.md` |
 | am-jallen | `0x20` | yes, `git commit -S` with stdin closed exits 0 and verifies `G` | 2026-08-21, GTD-38 |
+| cupcake | `0x20` | yes, same test | 2026-08-25, after a `-K` recovery + patch |
 
 `setup-git-signing` asks for no-touch/no-PIN, and am-jallen's key kept it.
 chonky's did not, because a `-K` recovery hands back a `0x21` stub and silently
 reintroduces the touch. Read the flags byte on each machine; do not trust either
 this file or the key's provenance. `yubikey-ssh.md` has the decoding recipe.
+
+**A `0x21` stub is a one-command fix, not a reason to regenerate.**
+`ssh-keygen -p` sets FIDO options as well as passphrases, so a recovered key can
+be flipped back in place, without the token:
+
+```sh
+ssh-keygen -p -O no-touch-required -P "" -N "" -f ~/.ssh/id_ed25519_sk_gitsign
+```
+
+This matters on a rebuild. Recovering with `ssh-keygen -K` keeps the machine's
+existing key — so its `allowed_signers` line and GitHub registration stay valid,
+and every commit it ever signed keeps verifying. Generating a fresh key instead
+discards all of that. cupcake was rebuilt this way on 2026-08-25.
 
 So: on a `0x20` machine, signing costs nothing and agents are fine. On a `0x21`
 machine, an unattended session hangs on every commit, and `git rebase --exec`

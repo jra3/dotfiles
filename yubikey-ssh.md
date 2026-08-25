@@ -71,6 +71,12 @@ below). To re-measure, decode the private key's base64 body and read the byte
 after the application string — bit `0x01` is user-presence, `0x04` is user
 verification, `0x20` is always set.
 
+**The application string appears more than once** (three times for a gitsign
+key: the public section, the private section, and the comment). Only the private
+section's is followed by the flags byte; take the occurrence whose next byte has
+`0x20` set, or you will read `0x00` off the public one and conclude the key is
+touchless when it isn't.
+
 ### Touchless tailnet auth to am-jallen (added 2026-08-02)
 
 Minted so unattended agent sessions can reach am-jallen without a human present
@@ -200,6 +206,25 @@ The rebuild path, in the order that actually works.
   rebuilt machine will hand back a `0x21` stub and silently reintroduce the
   touch. Re-check the flags byte after any `-K`, and patch it back to `0x20`
   rather than assuming the credential changed.
+
+  **Patching it back is one command** (`ssh-keygen -p` sets FIDO options, not
+  just passphrases). It rewrites the on-disk stub only — no token, no PIN, no
+  touch, and the credential itself is untouched:
+
+  ```
+  ssh-keygen -p -O no-touch-required -P "" -N "" -f ~/.ssh/id_ed25519_sk_gitsign
+  ```
+
+  Validated on cupcake 2026-08-25: `-K` recovery came back `0x21`, this flipped
+  it to `0x20`, and `git commit -S` with stdin closed then exited 0 and verified
+  `G` with no touch. So a rebuild does NOT have to choose between key continuity
+  and unattended signing — recover, patch, done. Generating a fresh key throws
+  away the `allowed_signers` entry and the GitHub registration for nothing.
+
+  This only works if the credential on the token was minted `no-touch-required`
+  in the first place. The stub flag and the authenticator's own policy are
+  separate; this edits the stub. If the credential requires presence, the token
+  still demands a tap and the smoke test below will hang.
 - **`commit.gpgsign = true` is global again (2026-08-21, GTD-38), so whether a
   commit needs a touch is decided by each machine's flags byte.** Commit
   `8dcefd1` made *transport* touchless; committing is touchless only where the
