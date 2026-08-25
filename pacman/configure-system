@@ -91,8 +91,12 @@ if [ ! -f "$HOME/.ssh/agent-keys" ]; then
         echo "# One key per line, relative to ~/.ssh (absolute paths also work). '#' comments"
         echo "# and blank lines are ignored; entries whose file is missing are skipped."
         echo "# Host-local: ~/.ssh is not stowed, so this file never enters the dotfiles repo."
+        # Skip *gitsign*: that key signs commits, it never authenticates an SSH
+        # session, so it has no business in the agent. Seeding it also disguises
+        # the absence of a real auth key -- agent-keys looks populated while
+        # inbound/outbound SSH has no credential at all.
         for key in "$HOME"/.ssh/id_*sk*; do
-            if [[ $key != *.pub && -f $key ]]; then
+            if [[ $key != *.pub && $key != *gitsign* && -f $key ]]; then
                 echo "${key##*/}"
             fi
         done
@@ -126,7 +130,13 @@ if [ -f "$HOME/.ssh/id_ed25519_sk.pub" ]; then
         echo "  ~/.ssh/authorized_keys already present; leaving it alone."
     fi
 else
-    echo "  No ~/.ssh/id_ed25519_sk.pub; skipping authorized_keys seed."
+    echo "  !! No ~/.ssh/id_ed25519_sk.pub -- this host has no FIDO2 AUTH key." >&2
+    echo "     sshd is enabled and bound to the tailnet above, but authorized_keys" >&2
+    echo "     does not exist, so every inbound login will be refused. The gitsign" >&2
+    echo "     key does not count: it signs commits and cannot authenticate." >&2
+    echo "     Mint one (PIN + touch, needs a real terminal), then re-run:" >&2
+    echo "       ssh-keygen -t ed25519-sk -O resident -O application=ssh:\$(hostname -s) \\" >&2
+    echo "         -N \"\" -C \"auth (\$(hostname -s))\" -f ~/.ssh/id_ed25519_sk" >&2
 fi
 
 # --- SSH agent (user) ---
@@ -163,7 +173,12 @@ fi
 # is per-machine and must not be stowed.
 if command -v helium-browser &>/dev/null; then
     echo "Configuring Helium as default browser..."
-    omarchy_cfg="${OMARCHY_PATH:-$HOME/.local/share/omarchy}/config/chromium-flags.conf"
+    # Fall back to the real install path, NOT ~/.local/share/omarchy: that was a
+    # compat symlink in Omarchy 3 and does not exist in 4.x. OMARCHY_PATH is
+    # exported by Hyprland, so it is set in a desktop terminal and UNSET over SSH
+    # or from a timer -- where the old fallback silently skipped writing the flags
+    # file, and the extension then never loads.
+    omarchy_cfg="${OMARCHY_PATH:-/usr/share/omarchy}/config/chromium-flags.conf"
     flags_file="$HOME/.config/helium-browser-flags.conf"
     if [ -f "$omarchy_cfg" ]; then
         install -d "$HOME/.config"
@@ -173,7 +188,13 @@ if command -v helium-browser &>/dev/null; then
         echo "  Omarchy chromium-flags.conf not found; skipping flags file."
     fi
 
-    xdg-settings set default-web-browser helium.desktop
+    # `env -u BROWSER`: xdg-settings REFUSES to change the default browser while
+    # $BROWSER is set, exiting non-zero -- and with `set -e` that aborts this whole
+    # script, skipping every stanza below. Omarchy 4 exports
+    # BROWSER=omarchy-launch-browser from default/bash/envs (its own comment calls
+    # out this exact interaction), so it is set in any interactive shell you would
+    # run this from. Unset it for this one call only.
+    env -u BROWSER xdg-settings set default-web-browser helium.desktop
     for mime in x-scheme-handler/http x-scheme-handler/https text/html; do
         xdg-mime default helium.desktop "$mime"
     done
@@ -290,16 +311,6 @@ if command -v gh >/dev/null 2>&1; then
     fi
 else
     echo "  gh not installed; skipping."
-fi
-
-# --- Pacman hooks ---
-echo "Installing pacman hooks..."
-HOOKS_DIR="$(cd "$(dirname "$0")" && pwd)/hooks"
-if [ -d "$HOOKS_DIR" ]; then
-    sudo cp "$HOOKS_DIR"/*.hook /etc/pacman.d/hooks/
-    echo "  Pacman hooks installed."
-else
-    echo "  No hooks directory found, skipping."
 fi
 
 echo "Done!"
