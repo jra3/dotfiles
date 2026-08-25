@@ -162,7 +162,13 @@ This documents the default software stack configured in Omarchy:
 - `claude/` - Claude Code settings and custom commands
 - `ccstatusline/` - Claude Code status line: the `ccstatusline` layout plus the `cc-pr-widget` PR/CI segment it shells out to; see `ccstatusline/README.md`
 - `slack/` - `slack://` deep-link handler that opens links in the browser (no desktop Slack app); see `slack/README.md`
-- `bitwarden/` - Bitwarden CLI helper script (`get-signature`) for extracting attachments
+- `bitwarden/` - Bitwarden CLI helpers. `get-signature` (extracts attachments) still
+  works. **`bw-pick` is broken by Omarchy 4** — it drives its two-step picker with
+  `walker`, which Quattro replaced with the Quickshell launcher, so every invocation
+  fails. Its `SUPER + SHIFT + SLASH` binding is commented out in `bindings.lua`
+  rather than deleted, so the key stays dead instead of reviving Omarchy's
+  1Password binding. To be replaced rather than ported; `rbw` itself is fine and
+  the pure helpers still have coverage in `tests/bw-pick.bats`
 - `pacman/` - Arch package lists and `configure-system` for post-install setup
 - `voxtype/` - Dictation config (`large-v3-turbo`, meeting capture) and `meeting-toggle`.
   The daemon and its `voxtype.service` are installed by `voxtype setup systemd`, not stowed

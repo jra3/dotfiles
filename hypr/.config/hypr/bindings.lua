@@ -54,7 +54,12 @@ hl.unbind("SUPER + SHIFT + P")         -- was: Google Photos
 o.bind("SUPER + SHIFT + E", "Emacs", o.launch("env GDK_BACKEND=wayland emacs"))
 o.bind("SUPER + SHIFT + T", "Activity", { tui = "btop" })
 o.bind("SUPER + SHIFT + W", "Typora", o.launch("typora --enable-wayland-ime"))
-o.bind("SUPER + SHIFT + SLASH", "Passwords", o.launch("bw-pick"))
+-- Passwords: retired 2026-08-25. bw-pick shells out to `walker`, which Omarchy 4
+-- replaced with the Quickshell launcher, so the binding was a no-op. The unbind
+-- above stays: without it Omarchy's own 1Password binding comes back, and
+-- 1Password is deliberately not installed either. Key is intentionally dead
+-- until bw-pick is rewritten. See CLAUDE.md.
+-- o.bind("SUPER + SHIFT + SLASH", "Passwords", o.launch("bw-pick"))
 o.bind("SUPER + SHIFT + ALT + K", "Chess", { webapp = "https://chess.com/home", focus = true })
 
 --------------------------------------------------------------------------------
