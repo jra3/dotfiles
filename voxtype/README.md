@@ -100,3 +100,4 @@ differences mostly show up on proper nouns and technical vocabulary.
 |---|---|---|
 | chonky | — | `large-v3-turbo` |
 | cupcake | i3-1315U (2P+4E, 15W), UHD graphics | TBD — benchmark pending |
+| paperweight | Ryzen AI Max+ 395 (Strix Halo), Radeon 8060S iGPU, 128 GB unified | `large-v3-turbo`, Vulkan via RADV |

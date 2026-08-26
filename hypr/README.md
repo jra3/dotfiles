@@ -69,6 +69,7 @@ which is why it is the monitor scale rounded to the nearest whole number.
 |---|---|---|
 | chonky | 2560x1600 eDP | docked right of the LG, scale 1.6 |
 | cupcake | BOE NV122WUM-N42, 1920x1200 | Framework Laptop 12, scale 1.25 |
+| paperweight | none, desktop | drives the LG alone, scale 1.6, `GDK_SCALE` 2 |
 | — | LG Electronics LG SDQHD, 2560x2880 | desktop primary at `0x0` |
 
 Bottom-aligning a laptop panel beside the LG means offsetting Y by the difference of
