@@ -53,6 +53,7 @@ stow and the repo stops being the source of truth. Seen during the Quattro upgra
 |---|---|
 | `~/.config/tmux/tmux.conf` | upgrade migration |
 | `~/.config/xdg-terminals.list` | terminal picker |
+| `~/.config/ghostty/config` | `omarchy display text size` (resolved 2026-08-25: file is host-local now, shared bits moved to `shared.conf` — see the `ghostty/` entry) |
 
 After changing anything through an Omarchy menu, check the file with `ls -l` and
 `stow -R <package>` if it became a regular file.
@@ -148,7 +149,17 @@ This documents the default software stack configured in Omarchy:
 **Stow packages** - Each directory is independent and can be deployed separately:
 - `zsh/` - Shell configuration (XDG-compliant)
 - `git/` - Git config, global ignore patterns, SSH commit signing (`allowed_signers` + `setup-git-signing`)
-- `ghostty/` - Ghostty terminal emulator, plus `xdg-terminals.list` — the file `xdg-terminal-exec` reads to pick Ghostty over Omarchy 4's foot default
+- `ghostty/` - Ghostty terminal emulator, plus `xdg-terminals.list` — the file
+  `xdg-terminal-exec` reads to pick Ghostty over Omarchy 4's foot default.
+  The stowed file is `shared.conf`, not `config`: **`~/.config/ghostty/config` is
+  deliberately host-local** — it holds only `font-size` (a per-display answer) and a
+  `config-file` include of `shared.conf`. `omarchy display text size` persists by
+  `sed -i` on that exact path (it reset a stowed 12 to its 9pt anchor during the
+  Quattro upgrade, un-stowing the file in the process, discovered 2026-08-25), so
+  the file Omarchy seds must be a regular file. Ghostty loads includes *after* the
+  including file, so never add `font-size` to `shared.conf` — it would override
+  every host. Side effect: `omarchy font set` seds `font-family` in `config` only,
+  so it no longer reaches Ghostty; the family is pinned in `shared.conf` instead
 - `hypr/` - Hyprland compositor. `.lua` since Quattro (`hyprland`, `input`,
   `bindings`, `looknfeel`, `autostart`), plus the two `.conf` files read by *other*
   processes and so untouched by `hyprctl`: `hyprsunset.conf` (apply with
