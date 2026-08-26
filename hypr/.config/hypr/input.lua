@@ -92,10 +92,22 @@ hl.config({
 -- Drop this block if the Framework 12 gets a ZMK keyboard and the global string
 -- stops being the laptop default.
 --
--- `name` is the device as `hyprctl devices` reports it. The Adv360 registers
--- three (-consumer-control and -system-control alongside this one); only the
--- base keyboard carries the layout.
-hl.device({
-  name = "kinesis-kinesis-adv360",
-  kb_options = kb_options_base,
-})
+-- `name` is the device as `hyprctl devices` reports it, and the Adv360 does NOT
+-- have one stable name. It registers a pointer as well as a keyboard, both
+-- reported by libinput as "Kinesis Kinesis Adv360", and Hyprland breaks that tie
+-- by appending -1 to whichever it enumerates second. So the typing keyboard is
+-- `kinesis-kinesis-adv360` on some boots and `kinesis-kinesis-adv360-1` on
+-- others; it was the bare name when this exemption was first written and the -1
+-- on the very next replug, which put the swap back on the keyboard and the
+-- exemption on the mouse.
+--
+-- Claim both names. kb_options on a pointer device is inert, so whichever one is
+-- the mouse this boot just ignores it. (The -consumer-control and
+-- -system-control endpoints get distinct names from libinput and carry no
+-- layout, so they need nothing.)
+for _, name in ipairs({ "kinesis-kinesis-adv360", "kinesis-kinesis-adv360-1" }) do
+  hl.device({
+    name = name,
+    kb_options = kb_options_base,
+  })
+end
