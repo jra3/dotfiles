@@ -221,6 +221,18 @@ omarchy_fns="${OMARCHY_PATH:-/usr/share/omarchy}/default/bash/fns/worktrees"
 [[ -f $omarchy_fns ]] && source "$omarchy_fns"
 unset omarchy_fns
 
+# try -- Omarchy's ephemeral workspace manager. Omarchy's default bash init
+# roots it at ~/Work/tries; this machine uses ~/jra3 instead (mise-trusted,
+# with a ~/jra3/.mise.toml mirroring the installer's ~/Work one). Lazy eval,
+# same as Omarchy's wrapper.
+if command -v try &>/dev/null; then
+    try() {
+        unfunction try
+        eval "$(command try init ~/jra3/tries)"
+        try "$@"
+    }
+fi
+
 # ============================================================================
 # Aliases
 # ============================================================================
