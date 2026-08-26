@@ -222,9 +222,11 @@ omarchy_fns="${OMARCHY_PATH:-/usr/share/omarchy}/default/bash/fns/worktrees"
 unset omarchy_fns
 
 # try -- Omarchy's ephemeral workspace manager. Omarchy's default bash init
-# roots it at ~/Work/tries; this machine uses ~/jra3 instead (mise-trusted,
-# with a ~/jra3/.mise.toml mirroring the installer's ~/Work one). Lazy eval,
-# same as Omarchy's wrapper.
+# roots it at ~/Work/tries. That directory is gone (removed 2026-08-26): repos
+# live in per-owner subdirs of ~ instead, so tries go under ~/jra3. That dir
+# needs the same setup the installer gave ~/Work -- a ~/jra3/.mise.toml holding
+# `_.path = "{{ cwd }}/bin"` under [env], plus `mise trust ~/jra3` -- or every
+# try lands without its bin/ on PATH. Lazy eval, same as Omarchy's wrapper.
 if command -v try &>/dev/null; then
     try() {
         unfunction try
