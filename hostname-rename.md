@@ -1,7 +1,8 @@
 # Renaming this machine: `am-jallen` -> `paperweight`
 
-Runbook for the console session. Written 2026-08-19; the rename itself is
-deliberately **not** done yet.
+Runbook for the console session. Written 2026-08-19. **The rename landed
+2026-08-26**; every verification below passed. Kept as the record of what was
+changed and as the rollback procedure.
 
 The old name was Antimetal-issued (`am-` + `jallen`) and Antimetal is no longer
 relevant. `paperweight` is the desktop.
@@ -133,13 +134,18 @@ URL put back.
 
 ## Afterwards
 
-- Reboot at your convenience — hygiene, not correctness. Some things read the
-  hostname once at start (cups regenerates `/etc/printcap`, which currently
-  carries `rm=am-jallen`).
+- `/etc/printcap` — resolved 2026-08-26, and the prescription here was wrong.
+  Restarting cups does **not** rewrite it: cupsd regenerates printcap only when
+  a queue's own config changes, then flushes on the 30s `DirtyCleanInterval`.
+  Any real `lpadmin` change to a queue triggers it (a no-op set to the value
+  already stored does not), and a `systemctl restart cups` afterwards flushes
+  early instead of waiting out the timer. Check `stat -c %y /etc/printcap`, not
+  just the contents; a stale mtime means nothing has been rewritten yet.
 - `ssh` from a machine that has **not** pulled dotfiles still works —
   `CanonicalizeHostname` rewrites any bare name into the tailnet — but it
   connects as the *local* username. On cupcake that means `jallen@paperweight`,
-  which fails. Pull dotfiles on cupcake.
+  which fails. Pull dotfiles on cupcake. Confirmed working from cupcake
+  2026-08-26.
 - Cosmetic leftovers, harmless, clean up whenever: the `am-jallen` comment in
   `/etc/tsfilter.nft`, `root@am-jallen` in the ssh host key comments, the
   `# am-jallen` label in `git/.config/git/allowed_signers`, and prose mentions
