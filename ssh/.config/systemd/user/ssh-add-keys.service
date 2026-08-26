@@ -3,7 +3,7 @@
 # Loading an sk key only registers its on-disk credential handle — it never
 # contacts the YubiKey (touch/PIN happen at *use* time), so this runs headless
 # and even with the key unplugged. Keys must be in the local agent for SSH
-# agent forwarding (e.g. to am-jallen / chonky) to broker them.
+# agent forwarding (e.g. to paperweight / chonky) to broker them.
 #
 # The set of sk keys varies per host, so the list lives in a host-local file
 # ~/.ssh/agent-keys (one key per line, relative to ~/.ssh; '#' comments and

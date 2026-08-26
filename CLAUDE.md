@@ -244,10 +244,10 @@ one is per-machine, and the two machines measured disagree:**
 | Machine | gitsign flags | Signs unattended? | Measured |
 |---|---|---|---|
 | chonky | `0x21` | no, prompts `Confirm user presence` | 2026-07-28, `yubikey-ssh.md` |
-| am-jallen | `0x20` | yes, `git commit -S` with stdin closed exits 0 and verifies `G` | 2026-08-21, GTD-38 |
+| paperweight | `0x20` | yes, `git commit -S` with stdin closed exits 0 and verifies `G` | 2026-08-21, GTD-38 |
 | cupcake | `0x20` | yes, same test | 2026-08-25, after a `-K` recovery + patch |
 
-`setup-git-signing` asks for no-touch/no-PIN, and am-jallen's key kept it.
+`setup-git-signing` asks for no-touch/no-PIN, and paperweight's key kept it.
 chonky's did not, because a `-K` recovery hands back a `0x21` stub and silently
 reintroduces the touch. Read the flags byte on each machine; do not trust either
 this file or the key's provenance. `yubikey-ssh.md` has the decoding recipe.

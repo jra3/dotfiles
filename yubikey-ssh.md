@@ -42,7 +42,7 @@ inferred rather than confirmed.
 |---|---|---|---|
 | **chonky** | 5 Nano, `37196467` | `ssh:chonky-notouch` *(tailnet)* and `ssh:chonky-nopin` *(GitHub)*, plus `ssh:chonky` and `ssh:chonky-touch-no-pinnano` | `SHA256:bIzPlE8zNZrvpm8ZscwtSG9fB6lc36fq0fjQr+I/++A` |
 | **cupcake** | 5 Nano, `37196474` | `ssh:github-cupcake` | `SHA256:Gy580sDeIFooogvoROCcfxfkYWEsgQqYPRQ0p9iyFiI` |
-| **am-jallen** | 5C Nano, `16946249` | `ssh:github` *(inferred by elimination — confirm with `ssh-keygen -K` on that machine)* | `SHA256:C+wONGjhNv/j57dyLl7xR8zoabSEd4ljSWz8GfkgBk0` |
+| **paperweight** | 5C Nano, `16946249` | `ssh:github` *(inferred by elimination — confirm with `ssh-keygen -K` on that machine)* | `SHA256:C+wONGjhNv/j57dyLl7xR8zoabSEd4ljSWz8GfkgBk0` |
 
 Naming is **not** consistent across machines: chonky uses `ssh:<hostname>*`,
 cupcake uses `ssh:github-<hostname>`, and the oldest uses a bare `ssh:github`.
@@ -59,7 +59,7 @@ for tailnet SSH, so a stolen laptop cannot use it against GitHub.
 | Application | Flags | Policy |
 |---|---|---|
 | `ssh:chonky-notouch` | `0x20` | **no touch, no PIN** — deployed as `~/.ssh/id_ed25519_sk_rk_chonky-notouch` for tailnet SSH |
-| `ssh:chonky-nopin` | `0x21` | touch, no PIN — **deployed** as `~/.ssh/id_ed25519_sk` (GitHub, plus the am-jallen fallback) |
+| `ssh:chonky-nopin` | `0x21` | touch, no PIN — **deployed** as `~/.ssh/id_ed25519_sk` (GitHub, plus the paperweight fallback) |
 | `ssh:chonky-touch-no-pinnano` | `0x21` | touch, no PIN — functional duplicate of the above |
 | `ssh:chonky` | `0x25` | touch **and** PIN |
 
@@ -77,9 +77,9 @@ section's is followed by the flags byte; take the occurrence whose next byte has
 `0x20` set, or you will read `0x00` off the public one and conclude the key is
 touchless when it isn't.
 
-### Touchless tailnet auth to am-jallen (added 2026-08-02)
+### Touchless tailnet auth to paperweight (added 2026-08-02)
 
-Minted so unattended agent sessions can reach am-jallen without a human present
+Minted so unattended agent sessions can reach paperweight without a human present
 to tap the key:
 
 ```
@@ -94,7 +94,7 @@ resident credential needs the FIDO2 PIN and one touch **at creation time only**.
 
 Three pieces make it work; all three are load-bearing:
 
-1. **am-jallen's `~/.ssh/authorized_keys`** carries the key with the
+1. **paperweight's `~/.ssh/authorized_keys`** carries the key with the
    `no-touch-required` option. That option is *permission, not policy* — it lets
    the server accept a signature lacking the presence flag, but the credential
    must also have been minted `0x20` or the token still demands a tap. The line
@@ -102,31 +102,31 @@ Three pieces make it work; all three are load-bearing:
    (`0x21`), so it never actually skipped the touch.
 2. **`ssh:chonky-nopin` stays in that `authorized_keys`** as a touch-required
    fallback, so a failure of the no-touch credential can't lock chonky out.
-   Nothing else in am-jallen's `authorized_keys` belongs to chonky.
-3. **chonky's machine-local `~/.ssh/config`** pins the offer order for am-jallen
+   Nothing else in paperweight's `authorized_keys` belongs to chonky.
+3. **chonky's machine-local `~/.ssh/config`** pins the offer order for paperweight
    with two `IdentityFile` lines (no-touch first, fallback second) plus
    `IdentitiesOnly yes`. This is the part that actually decides which key signs,
    and there is no substitute for it — see below.
 
 **Loading the key into the agent is not enough, and neither is agent order.**
 Measured 2026-08-02: with the no-touch key added to the agent *first*, plain
-`ssh am-jallen` still offered `~/.ssh/id_ed25519_sk` and hung waiting for a tap
+`ssh paperweight` still offered `~/.ssh/id_ed25519_sk` and hung waiting for a tap
 (`rc=124` after a 15 s timeout). OpenSSH ranks default/`IdentityFile` identities
 ahead of agent-only keys regardless of agent load order, and `id_ed25519_sk` is a
-default filename — so it wins every time, gets `PK_OK` from am-jallen (it is
+default filename — so it wins every time, gets `PK_OK` from paperweight (it is
 still authorized there as the fallback), and blocks on presence. Reordering
 `~/.ssh/agent-keys` does **not** fix this. Only an explicit per-host
 `IdentityFile` + `IdentitiesOnly yes` does.
 
 Verified with `ssh -o ControlPath=none -o ControlMaster=no`: plain `ssh
-am-jallen` makes three consecutive fresh connections at ~830 ms each, `-v` shows
+paperweight` makes three consecutive fresh connections at ~830 ms each, `-v` shows
 only the no-touch key offered and accepted, and no `Confirm user presence`
 appears. **Always disable multiplexing when testing this** — the 8h master will
 happily mask a broken key, and did during this work.
 
-`IdentitiesOnly` does not disturb agent forwarding: `ssh-add -l` on am-jallen
+`IdentitiesOnly` does not disturb agent forwarding: `ssh-add -l` on paperweight
 still lists all three of chonky's keys over the forwarded socket, so remote
-commit signing with `ssh:gitsign` is unaffected. The block is scoped to am-jallen
+commit signing with `ssh:gitsign` is unaffected. The block is scoped to paperweight
 alone — `ssh -G cupcake` still reports `identitiesonly no`.
 
 ### Signing-key anomaly
@@ -135,7 +135,7 @@ All three machines use the same application string `ssh:gitsign`, distinguished
 only by which YubiKey holds them. chonky's signing key is *additionally*
 registered as an **authentication** key on GitHub — it shows up in
 `https://github.com/jra3.keys`, which lists auth keys only, whereas cupcake's and
-am-jallen's do not. Harmless, but inconsistent.
+paperweight's do not. Harmless, but inconsistent.
 
 ## Bootstrapping a machine (validated on chonky, 2026-07-28)
 
@@ -229,7 +229,7 @@ The rebuild path, in the order that actually works.
   commit needs a touch is decided by each machine's flags byte.** Commit
   `8dcefd1` made *transport* touchless; committing is touchless only where the
   gitsign stub is `0x20`. On chonky it is `0x21`, so an agent session with nobody
-  present to tap the key hangs on commit. On am-jallen it is `0x20`, and
+  present to tap the key hangs on commit. On paperweight it is `0x20`, and
   `git commit -S` with stdin closed exits 0 and verifies `G` (measured
   2026-08-21). Check the byte before assuming either.
 - **A timed-out touch reports as a passphrase error.** `Couldn't sign message:
@@ -310,7 +310,7 @@ be launched in-session like rbw-agent, not as a sandboxed unit.**
   tailnet key: a no-touch *signing* key means malware on the laptop can mint
   signed commits in your name, which the tailnet key cannot do.
 - [ ] Fix `CLAUDE.md`'s "no-touch/no-PIN" claim for `setup-git-signing` keys.
-- [ ] Confirm `ssh:github` really is am-jallen's (`ssh-keygen -K` on that box).
+- [ ] Confirm `ssh:github` really is paperweight's (`ssh-keygen -K` on that box).
 - [ ] Consider deleting the redundant `ssh:chonky-touch-no-pinnano` from GitHub
       and from the key.
 - [ ] Consider dropping chonky's `ssh:gitsign` from GitHub's **auth** key list so

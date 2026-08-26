@@ -146,9 +146,11 @@ URL put back.
   connects as the *local* username. On cupcake that means `jallen@paperweight`,
   which fails. Pull dotfiles on cupcake. Confirmed working from cupcake
   2026-08-26.
-- Cosmetic leftovers, harmless, clean up whenever: the `am-jallen` comment in
-  `/etc/tsfilter.nft`, `root@am-jallen` in the ssh host key comments, the
-  `# am-jallen` label in `git/.config/git/allowed_signers`, and prose mentions
-  in `yubikey-ssh.md` / `pacman/configure-system`.
+- Cosmetic leftovers. The in-repo ones were cleaned 2026-08-26: the
+  `# am-jallen` label in `git/.config/git/allowed_signers`, and the prose in
+  `yubikey-ssh.md`, `CLAUDE.md`, `pacman/configure-system`, and
+  `ssh/.config/systemd/user/ssh-add-keys.service`. Still outstanding, both
+  outside this repo and both harmless: the `am-jallen` comment in
+  `/etc/tsfilter.nft`, and `root@am-jallen` in the ssh host key comments.
 - Delete the legacy `Host am-jallen` block from `config.shared` once nothing
   reaches for the old name.

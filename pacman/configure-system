@@ -114,7 +114,7 @@ fi
 # The credential is this machine's own FIDO2 auth key. That reads oddly ("why
 # authorize myself?") but is right: every machine's YubiKey is brokered to the
 # others by ForwardAgent (see ssh/.ssh/config.shared), so an inbound session
-# from am-jallen authenticates with whichever YubiKey you are physically sitting
+# from paperweight authenticates with whichever YubiKey you are physically sitting
 # next to. Same key, different chair.
 #
 # Consequence worth knowing: every inbound session costs a touch, so this grants
@@ -142,7 +142,7 @@ fi
 # --- SSH agent (user) ---
 # Run OpenSSH's own ssh-agent (FIDO2/sk-capable, unlike gnome-keyring's) and
 # auto-load this machine's YubiKey keys into it at login, so SSH agent
-# forwarding (e.g. to am-jallen / chonky) can broker them. SSH_AUTH_SOCK is
+# forwarding (e.g. to paperweight / chonky) can broker them. SSH_AUTH_SOCK is
 # pointed at the socket via ssh/.config/environment.d/ssh-agent.conf.
 # ssh-add-keys.service is stowed from the `ssh` package and self-skips (via
 # ConditionPathExists) until ~/.ssh/agent-keys exists — seeded just above, so
