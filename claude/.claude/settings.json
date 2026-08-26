@@ -1,4 +1,7 @@
 {
+  "env": {
+    "DISABLE_AUTOUPDATER": "1"
+  },
   "permissions": {
     "allow": [
       "Read(~/linear/**)",
@@ -128,7 +131,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5[1m]",
+  "model": "opus[1m]",
   "statusLine": {
     "type": "command",
     "command": "npx -y ccstatusline@latest",
