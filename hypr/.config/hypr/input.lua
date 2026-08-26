@@ -50,11 +50,19 @@
 -- ctrl:nocaps, not caps:ctrl_modifier -- the latter keeps the key identifying
 -- as Caps Lock and still able to latch, which is not what "Caps is Ctrl" means.
 --
--- NOTE: this applies on every host, not just the Framework 12. Alt/Super sit in
--- the same order on the Framework 16 (chonky), so the swap lands the same way
--- there -- but chonky's keyboard is QMK, and if its firmware ever remaps these
--- itself the two layers stack and cancel out. Check there before trusting it.
-local kb_options = "compose:ralt,ctrl:nocaps,shift:both_capslock_cancel,altwin:swap_alt_win"
+-- NOTE: altwin:swap_alt_win applies on every host, not just the Framework 12.
+-- Alt/Super sit in the same order on the Framework 16 (chonky), so the swap
+-- lands the same way there -- but a keyboard that remaps modifiers in its own
+-- firmware swaps them a second time and cancels the keymap out. chonky's board
+-- is QMK; the Kinesis Advantage 360 on the desktop is ZMK and is exempted at
+-- the bottom of this file. That exemption matches on device name, not host, so
+-- it follows the board to whatever machine it is plugged into. Check any new
+-- programmable board before trusting the global string.
+--
+-- Split in two so that exemption can reuse the shared part instead of
+-- repeating it and drifting.
+local kb_options_base = "compose:ralt,ctrl:nocaps,shift:both_capslock_cancel"
+local kb_options = kb_options_base .. ",altwin:swap_alt_win"
 
 hl.config({
   input = {
@@ -70,4 +78,24 @@ hl.config({
       scroll_factor = 0.3,
     },
   },
+})
+
+-- Kinesis Advantage 360: exempt from the Alt/Super swap.
+--
+-- The Adv360 places its modifiers in ZMK firmware, not in XKB -- LCTRL and
+-- LEFT_ALT in the thumb row, LEFT_COMMAND and RIGHT_COMMAND on the bottom row
+-- (see ~/jra3/Adv360-Pro-ZMK, config/adv360.keymap). Applying
+-- altwin:swap_alt_win on top of that swaps them a second time and undoes the
+-- keymap. Everything else in the string is still wanted: the board has a real
+-- CAPS key for ctrl:nocaps to take, and a RIGHT_ALT for compose:ralt.
+--
+-- Drop this block if the Framework 12 gets a ZMK keyboard and the global string
+-- stops being the laptop default.
+--
+-- `name` is the device as `hyprctl devices` reports it. The Adv360 registers
+-- three (-consumer-control and -system-control alongside this one); only the
+-- base keyboard carries the layout.
+hl.device({
+  name = "kinesis-kinesis-adv360",
+  kb_options = kb_options_base,
 })
