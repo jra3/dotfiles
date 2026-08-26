@@ -7,7 +7,8 @@
 -- Not overridden on purpose:
 --   kb_layout    -- Omarchy derives it from /etc/vconsole.conf.
 
--- kb_options: Caps is Ctrl, and Alt/Super are swapped.
+-- kb_options: Caps is Ctrl everywhere, and Alt/Super are swapped on the
+-- Framework 12 only.
 --
 -- This REPLACES Omarchy's "compose:caps,shift:both_capslock_cancel" rather than
 -- adding to it -- kb_options is a single string, not a list.
@@ -50,19 +51,51 @@
 -- ctrl:nocaps, not caps:ctrl_modifier -- the latter keeps the key identifying
 -- as Caps Lock and still able to latch, which is not what "Caps is Ctrl" means.
 --
--- NOTE: altwin:swap_alt_win applies on every host, not just the Framework 12.
--- Alt/Super sit in the same order on the Framework 16 (chonky), so the swap
--- lands the same way there -- but a keyboard that remaps modifiers in its own
--- firmware swaps them a second time and cancels the keymap out. chonky's board
--- is QMK; the Kinesis Advantage 360 on the desktop is ZMK and is exempted at
--- the bottom of this file. That exemption matches on device name, not host, so
--- it follows the board to whatever machine it is plugged into. Check any new
--- programmable board before trusting the global string.
+-- WHERE THE SWAP APPLIES: the Framework 12 and nothing else.
 --
--- Split in two so that exemption can reuse the shared part instead of
--- repeating it and drifting.
+-- The base string below is the default on every host. altwin:swap_alt_win is
+-- opt-in, per host, because it only describes the Framework 12's bottom row --
+-- it is a fix for that one keyboard, not a preference about modifiers.
+--
+-- This was inverted on 2026-08-26. The swap used to be global with an exemption
+-- for the Kinesis Advantage 360, which put every current and future board on the
+-- wrong side of the default: a keyboard that remaps modifiers in its own
+-- firmware (the Adv360 is ZMK, chonky's Framework 16 board is QMK) gets swapped a
+-- second time and cancels its own keymap out, so each one needed a new
+-- exemption. Listing the one host that wants the swap is the smaller list and
+-- the safer failure: a board this file has never heard of now behaves normally.
+--
+-- Caveat, since this matches on host and not on device: plug a programmable
+-- keyboard into a listed host and it gets the swap too. Narrow that case with an
+-- hl.device({ name = ..., kb_options = kb_options_base }) block when it happens.
+-- Don't pre-empt it -- device names are not stable enough to guess at from
+-- another machine. The Adv360 registers a pointer and a keyboard under one
+-- libinput name, and Hyprland appends -1 to whichever it enumerates second, so
+-- which one is "kinesis-kinesis-adv360" changes across replugs.
 local kb_options_base = "compose:ralt,ctrl:nocaps,shift:both_capslock_cancel"
-local kb_options = kb_options_base .. ",altwin:swap_alt_win"
+
+local swap_alt_win_hosts = {
+  cupcake = true, -- Framework Laptop 12
+}
+
+-- /etc/hostname rather than a `hostname` subprocess: Hyprland reaps its own
+-- children, and Omarchy's own input.lua reads /etc/vconsole.conf the same way.
+local function hostname()
+  local file = io.open("/etc/hostname", "r")
+  if not file then
+    return nil
+  end
+
+  local name = file:read("*l")
+  file:close()
+
+  return name and name:match("^%s*(.-)%s*$")
+end
+
+local kb_options = kb_options_base
+if swap_alt_win_hosts[hostname()] then
+  kb_options = kb_options .. ",altwin:swap_alt_win"
+end
 
 hl.config({
   input = {
@@ -79,35 +112,3 @@ hl.config({
     },
   },
 })
-
--- Kinesis Advantage 360: exempt from the Alt/Super swap.
---
--- The Adv360 places its modifiers in ZMK firmware, not in XKB -- LCTRL and
--- LEFT_ALT in the thumb row, LEFT_COMMAND and RIGHT_COMMAND on the bottom row
--- (see ~/jra3/Adv360-Pro-ZMK, config/adv360.keymap). Applying
--- altwin:swap_alt_win on top of that swaps them a second time and undoes the
--- keymap. Everything else in the string is still wanted: the board has a real
--- CAPS key for ctrl:nocaps to take, and a RIGHT_ALT for compose:ralt.
---
--- Drop this block if the Framework 12 gets a ZMK keyboard and the global string
--- stops being the laptop default.
---
--- `name` is the device as `hyprctl devices` reports it, and the Adv360 does NOT
--- have one stable name. It registers a pointer as well as a keyboard, both
--- reported by libinput as "Kinesis Kinesis Adv360", and Hyprland breaks that tie
--- by appending -1 to whichever it enumerates second. So the typing keyboard is
--- `kinesis-kinesis-adv360` on some boots and `kinesis-kinesis-adv360-1` on
--- others; it was the bare name when this exemption was first written and the -1
--- on the very next replug, which put the swap back on the keyboard and the
--- exemption on the mouse.
---
--- Claim both names. kb_options on a pointer device is inert, so whichever one is
--- the mouse this boot just ignores it. (The -consumer-control and
--- -system-control endpoints get distinct names from libinput and carry no
--- layout, so they need nothing.)
-for _, name in ipairs({ "kinesis-kinesis-adv360", "kinesis-kinesis-adv360-1" }) do
-  hl.device({
-    name = name,
-    kb_options = kb_options_base,
-  })
-end
