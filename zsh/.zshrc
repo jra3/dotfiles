@@ -244,6 +244,43 @@ alias ag='rg'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias watch='watch --color'
+# ----------------------------------------------------------------------------
+# claude-zai -- Claude Code against z.ai's Anthropic-compatible endpoint
+# ----------------------------------------------------------------------------
+# Same binary, GLM behind it, so the z.ai subscription pays instead of the
+# Anthropic one. A function rather than an alias because it has to read the key
+# at call time: it lives at ~/.config/zai/anthropic-key (mode 600) and never in
+# this repo, which is public.
+#
+# ANTHROPIC_API_KEY is unset for the child -- it is sent as x-api-key and wins
+# over ANTHROPIC_AUTH_TOKEN, which is the header z.ai wants. --model is passed
+# ahead of "$@" so ~/.claude/settings.json's `model` cannot win and a
+# per-invocation --model still can.
+#
+# Model ids, read off the store 2026-08-27: glm-5.3 and glm-5.3-flash are the
+# newest. For the current list, ask rather than guess:
+#   curl -s -H "Authorization: Bearer $(<~/.config/zai/anthropic-key)" \
+#        https://api.z.ai/api/paas/v4/models
+#
+# Two things behave differently from a normal session, both expected:
+# claude.ai connectors (Gmail, Linear, Notion) do not load, because a custom
+# auth source takes precedence over the claude.ai login; and the cost readout
+# is Anthropic's price list applied to GLM tokens, so it is fiction.
+claude-zai() {
+    local key=$HOME/.config/zai/anthropic-key
+    [[ -r $key ]] || { print -u2 "claude-zai: no readable key at $key"; return 1 }
+    local model=${CLAUDE_ZAI_MODEL:-glm-5.3-flash}
+    env -u ANTHROPIC_API_KEY \
+        ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic \
+        ANTHROPIC_AUTH_TOKEN="$(<$key)" \
+        ANTHROPIC_MODEL=$model \
+        ANTHROPIC_DEFAULT_HAIKU_MODEL=$model \
+        ANTHROPIC_DEFAULT_SONNET_MODEL=$model \
+        ANTHROPIC_DEFAULT_OPUS_MODEL=$model \
+        ANTHROPIC_SMALL_FAST_MODEL=$model \
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+        claude --model $model "$@"
+}
 
 # ============================================================================
 # Tool Completions

@@ -263,7 +263,7 @@ rows = [["state_icon", "workspace", "tab", "$ctx"]]
 # herdr = show in-app toasts
 # terminal = ask the outer terminal to show a desktop notification
 # system = ask the OS notification service directly
-delivery = "system"
+# delivery = "off"
 # delay_seconds = 1
 
 [ui.toast.herdr]
