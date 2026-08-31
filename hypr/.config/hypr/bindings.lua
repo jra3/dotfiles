@@ -47,6 +47,45 @@ hl.unbind("SUPER + SHIFT + P")         -- was: Google Photos
 -- SUPER+T stays unbound on purpose, so Helium gets it for new tabs.
 
 --------------------------------------------------------------------------------
+-- Tiling features we don't use, unbound to free the keys
+--------------------------------------------------------------------------------
+
+-- Window groups ("tabs"), pseudo-tiling, and Omarchy's generic scratchpad go
+-- unused here, so their 20 default keys are freed rather than left live. Nothing
+-- is rebound onto them yet; they are a pool for future bindings.
+--
+-- This does NOT touch the per-app Scratchpads section below. Those are our own
+-- special workspaces (Signal, Slack, ...), not `special:scratchpad`.
+--
+-- Spelled exactly as $OMARCHY_PATH/default/hypr/bindings/tiling.lua spells them.
+-- hl.unbind matches the modifier string literally, so "SUPER + ALT + SHIFT + TAB"
+-- written with SHIFT before ALT would silently leave the binding live.
+
+hl.unbind("SUPER + P")                 -- was: Pseudo window
+
+hl.unbind("SUPER + S")                 -- was: Toggle scratchpad
+hl.unbind("SUPER + ALT + S")           -- was: Move window to scratchpad
+
+hl.unbind("SUPER + G")                 -- was: Toggle window grouping
+hl.unbind("SUPER + ALT + G")           -- was: Move active window out of group
+hl.unbind("SUPER + ALT + LEFT")        -- was: Move window to group on left
+hl.unbind("SUPER + ALT + RIGHT")       -- was: Move window to group on right
+hl.unbind("SUPER + ALT + UP")          -- was: Move window to group on top
+hl.unbind("SUPER + ALT + DOWN")        -- was: Move window to group on bottom
+hl.unbind("SUPER + ALT + TAB")         -- was: Next window in group
+hl.unbind("SUPER + ALT + SHIFT + TAB") -- was: Previous window in group
+hl.unbind("SUPER + CTRL + LEFT")       -- was: Move grouped window focus left
+hl.unbind("SUPER + CTRL + RIGHT")      -- was: Move grouped window focus right
+hl.unbind("SUPER + ALT + mouse_down")  -- was: Next window in group
+hl.unbind("SUPER + ALT + mouse_up")    -- was: Previous window in group
+
+-- "Switch to group window 1-5". Omarchy binds these by keycode, so unbind by
+-- keycode too: code:10 is `1`.
+for index = 1, 5 do
+  hl.unbind("SUPER + ALT + code:" .. tostring(index + 9))
+end
+
+--------------------------------------------------------------------------------
 -- Applications
 --------------------------------------------------------------------------------
 
