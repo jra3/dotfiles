@@ -33,16 +33,18 @@ include ~/.config/kitty/shared.conf
 
 `omarchy display text size` matches `^font_size[[:space:]]+` in this file and
 `omarchy font set` matches `^font_family ` — the family is pinned in
-`shared.conf`, so the font menu no longer reaches kitty (same trade-off as
-`ghostty/`).
+`shared.conf`, so the font menu no longer reaches kitty (the same trade-off the
+retired `ghostty/` package made).
 
 ## SSH and TERM
 
-Kitty sets `TERM=xterm-kitty`. A host without that terminfo mangles keys and
-colours; paperweight was one on 2026-09-08 (it has ghostty's entry, not kitty's).
-`.zshrc` aliases `ssh` to `kitten ssh` when the shell is running inside kitty,
-which copies the terminfo into `~/.terminfo` on the remote on first connect, no
-root needed. The permanent fix on an Arch host is `pacman -S kitty-terminfo`.
+Kitty sets `TERM=xterm-kitty`, and a host without that terminfo entry mangles keys
+and colours. `.zshrc` aliases `ssh` to `kitten ssh` when `TERM` is `xterm-kitty`,
+which copies the entry into the remote's `~/.terminfo` on first connect, no root
+needed. The guard is on `TERM`, not on kitty being installed: inside herdr or tmux
+the multiplexer owns `TERM` and the remote has to be told about that one instead.
+The permanent fix on an Arch host is `pacman -S kitty-terminfo`, which the `kitty`
+package pulls in as a hard dependency — so any host in `packages-arch.txt` has it.
 
 ## Splits are unbound
 
@@ -142,6 +144,15 @@ measured on 0.48.2:
 Both limits go away under `tab_bar_style custom`, where a draw-time `tab_bar.py`
 sees every tab on every frame. That is the next step if the rules grow past
 "colour it by what is running".
+
+## Ghostty
+
+The `ghostty/` stow package was removed on 2026-09-08, and `~/.config/ghostty/`
+with it. It had the identical host-local/shared split (`config` held `font-size`
+and a `config-file` include of a stowed `shared.conf`), so git history before that
+date is the reference if the arrangement ever needs recovering. `ghostty` also came
+out of `pacman/packages-arch.txt`; the binary is left installed on hosts that
+already have it, as a fallback with stock defaults.
 
 ## Applying changes
 

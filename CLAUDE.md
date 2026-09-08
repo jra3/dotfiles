@@ -66,8 +66,7 @@ stow and the repo stops being the source of truth. Seen during the Quattro upgra
 |---|---|
 | `~/.config/tmux/tmux.conf` | upgrade migration |
 | `~/.config/xdg-terminals.list` | terminal picker |
-| `~/.config/ghostty/config` | `omarchy display text size` (resolved 2026-08-25: file is host-local now, shared bits moved to `shared.conf` — see the `ghostty/` entry) |
-| `~/.config/kitty/kitty.conf` | `omarchy display text size` and `omarchy font set` (host-local from the start, 2026-09-08: same split as ghostty — see the `kitty/` entry) |
+| `~/.config/kitty/kitty.conf` | `omarchy display text size`, `omarchy font set` (never stowed: the file is host-local, shared bits live in `shared.conf` — see the `kitty/` entry. Same arrangement `~/.config/ghostty/config` had before ghostty was retired on 2026-09-08) |
 
 After changing anything through an Omarchy menu, check the file with `ls -l` and
 `stow -R <package>` if it became a regular file.
@@ -190,7 +189,7 @@ This documents the default software stack configured in Omarchy:
 |----------|----------|-------------|
 | Shell | **zsh** | Default shell with XDG-compliant config |
 | Prompt | **Starship** | Cross-shell prompt with git integration |
-| Terminal | **Kitty** | GPU-accelerated terminal (CaskaydiaMono Nerd Font). Default since 2026-09-08, when ghostty 1.3.1-2 kept segfaulting on herdr attach (fixed upstream Aug 2026, not yet packaged). Omarchy 4 defaults to foot; `kitty/.config/xdg-terminals.list` is what keeps `SUPER+ENTER` on Kitty. The `ghostty/` package is **no longer stowed** (2026-09-08) |
+| Terminal | **kitty** | GPU-accelerated terminal (CaskaydiaMono Nerd Font), default since 2026-09-08. Omarchy 4 defaults to foot; `kitty/.config/xdg-terminals.list` is what keeps `SUPER+ENTER` on kitty. Replaced Ghostty, whose 1.3.1-2 segfaults its io thread whenever herdr attaches (fixed upstream Aug 2026, not yet packaged) |
 | Multiplexer | **tmux** | Terminal multiplexer. Config only — worktrees are Omarchy's `ga`/`gd`, workspaces are `herdr` |
 | Compositor | **Hyprland** | Wayland tiling compositor, configured in **Lua** |
 | Desktop shell | **Omarchy shell** | One Quickshell process: bar, notifications, launcher, OSD, lock, idle. Replaced waybar, mako, walker, swayosd, hyprlock, hypridle |
@@ -218,35 +217,26 @@ This documents the default software stack configured in Omarchy:
   declarative but its **sidebar** icon is not settable at all, and the file-view
   icon is gvfs metadata rather than a file, so it is applied per machine by
   `configure-system`. See `gtk/README.md`
-- `ghostty/` - Ghostty terminal emulator, no longer the default and **no longer
-  stowed**: `xdg-terminals.list` moved to `kitty/` on 2026-09-08 (see the `kitty/`
-  entry) and the package was unstowed the same day. The binary is still installed and
-  still opens by hand — the host-local `~/.config/ghostty/config` survives an unstow,
-  and its include is written `config-file = ?"…/shared.conf"`, where the leading `?`
-  means optional, so the now-dangling include is not an error (`ghostty +show-config`
-  exits 0). What it loses is everything in `shared.conf`: font family, padding, the
-  Omarchy theme include and the keybindings. `stow ghostty` brings them back.
-  The package's one file is `shared.conf`, not `config`: **`~/.config/ghostty/config` is
-  deliberately host-local** — it holds only `font-size` (a per-display answer) and a
-  `config-file` include of `shared.conf`. `omarchy display text size` persists by
-  `sed -i` on that exact path (it reset a stowed 12 to its 9pt anchor during the
-  Quattro upgrade, un-stowing the file in the process, discovered 2026-08-25), so
-  the file Omarchy seds must be a regular file. Ghostty loads includes *after* the
-  including file, so never add `font-size` to `shared.conf` — it would override
-  every host. Side effect: `omarchy font set` seds `font-family` in `config` only,
-  so it no longer reaches Ghostty; the family is pinned in `shared.conf` instead
-- `kitty/` - Kitty terminal emulator, the default since 2026-09-08, plus
-  `xdg-terminals.list` — the file `xdg-terminal-exec` reads to pick Kitty over
-  Omarchy 4's foot default. Same split as `ghostty/`: the stowed file is
-  `shared.conf`, and **`~/.config/kitty/kitty.conf` is deliberately host-local** —
-  it holds only `font_size` and an `include` of `shared.conf`, because
-  `omarchy display text size` and `omarchy font set` both `sed -i` that exact path.
-  Kitty applies later lines over earlier ones, so the include goes last and
-  `shared.conf` wins. **Stow it `--no-folding`** for the same reason as `gtk/`.
-  `omarchy default terminal` writes `xdg-terminals.list` with `cat >`, which goes
-  *through* the symlink, so a picker change lands in the repo as a diff rather
-  than un-stowing the file. Inside kitty `.zshrc` aliases `ssh` to `kitten ssh`
-  so remote hosts get the `xterm-kitty` terminfo. See `kitty/README.md`
+- `kitty/` - kitty terminal emulator, the default since 2026-09-08, plus
+  `xdg-terminals.list` — the file `xdg-terminal-exec` reads to pick kitty over
+  Omarchy 4's foot default. **Stow it `--no-folding`**, because Omarchy writes
+  into `~/.config/kitty/` — the same reason as `gtk/`. The stowed file is
+  `shared.conf`, not `kitty.conf`: **`~/.config/kitty/kitty.conf` is deliberately
+  host-local** — it holds only `font_size` (a per-display answer) and an `include`
+  of `shared.conf`. `omarchy display text size` persists by `sed -i` on that exact
+  path, so the file Omarchy seds must be a regular file. kitty applies later lines
+  over earlier ones, so with the include last never add `font_size` to
+  `shared.conf` — it would override every host. Side effect: `omarchy font set`
+  seds `font_family` in `kitty.conf` only, so it no longer reaches kitty; the
+  family is pinned in `shared.conf` instead. `omarchy default terminal` writes
+  `xdg-terminals.list` with `cat >`, which goes *through* the symlink, so a picker
+  change lands in the repo as a diff rather than un-stowing the file. Splits are
+  unbound (herdr owns layout) and tab switching sits on `ctrl+shift+1..9` so
+  `alt+N` reaches herdr. Inside kitty `.zshrc` routes `ssh` through `kitten ssh`
+  so remote hosts get the `xterm-kitty` terminfo. See `kitty/README.md`.
+  Replaced the `ghostty/` package, removed 2026-09-08; it had the identical
+  host-local/shared split, and git history has it if the arrangement needs
+  recovering
 - `helium/` - One unpacked Chromium extension, `youtube-no-shorts`, which removes
   Shorts from YouTube and redirects `/shorts/` to the normal watch page.
   **`~/.config/helium-browser-flags.conf` is deliberately not here** — it is

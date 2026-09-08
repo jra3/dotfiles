@@ -182,7 +182,7 @@ o.bind("XF86Tools", "Stop dictation", "voxtype record stop", { release = true })
 
 -- Newline insert via the far mouse thumb button (forward / BTN_EXTRA).
 -- Sends Shift+Enter: a newline in chat inputs (Slack, browsers) and, via
--- the terminal's shift+enter keybind (kitty/shared.conf), in Claude Code too.
+-- kitty's shift+enter binding (ESC+CR), in Claude Code too.
 --
 -- Uses wtype rather than the `send_shortcut` dispatcher on purpose. voxtype
 -- types through wtype, which installs its own virtual keyboard + keymap; until

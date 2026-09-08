@@ -12,7 +12,6 @@ direnv
 efibootmgr
 emacs-wayland
 fwupd
-ghostty
 git-delta
 github-cli
 glow

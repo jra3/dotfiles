@@ -35,7 +35,8 @@ You can still drive stow by hand; `bootstrap` is only a wrapper that knows the
 platform split:
 
 ```bash
-stow zsh git kitty
+stow zsh git
+stow --no-folding kitty
 ```
 
 > **If you ever add a package that ships a systemd drop-in, stow it with
@@ -82,7 +83,6 @@ symlink dead directories into `~/.config`.
 | `brew` | macOS Brewfile, install script, and system configuration |
 | `codex` | Codex CLI skills. Symlinks into the `claude` package so there is one copy per skill. Stow it `--no-folding` |
 | `gh` | GitHub CLI configuration and custom commands |
-| `ghostty` | Ghostty terminal emulator configuration (kept, no longer the default) |
 | `git` | Git configuration and global ignore patterns |
 | `helium` | The `youtube-no-shorts` unpacked Chromium extension. Stow it **folded** (plain `stow helium`), then run `pacman/configure-system` — see `helium/README.md` |
 | `hypr` | Hyprland compositor (keybindings, monitors, autostart, appearance) |
