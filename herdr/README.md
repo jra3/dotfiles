@@ -13,10 +13,10 @@ with everything commented out except the settings we actively override — plus 
 - `[ui] agent_panel_sort = "priority"` — order the agent panel by attention queue.
 - `[keys]` — tmux-style bindings mirroring `tmux/.config/tmux/tmux.conf`:
   - `prefix = "backtick"` — same prefix key as tmux.
-  - `split_vertical = "prefix+|"` / `split_horizontal = "prefix+minus"` — `|` = side-by-side,
-    `-` = stacked (matches tmux `bind | split-window -h` / `bind - split-window -v`).
-  - `focus_pane_{left,down,up,right} = "alt+{left,down,up,right}"` — Alt+arrows, no prefix
-    (tmux `bind -n M-Arrow select-pane`).
+  - the whole pane group is set to `""` — see [Panes are unbound](#panes-are-unbound-not-just-unused).
+  - `focus_agent = "prefix+alt+1..9"` — jump straight to an agent row. Dead until
+    2026-09-08, when kitty's tab switching moved off `alt+N` onto `ctrl+shift+N`; the
+    terminal had been eating those keys before herdr saw them. See `kitty/README.md`.
 
 - `[[keys.command]]` — custom commands, each backed by a script in `.local/bin/`:
   - `prefix+f` → `herdr-fork-focused` — fork the focused Claude Code pane into a new tab.
@@ -40,6 +40,38 @@ with everything commented out except the settings we actively override — plus 
   carried no information. `$ctx` (and `$model`, reported but not rendered) come from
   `claude/.claude/hooks/herdr-blocked-reason.sh`, which also publishes *why* a pane is
   blocked so the ask is readable from the sidebar.
+
+### Panes are unbound, not just unused
+
+Splits are never used here — every tab holds exactly one pane — so on 2026-09-08
+the whole pane group was set to `""` rather than left on herdr's defaults:
+`rename_pane`, `focus_pane_*`, `cycle_pane_{next,previous}`, `split_{vertical,horizontal}`,
+`close_pane`, `zoom` and `resize_mode`. An unused split key is only a way to wreck a
+layout by accident.
+
+`""` **disables** an action; a commented-out line keeps herdr's default, which is the
+opposite. (Same mechanism `remote_image_paste` documents. herdr also disables rather
+than falls back when a binding fails to parse: feed it a bogus key and
+`herdr config check` says `invalid keybinding: …; disabling binding`.)
+
+That freed `prefix+shift+p`, `prefix+tab`, `prefix+shift+tab`, `prefix+|`,
+`prefix+minus`, `prefix+x`, `prefix+z`, `prefix+r`, and Alt+arrows. The tmux-parity
+bindings this replaced were `split_vertical = "prefix+|"` / `split_horizontal =
+"prefix+minus"` and `focus_pane_* = "alt+{left,down,up,right}"`.
+
+Two of those never worked anyway. `focus_pane_{left,right}` were dead the whole time:
+both terminals bind Alt+Left/Right to `\x1bb`/`\x1bf` for word navigation
+(`kitty/.config/kitty/shared.conf`, and `ghostty/…/shared.conf` before it), and a
+terminal shortcut is dispatched before the key reaches the app — kitty consults its
+keymap in `dispatch_possible_special_key` on every event, and `send_text all` matches
+even the `kitty` keyboard mode herdr puts the terminal in. So Alt+Left/Right typed a
+word-motion escape into the focused pane instead of moving focus, while Alt+Up/Down
+worked. Those kitty word-nav bindings stay; nothing collides with them now.
+
+`navigate_pane_*` (`h`/`j`/`k`/`l`) is deliberately left alone — those only fire inside
+navigate mode (`prefix+g`), which is still wanted for workspaces, and they shadow
+nothing outside it. `last_pane`, `resize_pane_*` and `swap_pane_*` are unset by default
+already, so they need no line.
 
 ## herdr-eventd
 

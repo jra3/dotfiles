@@ -105,21 +105,33 @@ focus_agent = "prefix+alt+1..9"       # jump straight to an agent row
 # switch_tab = "prefix+1..9"
 switch_workspace = "prefix+shift+1..9" # unbound by default; mirrors switch_tab's prefix+1..9
 # close_tab = "prefix+shift+x"
-# rename_pane = "prefix+shift+p"
 # edit_scrollback = "prefix+e"
-focus_pane_left = "alt+left"         # tmux: bind -n M-Left  select-pane -L (no prefix)
-focus_pane_down = "alt+down"         # tmux: bind -n M-Down  select-pane -D
-focus_pane_up = "alt+up"             # tmux: bind -n M-Up    select-pane -U
-focus_pane_right = "alt+right"       # tmux: bind -n M-Right select-pane -R
-# cycle_pane_next = "prefix+tab"
-# cycle_pane_previous = "prefix+shift+tab"
-# last_pane = ""          # optional, unset by default; bind e.g. "prefix+tab" for global back-and-forth
-split_vertical = "prefix+|"          # tmux: bind | split-window -h (side by side)
-split_horizontal = "prefix+minus"    # tmux: bind - split-window -v (stacked)
-# close_pane = "prefix+x"
-# zoom = "prefix+z"       # legacy alias: fullscreen
-# resize_mode = "prefix+r"
 # toggle_sidebar = "prefix+b"
+
+# Panes are unused. Every tab here holds exactly one pane, so the whole pane
+# group is disabled rather than left on herdr's defaults — an unused split key
+# is only a way to wreck a layout by accident. "" disables an action (the same
+# mechanism remote_image_paste documents above); it is not the same as leaving
+# the line commented, which keeps the default binding.
+# Frees: alt+arrows, prefix+shift+p, prefix+tab, prefix+shift+tab, prefix+|,
+# prefix+minus, prefix+x, prefix+z, prefix+r.
+rename_pane = ""          # default prefix+shift+p; rename_tab (prefix+shift+t) covers it
+focus_pane_left = ""      # was alt+left,  default prefix+h
+focus_pane_down = ""      # was alt+down,  default prefix+j
+focus_pane_up = ""        # was alt+up,    default prefix+k
+focus_pane_right = ""     # was alt+right, default prefix+l
+cycle_pane_next = ""      # default prefix+tab
+cycle_pane_previous = ""  # default prefix+shift+tab
+split_vertical = ""       # was prefix+| (tmux: bind | split-window -h), default prefix+v
+split_horizontal = ""     # was prefix+- (tmux: bind - split-window -v), default prefix+minus
+close_pane = ""           # default prefix+x
+zoom = ""                 # default prefix+z; fullscreen, which does nothing with one pane
+resize_mode = ""          # default prefix+r
+# last_pane, resize_pane_{left,down,up,right} and swap_pane_* are already unset
+# by default, so they need no line here.
+# navigate_pane_* below is deliberately left alone: those keys only fire inside
+# navigate mode (prefix+g), which is still wanted for workspaces, and they
+# shadow nothing outside it.
 
 # Navigate-mode movement. These local shortcuts win while navigate mode is open.
 # They are independent from focus_pane_*. Do not include prefix+, esc, enter, tab, or 1..9 here.
