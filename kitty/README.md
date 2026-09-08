@@ -36,15 +36,52 @@ include ~/.config/kitty/shared.conf
 `shared.conf`, so the font menu no longer reaches kitty (the same trade-off the
 retired `ghostty/` package made).
 
+**The size menu now opens on the wrong number.** `omarchy-display-text-size`
+*writes* every terminal config that exists, kitty included, but its
+`term_current_pt` reads back the first one it finds in a fixed order:
+ghostty, alacritty, kitty, foot. Removing `~/.config/ghostty/config` promoted
+`~/.config/alacritty/alacritty.toml` to that slot, and alacritty is still
+installed (it is in `packages-arch.txt`, unused). The two agree at 11 today, so
+nothing is visibly wrong; they diverge the moment anything sets one without the
+other. Delete `~/.config/alacritty/` — or drop `alacritty` from
+`packages-arch.txt` — if the menu ever reports a size kitty is not using.
+
+The canonical size for a display is whatever `term_current_pt` computes:
+`round(shell_px * 9 / 12)`, where `shell_px` is the bar font size that
+`omarchy display text size` also drives, and which GTK's `text-scaling-factor`
+tracks. On the LG SDQHD (2560x2880, Hyprland scale 1.6, factor 1.1818) that is
+11 — the value every terminal here holds. If 11 nonetheless renders larger or
+smaller than ghostty did at 11, that is kitty and ghostty disagreeing about
+points-per-pixel under fractional scaling, not a misconfiguration: change
+`font_size` in the host-local `kitty.conf` and leave the other terminals alone.
+`ctrl+shift+=` / `ctrl+shift+-` adjust a running window live (2.0pt steps) and
+`ctrl+shift+backspace` resets to the configured value, which is the quickest way
+to find the number worth persisting. Kitty 0.48 has no remote-control command
+that reports the live size back, so read it off the screen.
+
 ## SSH and TERM
 
-Kitty sets `TERM=xterm-kitty`, and a host without that terminfo entry mangles keys
-and colours. `.zshrc` aliases `ssh` to `kitten ssh` when `TERM` is `xterm-kitty`,
-which copies the entry into the remote's `~/.terminfo` on first connect, no root
-needed. The guard is on `TERM`, not on kitty being installed: inside herdr or tmux
-the multiplexer owns `TERM` and the remote has to be told about that one instead.
-The permanent fix on an Arch host is `pacman -S kitty-terminfo`, which the `kitty`
-package pulls in as a hard dependency — so any host in `packages-arch.txt` has it.
+Kitty sets `TERM=xterm-kitty`, and a remote host without that terminfo entry
+mangles keys and colours. Fix it once per remote, either with
+`pacman -S kitty-terminfo` there (the `kitty` package pulls it in as a hard
+dependency, so any host in `packages-arch.txt` already has it) or by connecting
+once with an explicit `kitten ssh <host>`, which copies the entry into the
+remote's `~/.terminfo` and needs no root.
+
+An interactive kitty shell takes the second route on its own: `zsh/.zshrc`
+defines an `ssh()` function that routes through the kitten. Inside herdr or tmux
+the multiplexer owns `TERM`, so the guard is off there and you get plain `ssh`.
+
+**Do not alias `ssh` to `kitten ssh`.** Omarchy's `fns/ssh-reconnect` defines an
+`ssh()` *function* — it reconnects a dropped link and disarms the mouse-tracking
+and alternate-screen modes a killed remote tmux leaves armed — and
+`~/.zshrc.local` sources that whole `fns/` directory. zsh expands aliases while
+parsing a function definition, so any `alias ssh=...` anywhere turns that file
+into `defining function based on alias 'ssh'` plus a parse error, in every new
+shell. Ordering does not help; the alias loses either way, and the reconnect
+wrapper is worth more than saving a one-time-per-host setup step. (An earlier
+draft of this file claimed the alias existed. It was added on 2026-09-08, broke
+every shell immediately, and was reverted the same day.)
 
 ## Splits are unbound
 

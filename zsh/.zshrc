@@ -262,10 +262,18 @@ alias watch='watch --color'
 # Inside kitty, route interactive ssh through the ssh kitten: it copies the
 # xterm-kitty terminfo into ~/.terminfo on the remote on first connect (no root
 # needed), so hosts without kitty-terminfo (paperweight, 2026-09-08) get working
-# keys and colours. A function rather than an alias so the _ssh host completion
-# above still applies. Guarded on TERM, so tmux/herdr panes (tmux-256color) and
+# keys and colours. Guarded on TERM, so tmux/herdr panes (tmux-256color) and
 # other terminals keep plain ssh, and on interactive, so scripts and Claude
 # Code's Bash tool never go through the kitten.
+#
+# A function, NEVER an alias. Omarchy's fns/ssh-reconnect defines its own ssh()
+# -- reconnect on a dropped link, and disarm the mouse/alt-screen modes a dead
+# remote tmux leaves armed -- and ~/.zshrc.local sources that whole directory.
+# zsh expands an alias while parsing a function definition, so an `alias ssh=...`
+# anywhere in the rc makes that file a parse error in every new shell. A function
+# is merely redefined by ssh-reconnect where that is sourced, and the reconnect
+# wrapper is worth more than a one-time-per-host terminfo step. It also keeps the
+# _ssh host completion above working. See kitty/README.md.
 if [[ -o interactive && $TERM == xterm-kitty ]] && command -v kitten &>/dev/null; then
     ssh() { kitten ssh "$@"; }
 fi
