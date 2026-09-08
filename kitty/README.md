@@ -27,7 +27,7 @@ machine with:
 # Kitty applies later lines over earlier ones, so with the include last
 # shared.conf wins on any key present in both — keep only host-only keys
 # (font_size) here.
-font_size 12.0
+font_size 13.0
 include ~/.config/kitty/shared.conf
 ```
 
@@ -46,18 +46,39 @@ nothing is visibly wrong; they diverge the moment anything sets one without the
 other. Delete `~/.config/alacritty/` — or drop `alacritty` from
 `packages-arch.txt` — if the menu ever reports a size kitty is not using.
 
-The canonical size for a display is whatever `term_current_pt` computes:
-`round(shell_px * 9 / 12)`, where `shell_px` is the bar font size that
-`omarchy display text size` also drives, and which GTK's `text-scaling-factor`
-tracks. On the LG SDQHD (2560x2880, Hyprland scale 1.6, factor 1.1818) that is
-11 — the value every terminal here holds. If 11 nonetheless renders larger or
-smaller than ghostty did at 11, that is kitty and ghostty disagreeing about
-points-per-pixel under fractional scaling, not a misconfiguration: change
-`font_size` in the host-local `kitty.conf` and leave the other terminals alone.
-`ctrl+shift+=` / `ctrl+shift+-` adjust a running window live (2.0pt steps) and
-`ctrl+shift+backspace` resets to the configured value, which is the quickest way
-to find the number worth persisting. Kitty 0.48 has no remote-control command
-that reports the live size back, so read it off the screen.
+### kitty needs ~2pt more than ghostty did
+
+Omarchy computes one point size for every terminal: `round(shell_px * 9 / 12)`,
+where `shell_px` is the bar font size the same menu drives and which GTK's
+`text-scaling-factor` tracks. On the LG SDQHD (2560x2880, Hyprland scale 1.6,
+factor 1.1818) that is 11, and ghostty, alacritty and foot all hold 11.
+
+**kitty renders visibly smaller than ghostty did at the same nominal size**, so
+this host runs `font_size 13.0` — measured on 2026-09-08, not guessed. kitty and
+ghostty disagree about points-per-pixel under fractional scaling; the formula is
+calibrated to the old terminal. Expect roughly a +2 correction on a scaled
+display and treat the menu's number as a floor.
+
+So `omarchy display text size` will fight this: it seds `font_size` back to the
+formula value, and kitty goes small again. Re-apply the correction by hand after
+touching that menu. This is the same trade-off `omarchy font set` already makes
+for the family, one step worse — the menu is not wrong about `shell_px`, only
+about what kitty does with it.
+
+Finding the number on a new display: `ctrl+shift+=` / `ctrl+shift+-` resize a
+running window live in 2.0pt steps and `ctrl+shift+backspace` resets to the
+configured value. Kitty 0.48 has no remote-control command that reports the live
+size back — `kitty @ ls` omits it and `set-font-size` only writes — but the size
+is recoverable without one, because the step is exactly 2.0 from the configured
+value and each candidate yields a distinct cell grid. Read `columns`x`lines` off
+`kitty @ ls`, then walk `kitty @ set-font-size` over `configured ± 2n` until the
+geometry matches, and leave it on the winner:
+
+```bash
+sock="unix:$(ls $XDG_RUNTIME_DIR/omarchy-kitty-* | head -1)"
+kitty @ --to "$sock" ls | jq -r '.[0].tabs[0].windows[0] | "\(.columns)x\(.lines)"'
+kitty @ --to "$sock" set-font-size 13
+```
 
 ## SSH and TERM
 
