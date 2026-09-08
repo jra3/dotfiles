@@ -200,6 +200,41 @@ if o.cmd_present("meeting-toggle") then
 end
 
 --------------------------------------------------------------------------------
+-- Adv360 SmartSet layer (fn2, toggled by the grave key)
+--------------------------------------------------------------------------------
+
+-- The Kinesis Advantage360 on this desk is the SmartSet board, NOT the Pro --
+-- there is no ZMK and no UF2 flashing. Its layer lives in layouts/layout2.txt
+-- on the keyboard's own v-Drive: SmartSet + Hotkey 3 mounts it, SmartSet +
+-- Hotkey 4 reloads a layout without unmounting. The grave key toggles the layer
+-- with [grav]>[fn2t], and [grav]>[deft] inside the layer toggles back out.
+--
+-- The layer sends F13-F16 rather than replaying herdr's own backtick prefix
+-- chords. Without the `fkeys:basic_13-24` xkb option those codes carry XF86
+-- names, which is why the binds below read XF86Launch* and not F14/F15/F16 --
+-- confirmed with `xkbcli compile-keymap --layout us --options "$kb_options"`.
+-- Taking that option is a machine-wide change to input.lua and is not needed
+-- here; it would only make these three lines read more honestly.
+--
+-- F13 is deliberately absent below: the layer's J sends it, and XF86Tools is
+-- already bound to dictation above (same keycode as the foot pedal), so J is
+-- push-to-talk for free with no bind of its own.
+--
+--   J -> f13 -> XF86Tools     push to talk        (bound above, with the pedal)
+--   K -> f14 -> XF86Launch5   previous agent
+--   L -> f15 -> XF86Launch6   next agent
+--   ; -> f16 -> XF86Launch7   jump to whoever wants attention
+--
+-- herdr exposes no next/previous at any level, only `list` and `focus`, so the
+-- cycling lives in herdr-cycle. Ships in the `herdr` stow package, which isn't
+-- deployed on every host.
+if o.cmd_present("herdr-cycle") then
+  o.bind("XF86Launch5", "Previous agent", "herdr-cycle agent prev")
+  o.bind("XF86Launch6", "Next agent", "herdr-cycle agent next")
+  o.bind("XF86Launch7", "Jump to agent wanting attention", "herdr-jump-to-attention")
+end
+
+--------------------------------------------------------------------------------
 -- QMK firmware chords (Framework 16 ANSI keymap "john")
 --------------------------------------------------------------------------------
 

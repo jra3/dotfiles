@@ -17,6 +17,21 @@ setopt SHARE_HISTORY          # Share history across sessions
 setopt INC_APPEND_HISTORY     # Add commands immediately
 
 # ============================================================================
+# Wayland display fallback
+# ============================================================================
+# herdr panes inherit the herdr server's environment permanently, and a server
+# started from a tty or over SSH has no WAYLAND_DISPLAY. wl-paste then falls
+# back to wayland-0, fails to connect, and Claude Code's image paste silently
+# does nothing. Point at whichever compositor socket actually exists.
+if [[ -z $WAYLAND_DISPLAY && -n $XDG_RUNTIME_DIR ]]; then
+  for _wl_sock in $XDG_RUNTIME_DIR/wayland-[0-9]*(N=); do
+    export WAYLAND_DISPLAY=${_wl_sock:t}
+    break
+  done
+  unset _wl_sock
+fi
+
+# ============================================================================
 # Directory Navigation
 # ============================================================================
 setopt AUTO_CD              # Auto changes to a directory without typing cd
