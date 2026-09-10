@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# ccstatusline custom-command widget: the basename of the working directory.
+# The built-in current-working-dir widget can trim to one segment, but it
+# insists on a ".../" prefix when it does. Reads the cwd Claude Code puts in
+# the stdin JSON, so it matches what Claude Code thinks the directory is.
+set -euo pipefail
+cwd=$(jq -r '.cwd // .workspace.current_dir // empty') || exit 0
+[[ -n "$cwd" ]] || exit 0
+printf '%s' "${cwd##*/}"

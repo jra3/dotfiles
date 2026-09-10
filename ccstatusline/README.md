@@ -2,7 +2,7 @@
 
 Claude Code's status line. `claude/.claude/settings.json` sets
 `statusLine.command` to `npx -y ccstatusline@latest`; this package supplies the
-layout that command reads, plus the one custom segment it shells out to.
+layout that command reads, plus the custom segments it shells out to.
 
 ```
 stow ccstatusline
@@ -14,12 +14,21 @@ One row:
 
 | Segments |
 |---|
-| context % remaining · **PR widget** · git worktree · git branch · model |
+| context % remaining · **cwd** · **branch** · **PR widget** · model |
+
+`cwd` and `branch` are the two small scripts in `.local/bin`:
+
+- `cc-cwd` prints the basename of the directory Claude Code is running in. The
+  built-in `current-working-dir` widget can trim to one segment, but it insists
+  on a `.../` prefix when it does.
+- `cc-git-loc` prints the current branch, **magenta in the primary checkout and
+  yellow in a linked worktree**. The colour is the point: yellow means a
+  throwaway `ga`/`gd` worktree. It does not print the worktree's name, because a
+  `ga` worktree is named after its branch and its directory is already the
+  segment to the left (`.dotfiles--honk | honk`).
 
 Session and weekly usage used to sit on a second row. Dropped 2026-09-10: the
 Omarchy shell bar shows the same limits, so the row was a duplicate.
-
-`colorLevel: 3` (truecolor) — fine in kitty.
 
 ## The PR widget
 

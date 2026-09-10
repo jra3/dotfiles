@@ -8,7 +8,29 @@
         "rawValue": true
       },
       {
-        "id": "4",
+        "id": "cwd-sep",
+        "type": "separator"
+      },
+      {
+        "id": "cwd",
+        "type": "custom-command",
+        "commandPath": "cc-cwd",
+        "color": "blue",
+        "timeout": 1000
+      },
+      {
+        "id": "loc-sep",
+        "type": "separator"
+      },
+      {
+        "id": "git-loc",
+        "type": "custom-command",
+        "commandPath": "cc-git-loc",
+        "preserveColors": true,
+        "timeout": 1000
+      },
+      {
+        "id": "pr-stack-sep",
         "type": "separator"
       },
       {
@@ -18,26 +40,6 @@
         "color": "cyan",
         "preserveColors": true,
         "timeout": 2000
-      },
-      {
-        "id": "pr-stack-sep",
-        "type": "separator"
-      },
-      {
-        "id": "7",
-        "type": "git-worktree",
-        "color": "yellow",
-        "rawValue": true
-      },
-      {
-        "id": "6",
-        "type": "separator"
-      },
-      {
-        "id": "5",
-        "type": "git-branch",
-        "color": "magenta",
-        "rawValue": true
       },
       {
         "id": "model-sep",
