@@ -1,1 +1,4 @@
 **/.claude/settings.local.json
+# Linked worktrees live inside the primary checkout at .my-worktrees/<name>.
+# Ignored globally so the primary's `git status` and ripgrep skip them.
+.my-worktrees/
