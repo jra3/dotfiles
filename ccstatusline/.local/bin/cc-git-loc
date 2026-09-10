@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# ccstatusline custom-command widget: the current branch, coloured by where it
-# lives. Magenta in the primary checkout, yellow in a linked worktree. The
-# colour is the whole point: yellow means "this is a throwaway ga/gd worktree".
-# The worktree's own name is not printed — a ga worktree is named after its
-# branch and its directory sits one segment to the left already, and git's
-# internal name for it is mangled anyway (.dotfiles--honk -> -dotfiles--honk).
+# ccstatusline custom-command widget: where in the repo am I, in one word.
+# In a linked worktree, the worktree (yellow). In the primary checkout, the
+# branch (magenta). Pairs with cc-repo, which prints the repo's name.
+#
+# The worktree "name" is its directory basename with the repo prefix that
+# ga/gd adds stripped: .dotfiles--honk -> honk. Git's own internal name is
+# not used because it is mangled (.dotfiles--honk registers as -dotfiles--honk).
 # Receives ccstatusline JSON on stdin (ignored — git already knows the cwd).
 set -euo pipefail
 
@@ -14,14 +15,18 @@ YELLOW='\e[33m'
 MAGENTA='\e[35m'
 RST='\e[0m'
 
-BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
-[[ "$BRANCH" == "HEAD" ]] && BRANCH=$(git rev-parse --short HEAD)
-
 # A linked worktree's git-dir is <repo>/.git/worktrees/<name>; the primary
-# checkout's is just <repo>/.git. Same test ccstatusline's own git-worktree
-# widget makes before it prints "main" for the primary.
+# checkout's is just <repo>/.git.
 case "$GIT_DIR" in
-  */worktrees/*) COLOR=$YELLOW ;;
-  *)             COLOR=$MAGENTA ;;
+  */worktrees/*)
+    top=$(git rev-parse --show-toplevel)
+    common=$(git rev-parse --path-format=absolute --git-common-dir)
+    [[ "$common" == */.git ]] && common=${common%/.git}
+    wt=${top##*/}
+    wt=${wt#"${common##*/}--"}
+    printf "${YELLOW}%s${RST}" "$wt" ;;
+  *)
+    BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+    [[ "$BRANCH" == "HEAD" ]] && BRANCH=$(git rev-parse --short HEAD)
+    printf "${MAGENTA}%s${RST}" "$BRANCH" ;;
 esac
-printf "${COLOR}%s${RST}" "$BRANCH"

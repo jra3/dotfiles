@@ -8,13 +8,13 @@
         "rawValue": true
       },
       {
-        "id": "cwd-sep",
+        "id": "repo-sep",
         "type": "separator"
       },
       {
-        "id": "cwd",
+        "id": "repo",
         "type": "custom-command",
-        "commandPath": "cc-cwd",
+        "commandPath": "cc-repo",
         "color": "blue",
         "timeout": 1000
       },

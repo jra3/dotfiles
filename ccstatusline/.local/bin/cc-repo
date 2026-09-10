@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# ccstatusline custom-command widget: the repo's name — the basename of the
+# PRIMARY checkout, even from inside a linked worktree (.dotfiles--honk still
+# says ".dotfiles"). Outside git it falls back to the basename of the cwd
+# Claude Code puts in the stdin JSON.
+set -euo pipefail
+
+if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
+  # <repo>/.git for a normal clone; the bare dir itself for a bare repo.
+  [[ "$common" == */.git ]] && common=${common%/.git}
+  printf '%s' "${common##*/}"
+  exit 0
+fi
+
+cwd=$(jq -r '.cwd // .workspace.current_dir // empty') || exit 0
+[[ -n "$cwd" ]] || exit 0
+printf '%s' "${cwd##*/}"

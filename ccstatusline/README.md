@@ -14,18 +14,21 @@ One row:
 
 | Segments |
 |---|
-| context % remaining · **cwd** · **branch** · **PR widget** · model |
+| context % remaining · **repo** · **worktree or branch** · **PR widget** · model |
 
-`cwd` and `branch` are the two small scripts in `.local/bin`:
+`repo` and `worktree or branch` are two small scripts in `.local/bin`:
 
-- `cc-cwd` prints the basename of the directory Claude Code is running in. The
-  built-in `current-working-dir` widget can trim to one segment, but it insists
-  on a `.../` prefix when it does.
-- `cc-git-loc` prints the current branch, **magenta in the primary checkout and
-  yellow in a linked worktree**. The colour is the point: yellow means a
-  throwaway `ga`/`gd` worktree. It does not print the worktree's name, because a
-  `ga` worktree is named after its branch and its directory is already the
-  segment to the left (`.dotfiles--honk | honk`).
+- `cc-repo` prints the repo's name: the basename of the *primary* checkout,
+  so a `ga` worktree at `.dotfiles--honk` still says `.dotfiles`. Outside git
+  it falls back to the basename of the cwd Claude Code passes on stdin.
+- `cc-git-loc` prints where you are in that repo. In a linked worktree it is
+  the worktree, **yellow**, with the `<repo>--` prefix `ga` adds stripped
+  (`.dotfiles--honk` → `honk`). In the primary checkout it is the branch,
+  **magenta**. Git's own internal worktree name is not used because it is
+  mangled (`.dotfiles--honk` registers as `-dotfiles--honk`).
+
+So the honk worktree renders `.dotfiles | honk` in yellow, and the primary
+clone on main renders `.dotfiles | main` in magenta.
 
 Session and weekly usage used to sit on a second row. Dropped 2026-09-10: the
 Omarchy shell bar shows the same limits, so the row was a duplicate.
