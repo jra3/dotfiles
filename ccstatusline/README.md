@@ -10,12 +10,14 @@ stow ccstatusline
 
 ## Layout
 
-Two rows (ccstatusline's middle row is intentionally empty):
+One row:
 
-| Row | Segments |
-|---|---|
-| top | context % remaining · **PR widget** · git worktree · git branch |
-| bottom | session usage · reset timer · ⟨flex⟩ · weekly usage · weekly reset timer |
+| Segments |
+|---|
+| context % remaining · **PR widget** · git worktree · git branch |
+
+Session and weekly usage used to sit on a second row. Dropped 2026-09-10: the
+Omarchy shell bar shows the same limits, so the row was a duplicate.
 
 `colorLevel: 3` (truecolor) — fine in kitty.
 
