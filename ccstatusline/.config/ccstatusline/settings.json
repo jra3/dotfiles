@@ -38,6 +38,15 @@
         "type": "git-branch",
         "color": "magenta",
         "rawValue": true
+      },
+      {
+        "id": "model-flex",
+        "type": "flex-separator"
+      },
+      {
+        "id": "model",
+        "type": "model",
+        "rawValue": true
       }
     ]
   ],
