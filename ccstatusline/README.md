@@ -14,7 +14,7 @@ One row:
 
 | Segments |
 |---|
-| context % remaining · **PR widget** · git worktree · git branch · ⟨flex⟩ · model |
+| context % remaining · **PR widget** · git worktree · git branch · model |
 
 Session and weekly usage used to sit on a second row. Dropped 2026-09-10: the
 Omarchy shell bar shows the same limits, so the row was a duplicate.

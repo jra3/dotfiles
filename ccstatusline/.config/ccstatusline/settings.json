@@ -40,8 +40,8 @@
         "rawValue": true
       },
       {
-        "id": "model-flex",
-        "type": "flex-separator"
+        "id": "model-sep",
+        "type": "separator"
       },
       {
         "id": "model",
