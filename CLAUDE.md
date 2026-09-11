@@ -210,6 +210,12 @@ This documents the default software stack configured in Omarchy:
   itself still detects the tether correctly — only the presentation layer is gone.
   See `tether/README.md`. The `.network` file and `usbmuxd` are handled by
   `pacman/configure-system` + `packages-arch.txt`
+- `zai/` - z.ai's GLM Coding Plan as a fourth tab in Omarchy's agents panel.
+  `omarchy-agent-usage-zai` prints the record contract the panel reads and a
+  systemd user timer writes it every 5 minutes — the packaged
+  `omarchy-agent-usage-update` only iterates collectors inside
+  `$OMARCHY_PATH/bin`, so a user collector can never join its loop. Reads the
+  same key as `claude-zai`. See `zai/README.md`
 
 **XDG compliance** - Configs use XDG Base Directory paths:
 - Config files go in `<package>/.config/<app>/`
