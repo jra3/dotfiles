@@ -202,7 +202,7 @@ This documents the default software stack configured in Omarchy:
 | Search | **ripgrep** | Fast recursive grep |
 | Worktrees | **Omarchy `ga`/`gd`** | Shell fns from `$OMARCHY_PATH/default/bash/fns/worktrees`, sourced in `.zshrc`. `ga <branch>` creates `../<repo>--<branch>` and cds in; `gd` removes the current one. Replaced `gtr` on 2026-08-24 |
 | Database | **SQLite** | Database with custom config |
-| Passwords | **Bitwarden** | Password manager with CLI (`bw`), via `bw-pick`. 1Password and KeePassXC are deliberately **not** installed (removed 2026-08-23) |
+| Passwords | **Bitwarden** | Password manager with CLI (`bw`/`rbw`). 1Password and KeePassXC are deliberately **not** installed (removed 2026-08-23) |
 | Dictation | **voxtype** | Push-to-talk voice-to-text; `large-v3-turbo` on Vulkan |
 | Packages | **pacman/yay** | Arch package manager (package lists tracked) |
 
@@ -288,13 +288,12 @@ This documents the default software stack configured in Omarchy:
   in the `.desktop`** — it is shared across machines with different monitors, and did
   get hand-tuned per machine three times before the script. `--print` shows the env a
   host would get. See `bambu-studio/README.md`
-- `bitwarden/` - Bitwarden CLI helpers. `get-signature` (extracts attachments) still
-  works. **`bw-pick` is broken by Omarchy 4** — it drives its two-step picker with
-  `walker`, which Quattro replaced with the Quickshell launcher, so every invocation
-  fails. Its `SUPER + SHIFT + SLASH` binding is commented out in `bindings.lua`
-  rather than deleted, so the key stays dead instead of reviving Omarchy's
-  1Password binding. To be replaced rather than ported; `rbw` itself is fine and
-  the pure helpers still have coverage in `tests/bw-pick.bats`
+- `bitwarden/` - Bitwarden CLI helper: `get-signature` extracts a signature
+  attachment from the vault to `/tmp`. `bw-pick` (walker-driven picker) was removed
+  2026-09-13 — broken by Omarchy 4, which replaced `walker` with the Quickshell
+  launcher. `rbw` itself is fine; the picker can be rewritten against it later. The
+  `SUPER + SHIFT + SLASH` **unbind** stays in `bindings.lua`: without it Omarchy's
+  own 1Password binding revives on the now-dead key
 - `ssh/` - Shared SSH config (`config.shared`, included last so host-local `~/.ssh/config` wins), the ssh-agent loader, and the committed **public** halves of the YubiKey resident auth keys in `.ssh/authorized_keys.d/` — one file per machine, assembled into a host-local `~/.ssh/authorized_keys` by `build-authorized-keys`. Private credentials never leave their YubiKey; see `yubikey-ssh.md`
 - `pacman/` - Arch package lists and `configure-system` for post-install setup (not stowed)
 - `brew/` - macOS `Brewfile`, `install-packages`, and `configure-system` (not stowed)
