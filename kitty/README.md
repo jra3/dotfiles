@@ -11,6 +11,7 @@ directory would put those writes straight into this repo.
 | File | Where | Why |
 |---|---|---|
 | `.config/kitty/shared.conf` | stowed | everything shared between hosts |
+| `.config/kitty/tab_colors.py` | stowed | per-tab colours by running command (see *Tab colours*) |
 | `.config/xdg-terminals.list` | stowed | tells `xdg-terminal-exec` (SUPER+ENTER, `omarchy launch terminal`) to use kitty. The terminal picker (`omarchy default terminal`) rewrites it with `cat >`, which writes *through* the symlink, so the repo copy changes and the switch shows up in `git status` |
 | `~/.config/kitty/kitty.conf` | host-local, **not** stowed | holds `font_size` and includes `shared.conf` |
 
@@ -95,6 +96,52 @@ for k, defs in km.items():
 
 Each unbound key should print as `['<action>', '']` — the trailing `''` is the one that
 wins.
+
+## Tab colours
+
+Two layers, because tabs are coloured from two places.
+
+**All tabs, statically**, in the Tabs block of `shared.conf`. kitty's inactive
+defaults are `#444` on `#999` — 3.4:1, under the 4.5:1 WCAG AA floor, and the
+reason an inactive title is hard to read. They are pinned to Tokyo Night's
+`selection_background` and `foreground` (6.4:1). These are literal values, so
+the theme include at the top of `shared.conf` no longer drives them and
+`omarchy theme set` leaves them behind — the same trade-off `font_family`
+already takes. Omarchy's `kitty.conf.tpl` writes exactly one tab key,
+`active_tab_background`, so nothing here fights it. A
+`~/.config/omarchy/themed/kitty.conf.tpl` would keep theme tracking, at the cost
+of living outside this repo.
+
+**One tab at a time**, from `tab_colors.py`, wired up by `watcher` in
+`shared.conf`. kitty fires `on_cmd_startstop` for every command when shell
+integration is on (`no-cursor` still counts — that value only declines the
+cursor-shape changes), so the watcher recolours a tab when herdr starts in it
+and reverts when herdr exits. No polling, no shell wrapper, and it does not care
+how herdr was invoked. Rules live in the `RULES` dict, keyed by command name.
+
+Colours are four `int|None` attributes on the Tab object — the same ones
+`kitten @ set-tab-color` assigns — so the watcher sets them directly instead of
+shelling out to the remote-control socket on every prompt.
+
+Two limits are worth knowing before debugging a rule that "doesn't work", both
+measured on 0.48.2:
+
+* **Watcher modules are cached per kitty process**, in `launch.py`'s
+  `watcher_modules` dict, keyed by resolved path. Editing `tab_colors.py` and
+  sending SIGUSR1 does *not* reload it; nor does opening a new tab. Only a new
+  kitty process picks up the edit.
+* **Watchers attach at window creation.** A config reload reaches only windows
+  made after it, and a tab that already had herdr running when kitty started
+  never saw a start event. Paint those by hand once:
+
+  ```bash
+  kitten @ set-tab-color --match id:<tab> \
+    active_fg=#1a1b26 active_bg=#f7768e inactive_fg=#f7768e inactive_bg=#3d2430
+  ```
+
+Both limits go away under `tab_bar_style custom`, where a draw-time `tab_bar.py`
+sees every tab on every frame. That is the next step if the rules grow past
+"colour it by what is running".
 
 ## Applying changes
 
