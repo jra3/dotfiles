@@ -171,6 +171,11 @@ fi
 # the browser literally and the extension silently fails to load. Expanding
 # $HOME at write time is the only form that survives, which also means the file
 # is per-machine and must not be stowed.
+#
+# Our own unpacked extensions (the stowed helium/ package) are APPENDED to the
+# regenerated line rather than kept in a hand-maintained copy of the whole file.
+# That way an Omarchy update adding a bundled extension is picked up for free
+# instead of silently drifting, and our additions survive the regeneration.
 if command -v helium-browser &>/dev/null; then
     echo "Configuring Helium as default browser..."
     # Fall back to the real install path, NOT ~/.local/share/omarchy: that was a
@@ -183,6 +188,25 @@ if command -v helium-browser &>/dev/null; then
     if [ -f "$omarchy_cfg" ]; then
         install -d "$HOME/.config"
         sed "s|~/|$HOME/|g" "$omarchy_cfg" > "$flags_file"
+
+        # Chromium keeps only the LAST occurrence of a repeated switch, so every
+        # extension has to end up on one joined --load-extension list.
+        ours=""
+        for ext in youtube-no-shorts; do
+            ext_dir="$HOME/.local/share/chromium-extensions/$ext"
+            if [ -d "$ext_dir" ]; then
+                ours="${ours:+$ours,}$ext_dir"
+            else
+                echo "  $ext not stowed; run 'stow helium' and re-run."
+            fi
+        done
+        if [ -n "$ours" ]; then
+            if grep -q '^--load-extension=' "$flags_file"; then
+                sed -i "s|^--load-extension=\(.*\)$|--load-extension=\1,$ours|" "$flags_file"
+            else
+                printf '%s\n' "--load-extension=$ours" >> "$flags_file"
+            fi
+        fi
         echo "  Wrote $flags_file (tilde paths expanded)."
     else
         echo "  Omarchy chromium-flags.conf not found; skipping flags file."
@@ -201,6 +225,71 @@ if command -v helium-browser &>/dev/null; then
     echo "  Helium set as default browser for http/https/html."
 else
     echo "  Helium not installed, skipping browser setup."
+fi
+
+# --- Helium: force-install extensions by policy ---
+# Chromium-family policy lives in /etc/chromium/policies/managed/*.json and Helium
+# reads exactly that path -- it is the only policy directory in the binary, and it
+# opens every .json there at startup. Omarchy creates the directory
+# (install/config/theme-system.sh) and chmods it a+rw so `omarchy theme set` can
+# drop color.json in -- but that a+rw does NOT always survive. On 2026-09-14 it
+# was found root:root 755 with no extensions.json at all and floccus
+# correspondingly not installed, so the sudo fallback below is the branch that
+# actually runs. Re-run this script if an extension goes missing.
+#
+# The `?prodversion=` on the update URL is load-bearing. Helium is
+# ungoogled-chromium-based and strips prodversion from Chrome Web Store update
+# requests; the store answers `<updatecheck status="noupdate"/>` to any request
+# that omits it, so a plain forcelist entry silently fails for EVERY extension --
+# the only trace is `failed to install ... no_update_info: 1` under
+# --vmodule='*extension*=2'. Chromium appends its own query params to whatever
+# update URL it is handed, so carrying prodversion in the URL puts it back on the
+# wire. It only has to be >= the extension's minimum_chrome_version, so a stale
+# pin keeps working; re-run this script after a Helium upgrade to refresh it.
+#
+# Policy installs the extension and nothing else. Per-extension *settings* are
+# still per-machine setup: floccus's sync account, F.B. Purity's options panel.
+if command -v helium-browser &>/dev/null; then
+    echo "Configuring Helium extension policy..."
+    policy_dir="/etc/chromium/policies/managed"
+    # "Helium 0.16.6.1 (Chromium 152.0.7977.82)" -- take the Chromium half.
+    helium_ver="$(helium-browser --version 2>/dev/null |
+        sed -n 's/.*Chromium \([0-9][0-9.]*\).*/\1/p')"
+    : "${helium_ver:=152.0.7977.82}"
+
+    # id|description. An indexed array, not associative: order is preserved so
+    # the generated JSON does not churn between runs.
+    helium_extensions=(
+        "fnaicdffflnofjppbagibeoednhnbjhg|floccus -- bookmark sync"
+        "nmkinhboiljjkhaknpaeaicmdjhagpep|Fluff Busting Purity -- Facebook feed cleanup"
+    )
+
+    if [ ! -d "$policy_dir" ]; then
+        sudo mkdir -p "$policy_dir"
+        sudo chmod a+rw "$policy_dir"   # match theme-system.sh, which writes color.json unprivileged
+    fi
+
+    update_url="https://clients2.google.com/service/update2/crx?prodversion=$helium_ver"
+    entries=()
+    for ext in "${helium_extensions[@]}"; do
+        entries+=("    \"${ext%%|*};$update_url\"")
+    done
+    # $( ) already strips the trailing newline, so the leftover suffix is a bare
+    # comma -- stripping ",\n" here would silently leave invalid JSON.
+    forcelist="$(printf '%s,\n' "${entries[@]}")"
+    forcelist="${forcelist%,}"
+    policy_json="$(printf '{\n  "ExtensionInstallForcelist": [\n%s\n  ]\n}' "$forcelist")"
+
+    if [ -w "$policy_dir" ]; then
+        printf '%s\n' "$policy_json" > "$policy_dir/extensions.json"
+    else
+        printf '%s\n' "$policy_json" | sudo tee "$policy_dir/extensions.json" >/dev/null
+    fi
+    for ext in "${helium_extensions[@]}"; do
+        echo "  force-installed: ${ext#*|}"
+    done
+    echo "  Written to $policy_dir/extensions.json (prodversion=$helium_ver)."
+    echo "  Restart Helium to pick it up; verify at chrome://policy."
 fi
 
 # --- Emacs: retire the daemon ---
@@ -311,6 +400,17 @@ if command -v gh >/dev/null 2>&1; then
     fi
 else
     echo "  gh not installed; skipping."
+fi
+
+# --- Inbox folder ---
+# ~/jra3/inbox exists on every machine. The sidebar bookmark that points at it is
+# stowed (gtk package); its icon is gvfs metadata, which is per-machine and binary,
+# so it has to be applied here. See gtk/README.md.
+echo "Configuring inbox folder..."
+if command -v setup-inbox >/dev/null 2>&1; then
+    setup-inbox
+else
+    echo "  setup-inbox not on PATH (stow the gtk package); skipping."
 fi
 
 echo "Done!"

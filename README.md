@@ -38,7 +38,7 @@ stow */
 Or deploy individual packages:
 
 ```bash
-stow zsh git ghostty
+stow zsh git kitty
 ```
 
 > **If you ever add a package that ships a systemd drop-in, stow it with
@@ -50,10 +50,13 @@ stow zsh git ghostty
 
 | Package | Description |
 |---------|-------------|
+| `codex` | Codex CLI skills. Symlinks into the `claude` package so there is one copy per skill. Stow it `--no-folding` |
 | `gh` | GitHub CLI configuration and custom commands |
-| `ghostty` | Ghostty terminal emulator configuration |
+| `ghostty` | Ghostty terminal emulator configuration (kept, no longer the default) |
 | `git` | Git configuration and global ignore patterns |
+| `helium` | The `youtube-no-shorts` unpacked Chromium extension. Stow it **folded** (plain `stow helium`), then run `pacman/configure-system` — see `helium/README.md` |
 | `hypr` | Hyprland compositor (keybindings, monitors, autostart, appearance) |
+| `kitty` | Kitty terminal emulator configuration, the default terminal. Stow it `--no-folding` |
 | `pacman` | Arch Linux package lists, install script, and system configuration |
 | `ripgrep` | ripgrep configuration |
 | `sqlite` | SQLite configuration |

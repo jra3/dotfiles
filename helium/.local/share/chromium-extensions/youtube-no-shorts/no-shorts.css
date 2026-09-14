@@ -1,0 +1,48 @@
+/*
+ * Structural Shorts surfaces, hidden before first paint.
+ *
+ * These are the elements YouTube names after Shorts, so they can be matched by
+ * tag or attribute and never need a script. Anything findable only by label --
+ * the sidebar entry and the filter chips, which carry no /shorts/ href at all --
+ * is handled in no-shorts.js.
+ *
+ * Shelves are hidden as the shelf element, not as the section around it. On the
+ * search page a single ytd-item-section-renderer holds the Shorts shelves and
+ * every real result as siblings, so collapsing the section would blank the whole
+ * page. Sections are only touched where the shelf is provably their only child.
+ */
+
+/* Home and Subscriptions: the whole "Shorts" row, so the grid closes up instead
+   of leaving a titled empty band. Rich sections wrap one shelf by construction. */
+ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
+ytd-rich-section-renderer:has(grid-shelf-view-model),
+ytd-rich-shelf-renderer[is-shorts],
+
+/* Search and channel pages: the shelf itself, inline among real results. */
+grid-shelf-view-model,
+
+/* Older horizontal reel, still used on watch pages. */
+ytd-reel-shelf-renderer,
+ytd-item-section-renderer:has(> #contents > ytd-reel-shelf-renderer:only-child),
+ytd-reel-item-renderer,
+
+/* Individual Shorts lockups wherever they are inlined among normal videos.
+   The -v2 element is the outer one; both are hidden so either nesting works. */
+ytm-shorts-lockup-view-model,
+ytm-shorts-lockup-view-model-v2,
+ytd-rich-item-renderer:has(ytm-shorts-lockup-view-model),
+ytd-rich-item-renderer:has(ytm-shorts-lockup-view-model-v2),
+
+/* Any renderer whose thumbnail points at a Short. Scoped to the lockup element
+   names so a /shorts/ link in a description or comment can't blank a section. */
+ytd-video-renderer:has(a[href^="/shorts/"]),
+ytd-compact-video-renderer:has(a[href^="/shorts/"]),
+ytd-grid-video-renderer:has(a[href^="/shorts/"]),
+ytd-playlist-video-renderer:has(a[href^="/shorts/"]),
+yt-lockup-view-model:has(a[href^="/shorts/"]),
+
+/* Channel page tab strip. */
+yt-tab-shape[tab-title="Shorts"],
+tp-yt-paper-tab:has(a[href$="/shorts"]) {
+  display: none !important;
+}

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube: No Shorts",
+  "version": "1.0",
+  "description": "Removes Shorts from YouTube. Shelves, sidebar entry, channel tab, filter chips and search hits are hidden; /shorts/<id> redirects to the normal watch page.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2buCiRH01OE3G4yuUKbTBVujfudaeonYNzqXF5J9B+V9X7Y17jU3xs/bbObMShFQqs/Ab/o9AUa9OALoypXZf3E+KxAPsjtPYBM1bizFQzui1o1Yxh4qOhkdavTolxRS0svuqlq0dE3Sv/anXFV312CK4RAjbjdqyW1kBYLWv0Fx/7CAlbrZP4QbxDYDbWrHl6Gp/yLIdAciJBpgGONn0dZXt/qFs+DyQN9FnzlUH7COmLbeuhjx/zZPFN3WBUqeJ0o/vVsf4yZtqelBfBgmAFjLSJlw4F6aiIM09pKwXxcJPy07lPJXkvSo2yp93CMfDqIbH1F3hpgUI9LhNe+RKQIDAQAB",
+  "permissions": ["declarativeNetRequest"],
+  "host_permissions": ["*://*.youtube.com/*"],
+  "declarative_net_request": {
+    "rule_resources": [
+      { "id": "shorts-redirects", "enabled": true, "path": "rules.json" }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"],
+      "css": ["no-shorts.css"],
+      "js": ["no-shorts.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

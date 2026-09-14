@@ -54,6 +54,7 @@ stow and the repo stops being the source of truth. Seen during the Quattro upgra
 | `~/.config/tmux/tmux.conf` | upgrade migration |
 | `~/.config/xdg-terminals.list` | terminal picker |
 | `~/.config/ghostty/config` | `omarchy display text size` (resolved 2026-08-25: file is host-local now, shared bits moved to `shared.conf` — see the `ghostty/` entry) |
+| `~/.config/kitty/kitty.conf` | `omarchy display text size` and `omarchy font set` (host-local from the start, 2026-09-08: same split as ghostty — see the `kitty/` entry) |
 
 After changing anything through an Omarchy menu, check the file with `ls -l` and
 `stow -R <package>` if it became a regular file.
@@ -79,6 +80,46 @@ can re-run this, so re-check `~/.emacs.d` after one.
 
 The cost of declining is only Omarchy's theme/font syncing. To have both, load
 `/usr/share/omarchy-emacs/config/omarchy.el` from the personal config instead.
+
+## Helium extensions are force-installed by policy
+
+Helium reads Chromium's policy directory, `/etc/chromium/policies/managed/*.json`
+— the only policy path in the binary, and it opens every file there at startup.
+Omarchy creates that directory in `install/config/theme-system.sh` and `chmod
+a+rw`s it so `omarchy theme set` can write `color.json` unprivileged.
+`configure-system` adds `extensions.json`, force-installing these into every
+Helium profile on the machine:
+
+| Extension | ID |
+|---|---|
+| floccus — bookmark sync | `fnaicdffflnofjppbagibeoednhnbjhg` |
+| Fluff Busting Purity — Facebook feed cleanup | `nmkinhboiljjkhaknpaeaicmdjhagpep` |
+
+**That `a+rw` does not always survive.** On 2026-09-14 the directory was found
+`root:root 755` holding only `color.json`, with no `extensions.json` at all and
+floccus reduced to an empty husk (`{}`) in the profile — i.e. silently not
+installed for some time. `configure-system` falls back to `sudo tee` when the
+directory isn't writable, so it recovers, but nothing warns you that it regressed.
+If an extension goes missing, check this directory first.
+
+**The `?prodversion=` on the update URL is load-bearing.** Helium is
+ungoogled-chromium-based and strips `prodversion` from Chrome Web Store update
+requests; the store answers `<updatecheck status="noupdate"/>` to any request
+that omits it. So a plain `<id>;https://clients2.google.com/service/update2/crx`
+forcelist entry fails for *every* extension, and fails silently — nothing appears
+in the UI, and the only trace is `failed to install … no_update_info: 1` under
+`--vmodule='*extension*=2'`. Chromium appends its own query params to whatever
+update URL it is handed, so carrying `prodversion` in the URL puts it back on the
+wire. Verified 2026-08-31 (floccus 5.10.3) and again 2026-09-14 at
+`prodversion=152.0.7977.82`: floccus 5.10.3 and F.B. Purity 38.4.0.0 both install
+into a fresh profile, `location 7`, no disable reasons.
+
+The pinned version only has to be >= the extension's `minimum_chrome_version`, so
+a stale pin keeps working; re-run `configure-system` after a Helium upgrade to
+refresh it. Note that policy installs the extension but **not its settings** —
+floccus's sync account and F.B. Purity's options panel both stay per-machine
+setup. Adding another extension means adding one `id|description` line to the
+`helium_extensions` array in `configure-system`.
 
 ## Common Commands
 
@@ -111,6 +152,9 @@ directory doesn't already exist, so it bites on a fresh machine. No package
 currently ships a drop-in; the `emacs` one did until 2026-08-24. Any future one
 needs `--no-folding`.
 
+The reverse also bites: `helium/` **must** be folded, because Chromium will not
+load extension resources that resolve outside the extension root. See its README.
+
 **Drop-ins are not the only victim.** Folding also means any tool that writes into
 that directory writes *into the repo*, with nothing in `ls -l` to reveal it — the
 file is genuinely a regular file, because the symlink is one level up. On 2026-08-25
@@ -128,11 +172,12 @@ This documents the default software stack configured in Omarchy:
 |----------|----------|-------------|
 | Shell | **zsh** | Default shell with XDG-compliant config |
 | Prompt | **Starship** | Cross-shell prompt with git integration |
-| Terminal | **Ghostty** | GPU-accelerated terminal (CaskaydiaMono Nerd Font). Omarchy 4 defaults to foot; `ghostty/.config/xdg-terminals.list` is what keeps `SUPER+ENTER` on Ghostty |
+| Terminal | **Kitty** | GPU-accelerated terminal (CaskaydiaMono Nerd Font). Default since 2026-09-08, when ghostty 1.3.1-2 kept segfaulting on herdr attach (fixed upstream Aug 2026, not yet packaged). Omarchy 4 defaults to foot; `kitty/.config/xdg-terminals.list` is what keeps `SUPER+ENTER` on Kitty. The `ghostty/` package is **no longer stowed** (2026-09-08) |
 | Multiplexer | **tmux** | Terminal multiplexer. Config only — worktrees are Omarchy's `ga`/`gd`, workspaces are `herdr` |
 | Compositor | **Hyprland** | Wayland tiling compositor, configured in **Lua** |
 | Desktop shell | **Omarchy shell** | One Quickshell process: bar, notifications, launcher, OSD, lock, idle. Replaced waybar, mako, walker, swayosd, hyprlock, hypridle |
-| Browser | **Helium** | Web browser |
+| Browser | **Helium** | Web browser. Its flags file and the `youtube-no-shorts` extension are the `helium/` package |
+| Files | **Nautilus** | GNOME Files, the `inode/directory` default. Sidebar shortcuts are `gtk/.config/gtk-3.0/bookmarks` |
 | Editor | **Emacs** | Text editor. No daemon: `emacs` is aliased to `emacs -nw` in the shell, `SUPER+SHIFT+E` opens a GUI frame |
 | AI | **Claude Code** | AI-powered coding assistant |
 | VCS | **Git** | Version control with custom aliases |
@@ -149,9 +194,21 @@ This documents the default software stack configured in Omarchy:
 **Stow packages** - Each directory is independent and can be deployed separately:
 - `zsh/` - Shell configuration (XDG-compliant)
 - `git/` - Git config, global ignore patterns, SSH commit signing (`allowed_signers` + `setup-git-signing`)
-- `ghostty/` - Ghostty terminal emulator, plus `xdg-terminals.list` — the file
-  `xdg-terminal-exec` reads to pick Ghostty over Omarchy 4's foot default.
-  The stowed file is `shared.conf`, not `config`: **`~/.config/ghostty/config` is
+- `gtk/` - GTK bookmarks (the Nautilus sidebar, and every GTK file chooser),
+  plus `setup-inbox` — which creates `~/jra3/inbox` and sets its icon. Stow it
+  `--no-folding`: GTK writes into `~/.config/gtk-3.0/`. The bookmark is
+  declarative but its **sidebar** icon is not settable at all, and the file-view
+  icon is gvfs metadata rather than a file, so it is applied per machine by
+  `configure-system`. See `gtk/README.md`
+- `ghostty/` - Ghostty terminal emulator, no longer the default and **no longer
+  stowed**: `xdg-terminals.list` moved to `kitty/` on 2026-09-08 (see the `kitty/`
+  entry) and the package was unstowed the same day. The binary is still installed and
+  still opens by hand — the host-local `~/.config/ghostty/config` survives an unstow,
+  and its include is written `config-file = ?"…/shared.conf"`, where the leading `?`
+  means optional, so the now-dangling include is not an error (`ghostty +show-config`
+  exits 0). What it loses is everything in `shared.conf`: font family, padding, the
+  Omarchy theme include and the keybindings. `stow ghostty` brings them back.
+  The package's one file is `shared.conf`, not `config`: **`~/.config/ghostty/config` is
   deliberately host-local** — it holds only `font-size` (a per-display answer) and a
   `config-file` include of `shared.conf`. `omarchy display text size` persists by
   `sed -i` on that exact path (it reset a stowed 12 to its 9pt anchor during the
@@ -160,6 +217,32 @@ This documents the default software stack configured in Omarchy:
   including file, so never add `font-size` to `shared.conf` — it would override
   every host. Side effect: `omarchy font set` seds `font-family` in `config` only,
   so it no longer reaches Ghostty; the family is pinned in `shared.conf` instead
+- `kitty/` - Kitty terminal emulator, the default since 2026-09-08, plus
+  `xdg-terminals.list` — the file `xdg-terminal-exec` reads to pick Kitty over
+  Omarchy 4's foot default. Same split as `ghostty/`: the stowed file is
+  `shared.conf`, and **`~/.config/kitty/kitty.conf` is deliberately host-local** —
+  it holds only `font_size` and an `include` of `shared.conf`, because
+  `omarchy display text size` and `omarchy font set` both `sed -i` that exact path.
+  Kitty applies later lines over earlier ones, so the include goes last and
+  `shared.conf` wins. **Stow it `--no-folding`** for the same reason as `gtk/`.
+  `omarchy default terminal` writes `xdg-terminals.list` with `cat >`, which goes
+  *through* the symlink, so a picker change lands in the repo as a diff rather
+  than un-stowing the file. Inside kitty `.zshrc` aliases `ssh` to `kitten ssh`
+  so remote hosts get the `xterm-kitty` terminfo. See `kitty/README.md`
+- `helium/` - One unpacked Chromium extension, `youtube-no-shorts`, which removes
+  Shorts from YouTube and redirects `/shorts/` to the normal watch page.
+  **`~/.config/helium-browser-flags.conf` is deliberately not here** — it is
+  generated per-machine by `configure-system` from Omarchy's
+  `chromium-flags.conf` with `~/` expanded to `$HOME` (the wrapper escapes `$VAR`
+  and `~` before eval, so a tilde path silently fails to load), and that stanza
+  appends this package's extension dirs to Omarchy's `--load-extension` line — so
+  a new Omarchy bundled extension is picked up automatically, with no copy to
+  drift. Chromium keeps only the last occurrence of a repeated switch, so the
+  list cannot be split. Stow this one **folded** — the sole exception to the
+  `--no-folding` rule below. Chromium canonicalises extension resources and
+  refuses any that resolve outside the extension root, so unfolded the file
+  symlinks mean the content scripts are never injected while the manifest and DNR
+  rules still load — it looks healthy and blocks nothing. See `helium/README.md`
 - `hypr/` - Hyprland compositor. `.lua` since Quattro (`hyprland`, `input`,
   `bindings`, `looknfeel`, `autostart`), plus the two `.conf` files read by *other*
   processes and so untouched by `hyprctl`: `hyprsunset.conf` (apply with
@@ -180,8 +263,23 @@ This documents the default software stack configured in Omarchy:
 - `lazygit/` - lazygit TUI config with `gh stack` stacked-diff custom commands
   (needs the `github/gh-stack` gh extension; `gh extension install github/gh-stack`)
 - `claude/` - Claude Code settings and custom commands
+- `codex/` - Codex CLI skills. The skill files themselves live in `claude/`, and
+  `codex/.codex/skills/<name>` is a repo-internal symlink to them, so a skill has
+  one copy and editing it updates both agents. **Stow it `--no-folding`.**
+  `~/.codex` holds live state (`auth.json`, the session and history sqlite dbs), so
+  on a fresh machine where the directory does not exist yet, folding would replace
+  the whole of `~/.codex` with a symlink into this repo and Codex would write its
+  state into your dotfiles. Currently ships `unslop`. Codex reads skills from both
+  `~/.codex/skills` and the cross-agent `~/.agents/skills`; confirm what it actually
+  loaded with `codex debug prompt-input | grep -o '[^"]*<skill-name>[^"]*'`
 - `ccstatusline/` - Claude Code status line: the `ccstatusline` layout plus the `cc-pr-widget` PR/CI segment it shells out to; see `ccstatusline/README.md`
 - `slack/` - `slack://` deep-link handler that opens links in the browser (no desktop Slack app); see `slack/README.md`
+- `bambu-studio/` - BambuStudio launcher. `bambu-studio-launch` picks `GDK_SCALE` /
+  `GDK_DPI_SCALE` from the focused monitor's scale at launch time, because BambuStudio
+  forces X11 and Omarchy's XWayland draws at physical pixels. **Never hardcode a scale
+  in the `.desktop`** — it is shared across machines with different monitors, and did
+  get hand-tuned per machine three times before the script. `--print` shows the env a
+  host would get. See `bambu-studio/README.md`
 - `bitwarden/` - Bitwarden CLI helpers. `get-signature` (extracts attachments) still
   works. **`bw-pick` is broken by Omarchy 4** — it drives its two-step picker with
   `walker`, which Quattro replaced with the Quickshell launcher, so every invocation
