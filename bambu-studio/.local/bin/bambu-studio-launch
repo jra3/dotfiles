@@ -1,0 +1,48 @@
+#!/bin/bash
+# bambu-studio-launch — start BambuStudio with GTK scaling matched to the
+# focused Hyprland monitor. The reasoning is in bambu-studio/README.md.
+#
+#   bambu-studio-launch [bambu-studio args...]
+#   bambu-studio-launch --print      # show the env this host would get; don't launch
+
+BAMBU_STUDIO=/usr/bin/bambu-studio
+
+# Scale of the focused Hyprland monitor (the first one if none is focused).
+# 1 when not under Hyprland or when hyprctl/jq are missing.
+_monitor_scale() {
+  local scale
+  scale=$(hyprctl monitors -j 2>/dev/null \
+    | jq -r '([.[] | select(.focused)] + .)[0].scale // 1' 2>/dev/null)
+  echo "${scale:-1}"
+}
+
+# $1 = monitor scale. Prints "<GDK_SCALE> <GDK_DPI_SCALE>".
+#
+# GDK_SCALE is integer-only and sizes the whole layout, so it is the monitor
+# scale rounded to the nearest whole number — Omarchy's own convention for the
+# session-wide value. GDK_DPI_SCALE is fractional but moves fonts alone, and
+# fonts wider than the layout planned for get ellipsised, so it only ever
+# shrinks fonts back down to the monitor's real scale, never past the layout.
+_gdk_scales() {
+  awk -v s="$1" 'BEGIN {
+    s += 0;           if (s <= 0) s = 1
+    g = int(s + 0.5); if (g < 1) g = 1
+    d = s / g;        if (d > 1) d = 1
+    printf "%d %.4g\n", g, d
+  }'
+}
+
+main() {
+  local gdk_scale gdk_dpi_scale
+  read -r gdk_scale gdk_dpi_scale < <(_gdk_scales "$(_monitor_scale)")
+  if [[ "${1:-}" == "--print" ]]; then
+    printf 'GDK_SCALE=%s GDK_DPI_SCALE=%s\n' "$gdk_scale" "$gdk_dpi_scale"
+    return 0
+  fi
+  exec env GDK_SCALE="$gdk_scale" GDK_DPI_SCALE="$gdk_dpi_scale" "$BAMBU_STUDIO" "$@"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  set -euo pipefail
+  main "$@"
+fi

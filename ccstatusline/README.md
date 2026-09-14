@@ -17,7 +17,7 @@ Two rows (ccstatusline's middle row is intentionally empty):
 | top | context % remaining · **PR widget** · git worktree · git branch |
 | bottom | session usage · reset timer · ⟨flex⟩ · weekly usage · weekly reset timer |
 
-`colorLevel: 3` (truecolor) — fine in Ghostty.
+`colorLevel: 3` (truecolor) — fine in Kitty and Ghostty.
 
 ## The PR widget
 

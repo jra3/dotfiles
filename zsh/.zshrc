@@ -244,6 +244,16 @@ alias ag='rg'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias watch='watch --color'
+# Inside kitty, route interactive ssh through the ssh kitten: it copies the
+# xterm-kitty terminfo into ~/.terminfo on the remote on first connect (no root
+# needed), so hosts without kitty-terminfo (paperweight, 2026-09-08) get working
+# keys and colours. A function rather than an alias so the _ssh host completion
+# above still applies. Guarded on TERM, so tmux/herdr panes (tmux-256color) and
+# other terminals keep plain ssh, and on interactive, so scripts and Claude
+# Code's Bash tool never go through the kitten.
+if [[ -o interactive && $TERM == xterm-kitty ]] && command -v kitten &>/dev/null; then
+    ssh() { kitten ssh "$@"; }
+fi
 # ----------------------------------------------------------------------------
 # claude-zai -- Claude Code against z.ai's Anthropic-compatible endpoint
 # ----------------------------------------------------------------------------
