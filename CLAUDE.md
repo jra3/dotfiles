@@ -305,6 +305,7 @@ This documents the default software stack configured in Omarchy:
   rather than deleted, so the key stays dead instead of reviving Omarchy's
   1Password binding. To be replaced rather than ported; `rbw` itself is fine and
   the pure helpers still have coverage in `tests/bw-pick.bats`
+- `ssh/` - Shared SSH config (`config.shared`, included last so host-local `~/.ssh/config` wins), the ssh-agent loader, and the committed **public** halves of the YubiKey resident auth keys in `.ssh/authorized_keys.d/` — one file per machine, assembled into a host-local `~/.ssh/authorized_keys` by `build-authorized-keys`. Private credentials never leave their YubiKey; see `yubikey-ssh.md`
 - `pacman/` - Arch package lists and `configure-system` for post-install setup (not stowed)
 - `brew/` - macOS `Brewfile`, `install-packages`, and `configure-system` (not stowed)
 - `macos/` - macOS system preferences (`macos-defaults`); macOS-only stow package

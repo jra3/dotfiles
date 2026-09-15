@@ -34,6 +34,11 @@ path is simply never used.
 
 ## Machine registry
 
+> **am-jallen was renamed to paperweight** (noted 2026-09-15). Its old YubiKey,
+> serial `16946249`, now lives with **minimini**; the `ssh:gitsign` fingerprint
+> confirms the same physical token. `ssh/.ssh/config.shared` still carries a
+> stale `Host am-jallen ...` block that no longer matches anything.
+
 Mirrors `git/.config/git/allowed_signers`. Signing fingerprints are authoritative
 (verified from `allowed_signers`); auth-key attribution is flagged where it is
 inferred rather than confirmed.
@@ -42,13 +47,56 @@ inferred rather than confirmed.
 |---|---|---|---|
 | **chonky** | 5 Nano, `37196467` | `ssh:chonky-notouch` *(tailnet)* and `ssh:chonky-nopin` *(GitHub)*, plus `ssh:chonky` and `ssh:chonky-touch-no-pinnano` | `SHA256:bIzPlE8zNZrvpm8ZscwtSG9fB6lc36fq0fjQr+I/++A` |
 | **cupcake** | 5 Nano, `37196474` | `ssh:github-cupcake` | `SHA256:Gy580sDeIFooogvoROCcfxfkYWEsgQqYPRQ0p9iyFiI` |
-| **paperweight** | 5C Nano, `16946249` | `ssh:github` *(inferred by elimination — confirm with `ssh-keygen -K` on that machine)* | `SHA256:C+wONGjhNv/j57dyLl7xR8zoabSEd4ljSWz8GfkgBk0` |
+| **minimini** *(was listed as am-jallen)* | 5C Nano, `16946249` | `ssh:github` **confirmed** via `ssh-keygen -K` 2026-09-15, plus `ssh:minimini-notouch` | `SHA256:C+wONGjhNv/j57dyLl7xR8zoabSEd4ljSWz8GfkgBk0` |
 
 Naming is **not** consistent across machines: chonky uses `ssh:<hostname>*`,
 cupcake uses `ssh:github-<hostname>`, and the oldest uses a bare `ssh:github`.
 Only the *file path* matters at runtime, so this is cosmetic — but it does mean
 you cannot infer the owning machine from the application string alone. New
 machines should use `ssh:<hostname>`.
+
+### Committed public keys (added 2026-09-15)
+
+The **public** halves of the resident auth credentials now live in the repo at
+`ssh/.ssh/authorized_keys.d/<machine>.pub` — one file per machine, stored in
+`authorized_keys` format so per-key options (`no-touch-required`) travel with the
+key rather than being re-typed on each host. `build-authorized-keys` (in
+`ssh/.local/bin/`, on `$PATH`) concatenates them into a host-local, generated
+`~/.ssh/authorized_keys`; that file is not stowed, so a host can still be given a
+different subset by dropping files from the `.d` directory.
+
+This mirrors what `allowed_signers` already does for the *signing* keys, and it
+closes the gap that made it necessary: the auth public keys previously existed
+only inside each host's hand-edited `authorized_keys`, so authorizing a new host
+required an already-authorized machine to be online. Nothing about the model
+changes — only public halves are committed, and every private credential stays
+resident on its YubiKey.
+
+| Machine | Auth application | Fingerprint |
+|---|---|---|
+| **chonky** | `ssh:chonky-notouch` *(`no-touch-required`)* | `SHA256:zy0eUb9VRPH74MsNoCaB0I4E2EMjyRp28MAyMEZHdVY` |
+| **chonky** | `ssh:chonky-nopin` | `SHA256:3Q8mK23dJT7FWacG05j/RKH7F4Qwr5Nt3wuGvJGrWcw` |
+| **chonky** | `ssh:chonky` | `SHA256:n9ZIYJoFAONwx8UmJFTTcmtNY+9Xob9u4/Sw8iuLcz4` |
+| **chonky** | `ssh:chonky-touch-no-pinnano` | `SHA256:z4nlCjDkxVXbwblAP5HBFbJClvoBgNj37tQo3jmlTgU` |
+| **minimini** | `ssh:minimini-notouch` *(`no-touch-required`, `0x20`)* | `SHA256:oiivr5uBvY6kyqWfp3vc0guSybnb7bsJ/k/7q2ggvuI` |
+| **minimini** | `ssh:github` *(`0x21`, touch fallback)* | `SHA256:AoSI2X/lBgMOi35wsvyO5WSS0pkIVfLOZtWXzp5einc` |
+| **cupcake** | `ssh:github-cupcake` | **missing** — see below |
+
+Attribution is decoded from each key's embedded application string rather than
+its free-text comment, which settles the "inferred by elimination" caveat on
+am-jallen's row above: `ssh:github` is confirmed.
+
+Two known gaps:
+
+- **cupcake's auth key is not committed.** It was not present in MiniMini's
+  `authorized_keys` and cupcake was offline when this was assembled. Capture it
+  on cupcake (`cat ~/.ssh/id_ed25519_sk.pub`) into
+  `ssh/.ssh/authorized_keys.d/cupcake.pub`.
+- **paperweight does not authorize any key MiniMini holds.** Measured 2026-09-15:
+  all four identities were offered and none drew a `Server accepts key`. Per the
+  touchless-auth section below, paperweight's `authorized_keys` carries chonky's
+  keys — so chonky, or console access, is the way in. Once there, adding
+  `minimini.pub` fixes it permanently.
 
 ### chonky's four auth keys (flags re-measured 2026-08-02)
 
@@ -194,6 +242,24 @@ The rebuild path, in the order that actually works.
 
 ## Gotchas
 
+- **macOS: Apple's OpenSSH cannot do FIDO at all.** `/usr/bin/ssh-keygen`
+  advertises the `sk-*` key types and ships `/usr/libexec/ssh-sk-helper`, but has
+  no FIDO middleware compiled in, so every sk operation dies with
+  `No FIDO SecurityKeyProvider specified` / `Key enrollment failed: invalid
+  format`. It needs an external `SecurityKeyProvider` library that Apple does not
+  ship and `libfido2` alone does not supply — the shim is built by OpenSSH.
+  Fix is `brew install openssh` (10.5p1, built with the `internal` provider;
+  pulls in `libfido2`, which its `ssh-sk-helper` links). Because
+  `/opt/homebrew/bin` precedes `/usr/bin`, this also makes `ssh`, `ssh-add`, and
+  `scp` resolve to the Homebrew build for every new shell — required, since
+  Apple's binaries cannot *use* these keys either, not just create them. Existing
+  shells need `rehash`. Validated on MiniMini 2026-09-15.
+- **Minting a no-touch key and then running `-K` undoes it.** A `-K` sweep
+  re-downloads *every* resident credential, including one just created, so the
+  fresh `0x20` stub is overwritten with `0x21`. Seen on MiniMini 2026-09-15:
+  `ssh:minimini-notouch` came back touch-required moments after being minted
+  `no-touch-required`. Patch the flags byte back to `0x20` rather than
+  re-enrolling — the credential on the token was never wrong.
 - **`ssh-keygen -K` does not preserve `no-touch-required`.** Downloaded stubs come
   back with the user-presence bit set (`flags=0x21`) regardless of how the
   credential was originally created. OpenSSH then asks the authenticator for
