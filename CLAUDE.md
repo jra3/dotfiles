@@ -378,13 +378,14 @@ commit with `git -c commit.gpgsign=false commit`.
 
 It was off from 2026-08-02 (`aaf5553`) to 2026-08-21, because an `sk-` (FIDO2)
 key that wants a touch fails in any non-interactive context. **Whether it wants
-one is per-machine, and the two machines measured disagree:**
+one is per-machine, and the four machines measured disagree:**
 
 | Machine | gitsign flags | Signs unattended? | Measured |
 |---|---|---|---|
 | chonky | `0x21` | no, prompts `Confirm user presence` | 2026-07-28, `yubikey-ssh.md` |
 | paperweight | `0x20` | yes, `git commit -S` with stdin closed exits 0 and verifies `G` | 2026-08-21, GTD-38 |
 | cupcake | `0x20` | yes, same test | 2026-08-25, after a `-K` recovery + patch |
+| minimini | `0x21` | **no**, prompts | 2026-09-15 |
 
 `setup-git-signing` asks for no-touch/no-PIN, and paperweight's key kept it.
 chonky's did not, because a `-K` recovery hands back a `0x21` stub and silently

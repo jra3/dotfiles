@@ -160,9 +160,43 @@ Host minimini minimini.corgi-hammerhead.ts.net
     IdentitiesOnly yes
 ```
 
+minimini's side is the mirror image, in its own host-local `~/.ssh/config`:
+`ssh:minimini-notouch` first (its stub is `0x20`, re-checked 2026-09-15 — the
+`-K` regression noted below had already been patched back), `ssh:github` second
+as the touch fallback, `IdentitiesOnly yes`.
+
+**Verified 2026-09-15, both directions, multiplexing off.** paperweight →
+minimini: only `ssh:tailnet` offered and accepted, three consecutive fresh
+connections at 0.75/0.56/0.55 s, no touch. minimini → paperweight:
+`sshsk_sign: provider "internal", key ED25519-SK, flags 0x20`, no touch.
+
 **Test with multiplexing off** — `-o ControlPath=none -o ControlMaster=no` — or
 the 8h master will mask a key that does not actually work. It did during the
 chonky work in August.
+
+**And test with `ForwardAgent=no`.** `config.shared` forwards the agent to every
+machine in the registry, so a `ssh minimini` → `ssh paperweight` hop from this
+end runs against *paperweight's* forwarded agent, not minimini's. That agent
+holds the stale `ssh:github` stub, so it gets offered first, `Server accepts
+key`, then `signing failed ... agent refused operation` — a failure that says
+nothing about minimini's own config, and which vanishes the moment forwarding is
+off. It cost a round of debugging here.
+
+### macOS runs no ssh-agent at all (measured 2026-09-15)
+
+The agent loader in this package is `ssh-add-keys.service`, a systemd user unit,
+and `bootstrap` skips `systemd`/`environment.d` on macOS. Nothing replaces it, so
+an interactive login on minimini has an empty `SSH_AUTH_SOCK` and `ssh-add -l`
+answers `Could not open a connection to your authentication agent`.
+`~/.ssh/agent-keys` is written there and correctly ordered, and nothing reads it.
+
+Harmless as things stand: with `IdentitiesOnly` and explicit `IdentityFile`
+lines, every key is file-backed, the offer order is exactly the config order, and
+the `0x20` credential signs with no agent involved. It matters only if a key ever
+needs to be offered *without* being named in a host block, or if per-connection
+touches become annoying enough to want caching — note that agent-backed
+identities are tried **before** file-backed ones, so introducing an agent would
+change the offer order these blocks depend on.
 
 ### chonky's four auth keys (flags re-measured 2026-08-02)
 
