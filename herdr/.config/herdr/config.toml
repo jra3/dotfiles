@@ -251,6 +251,7 @@ agent_panel_sort = "spaces"
 # $ctx comes from ~/.claude/hooks/herdr-blocked-reason.sh. $model is reported
 # too but not rendered: every pane is opus, so it carried no information.
 show_agent_labels_on_pane_borders = true
+status_indicators = "symbols"
 [ui.sidebar.agents]
 row_gap = 0
 rows = [["state_icon", "workspace", "tab", "$ctx"]]
@@ -278,6 +279,7 @@ rows = [["state_icon", "workspace", "tab", "$ctx"]]
 # delivery = "off"
 # delay_seconds = 1
 
+delivery = "system"
 [ui.toast.herdr]
 # position = "bottom-right"
 

@@ -69,4 +69,3 @@ esac
 
 # Load local environment if exists
 [[ -f ~/.zshenv.local ]] && source ~/.zshenv.local
-. "$HOME/.cargo/env"
