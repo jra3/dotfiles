@@ -36,8 +36,16 @@ path is simply never used.
 
 > **am-jallen was renamed to paperweight** (noted 2026-09-15). Its old YubiKey,
 > serial `16946249`, now lives with **minimini**; the `ssh:gitsign` fingerprint
-> confirms the same physical token. `ssh/.ssh/config.shared` still carries a
-> stale `Host am-jallen ...` block that no longer matches anything.
+> confirms the same physical token. paperweight got a *new* token, 5 Nano
+> `38056180`, on 2026-09-03 — `allowed_signers` carries both, the old one
+> `valid-before`d.
+>
+> **paperweight's `~/.ssh/id_ed25519_sk` is a stale stub for `ssh:github`,**
+> left behind when 16946249 walked off to minimini. It is a default identity
+> filename, so OpenSSH still offers it ahead of every other key; minimini even
+> answers `PK_OK` because the credential is genuinely authorized there. The
+> signature then fails, because the token is in the other machine. Any host block
+> that must reach minimini from paperweight needs `IdentitiesOnly yes`.
 
 Mirrors `git/.config/git/allowed_signers`. Signing fingerprints are authoritative
 (verified from `allowed_signers`); auth-key attribution is flagged where it is
@@ -48,6 +56,7 @@ inferred rather than confirmed.
 | **chonky** | 5 Nano, `37196467` | `ssh:chonky-notouch` *(tailnet)* and `ssh:chonky-nopin` *(GitHub)*, plus `ssh:chonky` and `ssh:chonky-touch-no-pinnano` | `SHA256:bIzPlE8zNZrvpm8ZscwtSG9fB6lc36fq0fjQr+I/++A` |
 | **cupcake** | 5 Nano, `37196474` | `ssh:github-cupcake` | `SHA256:Gy580sDeIFooogvoROCcfxfkYWEsgQqYPRQ0p9iyFiI` |
 | **minimini** *(was listed as am-jallen)* | 5C Nano, `16946249` | `ssh:github` **confirmed** via `ssh-keygen -K` 2026-09-15, plus `ssh:minimini-notouch` | `SHA256:C+wONGjhNv/j57dyLl7xR8zoabSEd4ljSWz8GfkgBk0` |
+| **paperweight** | 5 Nano, `38056180` *(replaced `16946249` on 2026-09-03)* | `ssh:tailnet` — **the only one**, and it is `0x20` no-touch; there is no touch-required fallback | `SHA256:KJwfYHtxNddx9t/Zk57xmmEo+FpvdAgJd9fbncXwCx8` |
 
 Naming is **not** consistent across machines: chonky uses `ssh:<hostname>*`,
 cupcake uses `ssh:github-<hostname>`, and the oldest uses a bare `ssh:github`.
@@ -80,23 +89,80 @@ resident on its YubiKey.
 | **chonky** | `ssh:chonky-touch-no-pinnano` | `SHA256:z4nlCjDkxVXbwblAP5HBFbJClvoBgNj37tQo3jmlTgU` |
 | **minimini** | `ssh:minimini-notouch` *(`no-touch-required`, `0x20`)* | `SHA256:oiivr5uBvY6kyqWfp3vc0guSybnb7bsJ/k/7q2ggvuI` |
 | **minimini** | `ssh:github` *(`0x21`, touch fallback)* | `SHA256:AoSI2X/lBgMOi35wsvyO5WSS0pkIVfLOZtWXzp5einc` |
+| **paperweight** | `ssh:tailnet` *(`no-touch-required`, `0x20`)* | `SHA256:CmciDy7rHiUHWy59jyQSe/BBMBUqkN2KndIu19QB2po` |
 | **cupcake** | `ssh:github-cupcake` | **missing** — see below |
 
 Attribution is decoded from each key's embedded application string rather than
 its free-text comment, which settles the "inferred by elimination" caveat on
 am-jallen's row above: `ssh:github` is confirmed.
 
-Two known gaps:
+One known gap remains:
 
 - **cupcake's auth key is not committed.** It was not present in MiniMini's
   `authorized_keys` and cupcake was offline when this was assembled. Capture it
   on cupcake (`cat ~/.ssh/id_ed25519_sk.pub`) into
-  `ssh/.ssh/authorized_keys.d/cupcake.pub`.
-- **paperweight does not authorize any key MiniMini holds.** Measured 2026-09-15:
-  all four identities were offered and none drew a `Server accepts key`. Per the
-  touchless-auth section below, paperweight's `authorized_keys` carries chonky's
-  keys — so chonky, or console access, is the way in. Once there, adding
-  `minimini.pub` fixes it permanently.
+  `ssh/.ssh/authorized_keys.d/cupcake.pub`. Note paperweight *does* trust three
+  keys labelled cupcake, plus cupcake's `ssh:gitsign` — none of them
+  `ssh:github-cupcake`. They are parked host-locally rather than committed,
+  because promoting a key here grants it on every machine and none of them has
+  been positively identified yet.
+
+**Resolved 2026-09-15: paperweight ↔ minimini.** Adding `paperweight.pub` and
+regenerating both ends closes the old "paperweight does not authorize any key
+MiniMini holds" gap; see the section below.
+
+### `build-authorized-keys` will not revoke silently (added 2026-09-15)
+
+Every machine that adopts this scheme starts with a hand-edited
+`authorized_keys` holding keys that are in no `.d` file — on paperweight there
+were eight, including cupcake's and a homelab automation key. The first run
+regenerates the file from the `.d` directory alone, so all eight would have gone,
+and a machine you had not thought about would simply stop being able to log in.
+Nothing would have told you.
+
+So the script now diffs the *key bodies* it is about to install against the ones
+already trusted (the base64 body, not the comment — comments get retyped and
+per-key options come and go) and stops if anything would be dropped:
+
+```
+build-authorized-keys            # stop and list what would be revoked
+build-authorized-keys --adopt    # park those keys in 00-<host>-local.pub, then install
+build-authorized-keys --prune    # revoke them on purpose
+```
+
+`--adopt` writes them to `~/.ssh/authorized_keys.d/00-<hostname>-local.pub`,
+which is a **host-local, uncommitted** file sitting alongside the stowed
+symlinks. That is deliberate: promoting a key into a committed
+`<machine>.pub` grants it on chonky, cupcake, minimini and paperweight at once,
+so it should be a decision, not a side effect of a cleanup. Sort the adopted
+file out one key at a time.
+
+This is also why the `ssh` package must be stowed **`--no-folding`** (`bootstrap`
+does it). Folded, `~/.ssh/authorized_keys.d/` is itself a symlink into the repo
+and there is nowhere to put a host-local file.
+
+### paperweight ↔ minimini, touchless (added 2026-09-15)
+
+Both ends already had a `0x20` credential — paperweight's `ssh:tailnet`,
+minimini's `ssh:minimini-notouch` — and neither machine trusted the other's.
+Committing `paperweight.pub` and running `build-authorized-keys` on both is the
+whole server-side fix.
+
+The client side needs one thing more on paperweight, for the reason in the
+registry note above: `~/.ssh/id_ed25519_sk` is a stale `ssh:github` stub, it is a
+default identity filename, and minimini *accepts* it, so it wins the offer and
+then cannot sign. `ssh/.ssh/config.shared` carries the `User`/`ForwardAgent`
+block; the pinning is host-local, in `~/.ssh/config`, above the `Include`:
+
+```
+Host minimini minimini.corgi-hammerhead.ts.net
+    IdentityFile ~/.ssh/id_ed25519_sk_tailnet
+    IdentitiesOnly yes
+```
+
+**Test with multiplexing off** — `-o ControlPath=none -o ControlMaster=no` — or
+the 8h master will mask a key that does not actually work. It did during the
+chonky work in August.
 
 ### chonky's four auth keys (flags re-measured 2026-08-02)
 
@@ -376,7 +442,27 @@ be launched in-session like rbw-agent, not as a sandboxed unit.**
   tailnet key: a no-touch *signing* key means malware on the laptop can mint
   signed commits in your name, which the tailnet key cannot do.
 - [ ] Fix `CLAUDE.md`'s "no-touch/no-PIN" claim for `setup-git-signing` keys.
-- [ ] Confirm `ssh:github` really is paperweight's (`ssh-keygen -K` on that box).
+- [x] ~~Confirm `ssh:github` really is paperweight's.~~ It is **minimini's** —
+      confirmed by `ssh-keygen -K` on minimini 2026-09-15. paperweight only holds
+      a stale stub for it.
+- [ ] **paperweight has no touch-required auth fallback.** `ssh:tailnet` (`0x20`)
+      is its only auth credential, so if that one credential goes bad there is no
+      second key to fall back on — unlike chonky and minimini, which each keep a
+      `0x21` one for exactly this. Mint `ssh:paperweight` resident,
+      touch-required, and add it to `paperweight.pub`. Do it *before* the next
+      `ssh-keygen -K` on that box, and re-check the flags byte afterwards.
+- [ ] **Identify the three cupcake-labelled keys paperweight trusts**
+      (`ssh:yubikey-cupcake`, `jallen@cupcake`, `john@cupcake homelab
+      automation`) plus `ssh:antimetal`, `nop@porcnick.com` and `Personal Key`.
+      They are parked in paperweight's host-local
+      `~/.ssh/authorized_keys.d/00-paperweight-local.pub`; promote the real ones
+      into a committed `<machine>.pub` and delete the rest.
+- [ ] **Delete paperweight's stale `~/.ssh/id_ed25519_sk`** (and drop it from
+      `~/.ssh/agent-keys`). It is unusable there — the token left on 2026-09-03 —
+      and being a default identity filename it is offered first to every host,
+      which is the only reason minimini needs `IdentitiesOnly`. Left in place for
+      now because `~/.ssh/config` pins it for `github.com` and `aur.archlinux.org`
+      too, and those need re-pointing at the same time.
 - [ ] Consider deleting the redundant `ssh:chonky-touch-no-pinnano` from GitHub
       and from the key.
 - [ ] Consider dropping chonky's `ssh:gitsign` from GitHub's **auth** key list so

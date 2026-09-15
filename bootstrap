@@ -100,8 +100,13 @@ for pkg in "${PACKAGES[@]}"; do
     # The emacs package ships a systemd drop-in directory. Plain stow FOLDS it
     # into a symlink, and systemd silently ignores drop-ins inside a symlinked
     # drop-in dir — see the long note in pacman/configure-system.
+    #
+    # ssh ships ~/.ssh/authorized_keys.d/. Folded, that whole directory becomes a
+    # symlink into the repo, and a host can no longer drop a local-only key file
+    # in beside the committed ones — which is the per-host subsetting that
+    # build-authorized-keys exists to allow.
     flags=("${STOW_FLAGS[@]}" "${EXTRA_IGNORES[@]+"${EXTRA_IGNORES[@]}"}")
-    [ "$pkg" = emacs ] && flags+=(--no-folding)
+    case "$pkg" in emacs|ssh) flags+=(--no-folding) ;; esac
 
     echo "  stow: $pkg"
     if ! stow "${flags[@]}" "$pkg" 2>&1 | sed 's/^/      /'; then
