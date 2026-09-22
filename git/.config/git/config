@@ -24,7 +24,7 @@
             elif [ \"$st\" = CLOSED ] && [ \"$closed\" = 1 ]; then echo \"closed, review manually: $b\"; fi; \
         done; }; f"
 [init]
-    defaultBranch = master
+	defaultBranch = main
 [pull]
     rebase = true            # Rebase (instead of merge) on pull
 [push]

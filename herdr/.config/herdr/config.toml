@@ -279,7 +279,7 @@ rows = [["state_icon", "workspace", "tab", "$ctx"]]
 # delivery = "off"
 # delay_seconds = 1
 
-delivery = "system"
+delivery = "herdr"
 [ui.toast.herdr]
 # position = "bottom-right"
 

@@ -39,3 +39,7 @@ ut() {
         date -d "@$1" -Iseconds
     fi
 }
+
+# llama.cpp router (llama-router.service). Port 8081 because 8080 is the chikin
+# fleet dashboard; without this pi's /login placeholder points at the wrong one.
+export LLAMA_BASE_URL="http://127.0.0.1:8081"

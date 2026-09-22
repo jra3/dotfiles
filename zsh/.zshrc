@@ -297,6 +297,56 @@ claude-zai() {
         claude --model $model "$@"
 }
 
+# ----------------------------------------------------------------------------
+# claude-qwen -- Claude Code against the local llama.cpp router
+# ----------------------------------------------------------------------------
+# llama.cpp serves a native Anthropic /v1/messages endpoint, so no proxy is
+# needed. The router runs with --no-models-autoload, so load on demand first.
+# Service: systemctl --user {status,start} llama-router
+
+claude-qwen() {
+    local url=${LLAMA_BASE_URL:-http://127.0.0.1:8081}
+    local model=${CLAUDE_QWEN_MODEL:-Qwen3-Coder-Next-Q5_K_M}
+
+    curl -sf -m 3 "$url/health" >/dev/null 2>&1 || {
+        print -u2 "claude-qwen: no router at $url -- systemctl --user start llama-router"
+        return 1
+    }
+
+    # Don't inspect /models -- just ask the model to do a token. That is the
+    # only honest readiness test, and curl -sf already fails on the router's
+    # 400 "model is not loaded". /models/load is idempotent.
+    local ping="{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}"
+
+    if ! curl -sf -m 10 "$url/v1/chat/completions" -H 'Content-Type: application/json' -d "$ping" >/dev/null 2>&1; then
+        print -u2 "claude-qwen: loading $model (cold start takes a few minutes)..."
+        curl -sf -m 30 -X POST "$url/models/load" -H 'Content-Type: application/json' \
+            -d "{\"model\":\"$model\"}" >/dev/null 2>&1
+        local i
+        for i in {1..120}; do
+            curl -sf -m 10 "$url/v1/chat/completions" -H 'Content-Type: application/json' \
+                -d "$ping" >/dev/null 2>&1 && break
+            sleep 5
+        done
+        curl -sf -m 10 "$url/v1/chat/completions" -H 'Content-Type: application/json' \
+            -d "$ping" >/dev/null 2>&1 || {
+            print -u2 "claude-qwen: $model failed to load -- curl $url/models"
+            return 1
+        }
+    fi
+
+    env -u ANTHROPIC_API_KEY \
+        ANTHROPIC_BASE_URL=$url \
+        ANTHROPIC_AUTH_TOKEN=local \
+        ANTHROPIC_MODEL=$model \
+        ANTHROPIC_DEFAULT_HAIKU_MODEL=$model \
+        ANTHROPIC_DEFAULT_SONNET_MODEL=$model \
+        ANTHROPIC_DEFAULT_OPUS_MODEL=$model \
+        CLAUDE_CODE_MAX_CONTEXT_TOKENS=262144 \
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+        claude --model $model "$@"
+}
+
 # ============================================================================
 # Tool Completions
 # ============================================================================
