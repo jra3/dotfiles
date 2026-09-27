@@ -161,9 +161,9 @@ This documents the default software stack configured in Omarchy:
   every host. Side effect: `omarchy font set` seds `font-family` in `config` only,
   so it no longer reaches Ghostty; the family is pinned in `shared.conf` instead
 - `hypr/` - Hyprland compositor. `.lua` since Quattro (`hyprland`, `input`,
-  `bindings`, `looknfeel`, `autostart`), plus the two `.conf` files read by *other*
-  processes and so untouched by `hyprctl`: `hyprsunset.conf` (apply with
-  `omarchy restart hyprsunset`) and `xdph.conf` (applies on portal restart).
+  `bindings`, `looknfeel`, `autostart`). `hyprsunset.conf` and `xdph.conf` are
+  deliberately not here: ours matched Omarchy's stock copies, so each host keeps
+  the stock file (`omarchy refresh config hypr/<file>`) instead of a shadow.
   **`monitors.lua` is deliberately not here** — displays are host-local; see
   `hypr/README.md`
 - `ripgrep/` - ripgrep configuration

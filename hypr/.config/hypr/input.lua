@@ -101,12 +101,10 @@ hl.config({
   input = {
     kb_options = kb_options,
 
-    -- Faster than Omarchy's 40/250.
+    -- Faster than Omarchy's 40; repeat_delay keeps Omarchy's 250.
     repeat_rate = 50,
-    repeat_delay = 425,
 
     touchpad = {
-      tap_to_click = true,
       -- Omarchy ships 0.4; 0.3 is calmer on the Framework trackpad.
       scroll_factor = 0.3,
     },

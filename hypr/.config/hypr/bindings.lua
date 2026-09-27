@@ -13,6 +13,7 @@
 --   SUPER+SHIFT+F           File manager
 --   SUPER+ALT+SHIFT+F       File manager (cwd)
 --   SUPER+SHIFT+D           Docker (lazydocker)
+--   SUPER+SHIFT+T           Activity (btop) -- Omarchy has it on SUPER+CTRL+T
 --   SUPER+ALT+RETURN        Tmux -- Omarchy's attaches to a session named
 --                           "Work" rather than always opening a new one
 --   SUPER+CTRL+P            Power menu (Tailscale lives in the Omarchy plugin)
@@ -33,7 +34,6 @@ hl.unbind("SUPER + SHIFT + E")         -- was: Email (HEY)
 -- leftover: Omarchy claims the key for HEY compose, so deleting the line revives
 -- that binding rather than freeing the key.
 hl.unbind("SUPER + SHIFT + ALT + E")   -- was: New email (HEY)
-hl.unbind("SUPER + SHIFT + W")         -- was: Omawrite
 hl.unbind("SUPER + SHIFT + SLASH")     -- was: Passwords (1Password)
 hl.unbind("SUPER + SHIFT + G")         -- was: Signal (launch, not scratchpad)
 hl.unbind("SUPER + SHIFT + A")         -- was: ChatGPT
@@ -91,8 +91,6 @@ end
 
 -- GDK_BACKEND=wayland: the pgtk build picks X11 through XWayland otherwise.
 o.bind("SUPER + SHIFT + E", "Emacs", o.launch("env GDK_BACKEND=wayland emacs"))
-o.bind("SUPER + SHIFT + T", "Activity", { tui = "btop" })
-o.bind("SUPER + SHIFT + W", "Typora", o.launch("typora --enable-wayland-ime"))
 -- Passwords: retired 2026-08-25. bw-pick shells out to `walker`, which Omarchy 4
 -- replaced with the Quickshell launcher, so the binding was a no-op. The unbind
 -- above stays: without it Omarchy's own 1Password binding comes back, and
