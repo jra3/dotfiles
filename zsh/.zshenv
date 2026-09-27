@@ -3,6 +3,21 @@
 # Ensure path arrays do not contain duplicates
 typeset -U path PATH
 
+# Homebrew (macOS) — must run before anything else touches PATH.
+# This belongs in .zshenv rather than darwin.zsh (which .zshrc sources) because
+# .zshrc only runs for INTERACTIVE shells. Nearly every tool these configs
+# assume — git, tmux, rg, starship, gh, stow — lives in the Homebrew prefix, so
+# leaving this to .zshrc means scripts, git hooks, editors, and Claude Code's
+# Bash tool all run with a PATH that has no Homebrew in it at all.
+# Both prefixes are checked: /opt/homebrew on Apple Silicon, /usr/local on Intel.
+if [[ "$OSTYPE" == darwin* ]]; then
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -x /usr/local/bin/brew ]]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+fi
+
 # XDG Base Directory Specification
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"

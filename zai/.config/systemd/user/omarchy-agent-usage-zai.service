@@ -1,0 +1,6 @@
+[Unit]
+Description=Refresh the z.ai usage record the Omarchy agents panel reads
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/omarchy-agent-usage-zai --write

@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""Focus whichever agent most wants attention right now.
+
+Usage: herdr-jump-to-attention
+
+`herdr agent list` already answers "who wants me": every agent carries an
+`agent_status` and a monotonic `state_change_seq`, so "who asked most recently"
+is a sort, not an inference. No subscription and no daemon -- one CLI call.
+
+RANKING. `blocked` outranks everything: the agent is sitting at an approval or a
+question and is doing nothing until answered. `done` is next -- finished and
+waiting to be read, but not costing anything while it waits. `idle` and
+`working` do not want attention at all and are only reachable when nothing else
+is pending. Ties break on `state_change_seq` descending, so among equals the one
+that changed state most recently wins -- that is the "just" in "just asked".
+
+The focused agent is excluded, so the key always moves you somewhere or does
+nothing at all. It never re-focuses where you already are, which would look
+like the key had failed.
+"""
+
+import json
+import subprocess
+import sys
+
+# Lower sorts first. Anything unrecognised (including "unknown") lands last.
+PRIORITY = {"blocked": 0, "done": 1, "idle": 2, "working": 3}
+
+
+def main():
+    proc = subprocess.run(
+        ["herdr", "agent", "list"], capture_output=True, text=True, check=False
+    )
+    if proc.returncode != 0:
+        sys.exit(f"herdr agent list failed: {proc.stderr.strip()}")
+
+    agents = [a for a in json.loads(proc.stdout)["result"]["agents"] if not a.get("focused")]
+    if not agents:
+        return
+
+    agents.sort(
+        key=lambda a: (
+            PRIORITY.get(a.get("agent_status"), len(PRIORITY)),
+            -a.get("state_change_seq", 0),
+        )
+    )
+
+    subprocess.run(["herdr", "agent", "focus", agents[0]["pane_id"]], check=False)
+
+
+if __name__ == "__main__":
+    main()

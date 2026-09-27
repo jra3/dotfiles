@@ -63,6 +63,14 @@ literal. Rename them, or compute the value, and a scale change applies live and 
 vanishes on the next reload. `GDK_SCALE` must be an integer (GTK ignores fractional),
 which is why it is the monitor scale rounded to the nearest whole number.
 
+**`hl.env` reaches the session only at Hyprland startup.** Omarchy's `autostart.lua`
+imports Hyprland's environment into systemd and dbus once, when Hyprland starts.
+Change `omarchy_gdk_scale` and `hyprctl reload`, and everything launched from the
+shell keeps the old `GDK_SCALE` until the next login (`systemctl --user
+show-environment | grep GDK_SCALE` shows what apps actually get). Seen on cupcake
+2026-09-04: the file said 1, the session still said 2. Anything that needs the
+current value should ask `hyprctl monitors -j` instead — `bambu-studio-launch` does.
+
 **Known geometry**, for reconstruction:
 
 | Host | Panel | Notes |

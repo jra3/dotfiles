@@ -1,0 +1,34 @@
+#!/bin/bash
+# Create ~/jra3/inbox and give it its icon in Nautilus.
+#
+# The sidebar shortcut is declarative and lives in gtk/.config/gtk-3.0/bookmarks.
+# The icon cannot be: Nautilus keeps per-file icons as gvfs metadata in a binary
+# per-machine store (~/.local/share/gvfs-metadata), so it has to be re-applied on
+# every machine. That is what this script is for. Idempotent, no sudo.
+
+set -euo pipefail
+
+inbox="${INBOX_DIR:-$HOME/jra3/inbox}"
+# Any name in the current icon theme. Yaru ships mail-inbox and every Omarchy
+# machine has yaru-icon-theme (omarchy-base.packages), so this resolves whichever
+# Yaru accent is active. folder-download is the themed magenta-folder-with-arrow
+# alternative; it matches the other folders but reads as "Downloads".
+icon="${INBOX_ICON:-mail-inbox}"
+
+if [ ! -d "$inbox" ]; then
+    mkdir -p "$inbox"
+    echo "  created $inbox"
+fi
+
+# A custom icon set through Properties → the pencil button lands in
+# metadata::custom-icon (a file URI) and wins over the themed name, so clear it.
+gio set -d "$inbox" metadata::custom-icon 2>/dev/null || true
+
+current="$(gio info -a metadata::custom-icon-name "$inbox" 2>/dev/null |
+    sed -n 's/^ *metadata::custom-icon-name: //p')"
+if [ "$current" = "$icon" ]; then
+    echo "  $inbox icon already $icon"
+else
+    gio set -t string "$inbox" metadata::custom-icon-name "$icon"
+    echo "  set $inbox icon to $icon"
+fi

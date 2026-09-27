@@ -1,6 +1,9 @@
 [Desktop Entry]
 Name=BambuStudio
-Exec=env GDK_BACKEND=wayland GDK_SCALE=2 GDK_DPI_SCALE=0.85 /usr/bin/bambu-studio %U
+# Shadows /usr/share/applications/BambuStudio.desktop. Never put a GDK_SCALE
+# here: this file is shared across machines with different monitor scales.
+# bambu-studio-launch works it out from the focused monitor at launch time.
+Exec=bambu-studio-launch %U
 Icon=BambuStudio
 Type=Application
 Categories=Utility;

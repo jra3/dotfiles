@@ -1,0 +1,543 @@
+#!/usr/bin/python3
+"""Collect z.ai GLM Coding Plan usage into one display-ready JSON record.
+
+Prints the record contract the Omarchy agents panel reads — the same one the
+packaged omarchy-agent-usage-* collectors print — and with --write drops it
+into the panel's usage directory as zai.json, where the panel picks it up as
+another subscription tab.
+
+Two z.ai endpoints back it:
+
+  /api/monitor/usage/quota/limit   the rolling token window, the weekly window,
+                                   the monthly MCP tool-call quota, and the plan
+  /api/monitor/usage/model-usage   tokens per bucket per model
+
+Unlike the packaged collectors this one is not driven by
+omarchy-agent-usage-update: that command only iterates collectors inside
+$OMARCHY_PATH/bin, which is root-owned. omarchy-agent-usage-zai.timer runs it
+instead. The panel watches the usage directory either way.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import os
+import sys
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+AGENT_ID = "zai"
+AGENT_NAME = "Z.ai"
+AUTH_HELP = "Put the z.ai API key in ~/.config/zai/anthropic-key, or set ZAI_API_KEY."
+API_BASE_URL = "https://api.z.ai"
+KEY_FILE = "~/.config/zai/anthropic-key"
+TIMEOUT = 20
+
+# z.ai stamps every usage bucket in China Standard Time no matter where the
+# caller is, and reads the request window in that frame too. Measured
+# 2026-09-11: asking an EDT machine's "today 00:00 -> tomorrow 23:59" came back
+# labelled 00:00..23:00, newest non-empty bucket 23:00, while the local clock
+# said 11:12 and Shanghai's said 23:12. So both halves of the conversation are
+# built in this zone, and hourly buckets are converted to local days before
+# anything is filed under a date.
+API_TZ = dt.timezone(dt.timedelta(hours=8))
+
+# The hourly series is what makes a local-day chart possible, and the API only
+# serves it for a span under 8 days — ask for more and it answers with daily
+# buckets, which cannot be re-cut across a 12-hour timezone gap.
+HOURLY_DAYS = 7
+HISTORY_DAYS = 30
+
+# Window codes on a quota entry. Only 3, 5 and 6 have been observed (5-hour
+# tokens, monthly MCP calls, weekly tokens); anything else falls back to the
+# limit's own type for a title.
+UNIT_HOUR = 3
+UNIT_MONTH = 5
+UNIT_WEEK = 6
+
+
+class ZaiError(Exception):
+  pass
+
+
+def number(value: Any) -> int:
+  try:
+    return max(0, round(float(value or 0)))
+  except (TypeError, ValueError):
+    return 0
+
+
+def cache_root() -> Path:
+  root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "omarchy" / "agent-usage"
+  root.mkdir(parents=True, exist_ok=True)
+  return root
+
+
+def usage_path() -> Path:
+  state = Path(os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state"))
+  return state / "omarchy" / "agents" / "usage" / (AGENT_ID + ".json")
+
+
+def config_path() -> Path:
+  config_home = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+  return config_home / "omarchy" / "agents" / (AGENT_ID + ".json")
+
+
+def read_json(path: Path) -> dict[str, Any]:
+  try:
+    parsed = json.loads(path.read_text(encoding="utf-8"))
+  except (OSError, json.JSONDecodeError):
+    return {}
+  return parsed if isinstance(parsed, dict) else {}
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+  # A temp name unique to this writer, not derived from the target: the panel's
+  # own refresh can have a collector mid-write when the timer fires.
+  path.parent.mkdir(parents=True, exist_ok=True)
+  handle_fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+  tmp = Path(tmp_name)
+  try:
+    with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
+      handle.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
+    # Matches what omarchy-agent-usage-update leaves behind: the records are
+    # nobody else's business.
+    tmp.chmod(0o600)
+    tmp.replace(path)
+  finally:
+    tmp.unlink(missing_ok=True)
+
+
+# ------------------------------------------------------------------- auth
+
+def read_key_file(path: Path) -> str:
+  try:
+    return path.read_text(encoding="utf-8").strip()
+  except OSError:
+    return ""
+
+
+def api_key(config: dict[str, Any]) -> str:
+  env = str(os.environ.get("ZAI_API_KEY") or "").strip()
+  if env:
+    return env
+  inline = str(config.get("apiKey") or "").strip()
+  if inline:
+    return inline
+  configured = str(config.get("keyFile") or "").strip()
+  if configured:
+    return read_key_file(Path(configured).expanduser())
+  return read_key_file(Path(KEY_FILE).expanduser())
+
+
+# ------------------------------------------------------------------ client
+
+class ZaiClient:
+  def __init__(self, key: str, base_url: str) -> None:
+    self.key = key
+    self.base_url = base_url.rstrip("/")
+
+  def request(self, path: str, query: dict[str, str] | None = None) -> dict[str, Any]:
+    url = self.base_url + path
+    if query:
+      url += "?" + urllib.parse.urlencode(query)
+    # z.ai wants the raw key in Authorization, with no Bearer prefix.
+    request = urllib.request.Request(
+      url,
+      headers={
+        "Authorization": self.key,
+        "Accept-Language": "en-US,en",
+        "Content-Type": "application/json",
+      },
+    )
+    try:
+      with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+      if error.code in (401, 403):
+        raise ZaiError("z.ai rejected the API key") from error
+      raise ZaiError(f"z.ai returned HTTP {error.code}") from error
+    except (urllib.error.URLError, TimeoutError) as error:
+      raise ZaiError("z.ai is unreachable") from error
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+      raise ZaiError("z.ai returned an unreadable response") from error
+
+    if not isinstance(payload, dict):
+      raise ZaiError("z.ai returned an unreadable response")
+    if payload.get("success") is False:
+      raise ZaiError(str(payload.get("msg") or "z.ai rejected the request"))
+    data = payload.get("data")
+    return data if isinstance(data, dict) else {}
+
+  def quota(self) -> dict[str, Any]:
+    return self.request("/api/monitor/usage/quota/limit")
+
+  def model_usage(self, start: dt.datetime, end: dt.datetime) -> dict[str, Any]:
+    return self.request(
+      "/api/monitor/usage/model-usage",
+      query={
+        "startTime": start.strftime("%Y-%m-%d %H:%M:%S"),
+        "endTime": end.strftime("%Y-%m-%d %H:%M:%S"),
+      },
+    )
+
+
+# ------------------------------------------------------------------ limits
+
+def plan_label(level: str) -> str:
+  name = str(level or "").strip()
+  if name == "":
+    return ""
+  return "Coding " + name[:1].upper() + name[1:]
+
+
+def reset_at(value: Any) -> str:
+  ms = number(value)
+  if ms <= 0:
+    return ""
+  return dt.datetime.fromtimestamp(ms / 1000, dt.timezone.utc).isoformat()
+
+
+def window_title(entry: dict[str, Any]) -> tuple[str, str]:
+  """The panel's row label, and the longer label it falls back to parsing."""
+  unit = number(entry.get("unit"))
+  count = max(1, number(entry.get("number")))
+  if entry.get("type") == "TIME_LIMIT":
+    # The only count-based allowance z.ai reports: MCP tool calls (web search,
+    # web reader, zread), pooled per month.
+    return "MCP tools", "MCP tools (monthly)"
+  if unit == UNIT_HOUR:
+    return "Session", f"Session ({count}-hour)"
+  if unit == UNIT_WEEK:
+    return "Weekly", f"Weekly ({count * 7}-day)"
+  if unit == UNIT_MONTH:
+    return "Monthly", f"Monthly ({count}-month)"
+  return "Limit", "Limit"
+
+
+def limit_percent(entry: dict[str, Any]) -> float:
+  # A count-based quota carries the exact numerator and denominator; the
+  # integer percentage beside them is rounded, so prefer the ratio when both
+  # halves are there.
+  total = number(entry.get("usage"))
+  used = number(entry.get("currentValue"))
+  if total > 0 and "currentValue" in entry:
+    return min(1.0, used / total)
+  try:
+    percent = float(entry.get("percentage"))
+  except (TypeError, ValueError):
+    return -1.0
+  if percent < 0:
+    return -1.0
+  return min(1.0, percent / 100)
+
+
+def limits_from_quota(payload: dict[str, Any]) -> list[dict[str, Any]]:
+  entries = payload.get("limits")
+  if not isinstance(entries, list):
+    return []
+  limits = []
+  for entry in entries:
+    if not isinstance(entry, dict):
+      continue
+    percent = limit_percent(entry)
+    if percent < 0:
+      continue
+    title, label = window_title(entry)
+    limits.append({
+      "label": label,
+      "title": title,
+      "percent": percent,
+      "resetsAt": reset_at(entry.get("nextResetTime")),
+    })
+  # z.ai lists the MCP quota first; the panel renders limits in the order it is
+  # given them, and shortest window first is the order the Claude tab uses.
+  order = {"Session": 0, "Weekly": 1, "Monthly": 2, "MCP tools": 3}
+  limits.sort(key=lambda entry: order.get(entry["title"], 4))
+  return limits
+
+
+# A cached percentage outlives the probe that measured it, but only until its
+# window rolls over: once a window has reset the figure describes a period that
+# is over, and a stale 70% would misreport an allowance that is now untouched.
+def limit_window_open(entry: dict[str, Any], now: dt.datetime) -> bool:
+  raw = str(entry.get("resetsAt") or "")
+  if raw == "":
+    return True
+  try:
+    resets_at = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+  except ValueError:
+    return True
+  if resets_at.tzinfo is None:
+    resets_at = resets_at.replace(tzinfo=dt.timezone.utc)
+  return resets_at > now
+
+
+def usable_cached_limits(cached: dict[str, Any]) -> list[dict[str, Any]]:
+  entries = cached.get("limits")
+  if not isinstance(entries, list):
+    return []
+  now = dt.datetime.now(dt.timezone.utc)
+  return [entry for entry in entries if isinstance(entry, dict) and limit_window_open(entry, now)]
+
+
+# ------------------------------------------------------------------- stats
+
+def parse_bucket(label: Any) -> dt.datetime | None:
+  raw = str(label or "").strip()
+  for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+    try:
+      return dt.datetime.strptime(raw, fmt).replace(tzinfo=API_TZ)
+    except ValueError:
+      continue
+  return None
+
+
+def model_series(payload: dict[str, Any]) -> list[tuple[str, list[Any]]]:
+  rows = payload.get("modelDataList")
+  if not isinstance(rows, list):
+    return []
+  series = []
+  for row in rows:
+    if not isinstance(row, dict):
+      continue
+    name = str(row.get("modelName") or "").strip()
+    values = row.get("tokensUsage")
+    if name == "" or not isinstance(values, list):
+      continue
+    series.append((name, values))
+  return series
+
+
+def empty_bucket() -> dict[str, int]:
+  return {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "cacheCreationInputTokens": 0,
+  }
+
+
+def empty_stats() -> dict[str, Any]:
+  return {
+    "todayPrompts": 0,
+    "todaySessions": 0,
+    "todayTotalTokens": 0,
+    "todayTokensByModel": {},
+    "recentDays": [],
+    "totalPrompts": 0,
+    "totalSessions": 0,
+    "activeDays": 0,
+    "activeDates": [],
+    "modelUsage": {},
+  }
+
+
+def summarize_recent(payload: dict[str, Any], today: dt.date) -> dict[str, Any]:
+  """The last seven local days, re-cut from the API's hourly UTC+8 buckets."""
+  labels = payload.get("x_time")
+  if not isinstance(labels, list):
+    labels = []
+  local_days = [parse_bucket(label) for label in labels]
+  local_days = [moment.astimezone().date().isoformat() if moment else "" for moment in local_days]
+
+  recent_dates = [(today - dt.timedelta(days=offset)).isoformat() for offset in range(6, -1, -1)]
+  recent = {day: 0 for day in recent_dates}
+  today_key = today.isoformat()
+  today_by_model: dict[str, int] = {}
+
+  for name, values in model_series(payload):
+    for index, day in enumerate(local_days):
+      if day == "" or index >= len(values):
+        continue
+      tokens = number(values[index])
+      if tokens <= 0:
+        continue
+      if day in recent:
+        recent[day] += tokens
+      if day == today_key:
+        today_by_model[name] = today_by_model.get(name, 0) + tokens
+
+  return {
+    "todayTotalTokens": sum(today_by_model.values()),
+    "todayTokensByModel": today_by_model,
+    "recentDays": [{"date": day, "messageCount": recent[day]} for day in recent_dates],
+  }
+
+
+def summarize_history(payload: dict[str, Any]) -> dict[str, Any]:
+  """Tokens per model over the last 30 days, from the API's daily buckets.
+
+  Daily buckets cannot be re-cut into local days the way hourly ones can, so
+  the dates here are z.ai's own — up to a day off from the local calendar at
+  the edges. They only feed the active-day count and the model totals, where
+  that does not show.
+  """
+  labels = payload.get("x_time")
+  if not isinstance(labels, list):
+    labels = []
+  days = [str(label or "")[:10] for label in labels]
+
+  model_usage: dict[str, dict[str, int]] = {}
+  active_dates: set[str] = set()
+
+  for name, values in model_series(payload):
+    total = 0
+    for index, day in enumerate(days):
+      if index >= len(values):
+        continue
+      tokens = number(values[index])
+      if tokens <= 0:
+        continue
+      total += tokens
+      if day:
+        active_dates.add(day)
+    if total > 0:
+      # z.ai reports one total per model and never the input/output/cache
+      # split, so the whole figure lands in the input bucket: the panel adds
+      # the four fields for the bar, and a zero there would erase the model.
+      # The hover split is the cost of that, and it is why the README says not
+      # to read it.
+      bucket = empty_bucket()
+      bucket["inputTokens"] = total
+      model_usage[name] = bucket
+
+  return {
+    "activeDays": len(active_dates),
+    "activeDates": sorted(active_dates),
+    "modelUsage": model_usage,
+  }
+
+
+def collect_stats(client: ZaiClient) -> dict[str, Any]:
+  now = dt.datetime.now(API_TZ)
+  today = dt.datetime.now().astimezone().date()
+
+  hourly = client.model_usage(
+    (now - dt.timedelta(days=HOURLY_DAYS)).replace(minute=0, second=0, microsecond=0),
+    now.replace(minute=59, second=59, microsecond=0),
+  )
+  history = client.model_usage(
+    (now - dt.timedelta(days=HISTORY_DAYS - 1)).replace(hour=0, minute=0, second=0, microsecond=0),
+    now.replace(hour=23, minute=59, second=59, microsecond=0),
+  )
+
+  stats = empty_stats()
+  stats.update(summarize_recent(hourly, today))
+  stats.update(summarize_history(history))
+  return stats
+
+
+# ------------------------------------------------------------------ record
+
+def base_record(**overrides: Any) -> dict[str, Any]:
+  record: dict[str, Any] = {
+    "schemaVersion": 1,
+    "id": AGENT_ID,
+    "name": AGENT_NAME,
+    "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
+    "ready": False,
+    "hasLocalStats": False,
+    # The monitor API answers for the account, not for this machine, so a
+    # second synced device reports the same truth and must not be summed.
+    "scope": "account",
+    # It counts API calls and tokens, never prompts or sessions; the panel
+    # keeps those out of today's tooltip when this is false.
+    "hasPromptStats": False,
+    "tierLabel": "",
+    "usageStatusText": "",
+    "authHelpText": "",
+    "limits": [],
+  }
+  record.update(empty_stats())
+  record.update(overrides)
+  return record
+
+
+def scan(base_url: str, limits_only: bool) -> dict[str, Any]:
+  config = read_json(config_path())
+  key = api_key(config)
+  if not key:
+    return base_record(usageStatusText="Z.ai unavailable", authHelpText=AUTH_HELP)
+
+  client = ZaiClient(key, str(config.get("baseUrl") or base_url))
+  record = base_record()
+  limits_cache = cache_root() / "zai-limits.json"
+  stats_cache = cache_root() / "zai-stats.json"
+
+  try:
+    quota = client.quota()
+  except ZaiError as error:
+    # A window that has not rolled over yet still describes the allowance in
+    # force, so a failed probe falls back to the last one rather than dropping
+    # the tab out of the panel entirely.
+    cached = read_json(limits_cache)
+    record["limits"] = usable_cached_limits(cached)
+    record["tierLabel"] = str(cached.get("tierLabel") or "")
+    record["usageStatusText"] = "Z.ai limits unavailable"
+    record["authHelpText"] = str(error) + (" — showing the last known limits." if record["limits"] else ".")
+  else:
+    record["limits"] = limits_from_quota(quota)
+    record["tierLabel"] = plan_label(str(quota.get("level") or ""))
+    write_json(limits_cache, {"limits": record["limits"], "tierLabel": record["tierLabel"]})
+
+  # Opening the panel asks for the numbers that go stale on the wire, not for
+  # another two rounds of history.
+  stats = read_json(stats_cache) if limits_only else {}
+  if not stats:
+    try:
+      stats = collect_stats(client)
+      write_json(stats_cache, stats)
+    except ZaiError as error:
+      stats = read_json(stats_cache)
+      if not record["usageStatusText"]:
+        record["usageStatusText"] = "Z.ai usage unavailable"
+        record["authHelpText"] = str(error) + (" — showing the last known usage." if stats else ".")
+
+  if stats:
+    fields = empty_stats().keys()
+    record.update({name: value for name, value in stats.items() if name in fields})
+    record["hasLocalStats"] = True
+
+  record["ready"] = bool(record["limits"]) or bool(stats)
+  return record
+
+
+def main() -> int:
+  parser = argparse.ArgumentParser(description="Print the z.ai GLM Coding Plan usage record as JSON")
+  # --force has nothing to force past: every number here comes off the wire on
+  # every run. It exists so this collector takes the same invocation as the
+  # packaged ones.
+  parser.add_argument("--force", action="store_true")
+  parser.add_argument("--limits-only", action="store_true")
+  parser.add_argument(
+    "--write",
+    action="store_true",
+    help="write the record into the agents panel's usage directory instead of printing it",
+  )
+  parser.add_argument("--api-base-url", default=os.environ.get("ZAI_API_BASE_URL", API_BASE_URL))
+  args = parser.parse_args()
+
+  try:
+    record = scan(args.api_base_url, args.limits_only and not args.force)
+  except ZaiError as error:
+    record = base_record(usageStatusText="Z.ai unavailable", authHelpText=str(error))
+  except Exception as error:
+    record = base_record(usageStatusText="Z.ai unavailable", authHelpText="Z.ai usage scan failed")
+    print(f"omarchy-agent-usage-zai: {type(error).__name__}", file=sys.stderr)
+
+  if args.write:
+    write_json(usage_path(), record)
+  else:
+    print(json.dumps(record, separators=(",", ":")))
+  return 0
+
+
+if __name__ == "__main__":
+  raise SystemExit(main())

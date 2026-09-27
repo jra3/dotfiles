@@ -1,0 +1,15 @@
+# Readline config. zsh doesn't use this — it has its own bindkey setup in
+# .zshrc — but everything else that links against readline does: bash, python,
+# sqlite3, psql, gdb, irb. Without it, ctrl-arrow emits a raw escape sequence
+# instead of moving by word, which is jarring when the zsh side does the right
+# thing. Kept in sync with the ^[[1;5C / ^[[1;5D bindings in zsh/.zshrc.
+
+# xterm
+"\e[1;5D": backward-word
+"\e[1;5C": forward-word
+
+# tmux
+"\eOD": backward-word
+"\eOC": forward-word
+
+set completion-ignore-case On

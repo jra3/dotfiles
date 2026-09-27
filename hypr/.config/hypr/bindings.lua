@@ -34,7 +34,8 @@ hl.unbind("SUPER + SHIFT + E")         -- was: Email (HEY)
 -- leftover: Omarchy claims the key for HEY compose, so deleting the line revives
 -- that binding rather than freeing the key.
 hl.unbind("SUPER + SHIFT + ALT + E")   -- was: New email (HEY)
-hl.unbind("SUPER + SHIFT + SLASH")     -- was: Passwords (1Password)
+hl.unbind("SUPER + SHIFT + SLASH")     -- was: Passwords (1Password, then bw-pick). Load-bearing: without it
+                                       -- Omarchy's 1Password bind revives, and 1Password is not installed
 hl.unbind("SUPER + SHIFT + G")         -- was: Signal (launch, not scratchpad)
 hl.unbind("SUPER + SHIFT + A")         -- was: ChatGPT
 hl.unbind("SUPER + SHIFT + C")         -- was: Calendar (HEY)
@@ -91,12 +92,6 @@ end
 
 -- GDK_BACKEND=wayland: the pgtk build picks X11 through XWayland otherwise.
 o.bind("SUPER + SHIFT + E", "Emacs", o.launch("env GDK_BACKEND=wayland emacs"))
--- Passwords: retired 2026-08-25. bw-pick shells out to `walker`, which Omarchy 4
--- replaced with the Quickshell launcher, so the binding was a no-op. The unbind
--- above stays: without it Omarchy's own 1Password binding comes back, and
--- 1Password is deliberately not installed either. Key is intentionally dead
--- until bw-pick is rewritten. See CLAUDE.md.
--- o.bind("SUPER + SHIFT + SLASH", "Passwords", o.launch("bw-pick"))
 o.bind("SUPER + SHIFT + ALT + K", "Chess", { webapp = "https://chess.com/home", focus = true })
 
 --------------------------------------------------------------------------------
@@ -180,7 +175,7 @@ o.bind("XF86Tools", "Stop dictation", "voxtype record stop", { release = true })
 
 -- Newline insert via the far mouse thumb button (forward / BTN_EXTRA).
 -- Sends Shift+Enter: a newline in chat inputs (Slack, browsers) and, via
--- ghostty's shift+enter CSI-u keybind, in Claude Code too.
+-- kitty's shift+enter binding (ESC+CR), in Claude Code too.
 --
 -- Uses wtype rather than the `send_shortcut` dispatcher on purpose. voxtype
 -- types through wtype, which installs its own virtual keyboard + keymap; until
@@ -195,6 +190,41 @@ o.bind("mouse:276", "Insert newline", "wtype -M shift -s 40 -k Return -m shift")
 -- package, which isn't deployed on every host.
 if o.cmd_present("meeting-toggle") then
   o.bind("SUPER + CTRL + M", "Toggle meeting capture", "meeting-toggle")
+end
+
+--------------------------------------------------------------------------------
+-- Adv360 SmartSet layer (fn2, toggled by the grave key)
+--------------------------------------------------------------------------------
+
+-- The Kinesis Advantage360 on this desk is the SmartSet board, NOT the Pro --
+-- there is no ZMK and no UF2 flashing. Its layer lives in layouts/layout2.txt
+-- on the keyboard's own v-Drive: SmartSet + Hotkey 3 mounts it, SmartSet +
+-- Hotkey 4 reloads a layout without unmounting. The grave key toggles the layer
+-- with [grav]>[fn2t], and [grav]>[deft] inside the layer toggles back out.
+--
+-- The layer sends F13-F16 rather than replaying herdr's own backtick prefix
+-- chords. Without the `fkeys:basic_13-24` xkb option those codes carry XF86
+-- names, which is why the binds below read XF86Launch* and not F14/F15/F16 --
+-- confirmed with `xkbcli compile-keymap --layout us --options "$kb_options"`.
+-- Taking that option is a machine-wide change to input.lua and is not needed
+-- here; it would only make these three lines read more honestly.
+--
+-- F13 is deliberately absent below: the layer's J sends it, and XF86Tools is
+-- already bound to dictation above (same keycode as the foot pedal), so J is
+-- push-to-talk for free with no bind of its own.
+--
+--   J -> f13 -> XF86Tools     push to talk        (bound above, with the pedal)
+--   K -> f14 -> XF86Launch5   previous agent
+--   L -> f15 -> XF86Launch6   next agent
+--   ; -> f16 -> XF86Launch7   jump to whoever wants attention
+--
+-- herdr exposes no next/previous at any level, only `list` and `focus`, so the
+-- cycling lives in herdr-cycle. Ships in the `herdr` stow package, which isn't
+-- deployed on every host.
+if o.cmd_present("herdr-cycle") then
+  o.bind("XF86Launch5", "Previous agent", "herdr-cycle agent prev")
+  o.bind("XF86Launch6", "Next agent", "herdr-cycle agent next")
+  o.bind("XF86Launch7", "Jump to agent wanting attention", "herdr-jump-to-attention")
 end
 
 --------------------------------------------------------------------------------

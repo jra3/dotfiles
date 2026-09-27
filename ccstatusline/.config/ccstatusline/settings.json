@@ -8,7 +8,29 @@
         "rawValue": true
       },
       {
-        "id": "4",
+        "id": "repo-sep",
+        "type": "separator"
+      },
+      {
+        "id": "repo",
+        "type": "custom-command",
+        "commandPath": "cc-repo",
+        "color": "blue",
+        "timeout": 1000
+      },
+      {
+        "id": "loc-sep",
+        "type": "separator"
+      },
+      {
+        "id": "git-loc",
+        "type": "custom-command",
+        "commandPath": "cc-git-loc",
+        "preserveColors": true,
+        "timeout": 1000
+      },
+      {
+        "id": "pr-stack-sep",
         "type": "separator"
       },
       {
@@ -20,61 +42,12 @@
         "timeout": 2000
       },
       {
-        "id": "pr-stack-sep",
+        "id": "model-sep",
         "type": "separator"
       },
       {
-        "id": "7",
-        "type": "git-worktree",
-        "color": "yellow",
-        "rawValue": true
-      },
-      {
-        "id": "6",
-        "type": "separator"
-      },
-      {
-        "id": "5",
-        "type": "git-branch",
-        "color": "magenta",
-        "rawValue": true
-      }
-    ],
-    [],
-    [
-      {
-        "id": "66c09549-88ff-472a-9d9c-63d5b5a19106",
-        "type": "session-usage"
-      },
-      {
-        "id": "62d7b5ad-7f99-46ee-ab8a-dafdbbbdfea6",
-        "type": "separator"
-      },
-      {
-        "id": "18738cb8-2fbf-45ac-8e60-49e753f3314c",
-        "type": "reset-timer",
-        "rawValue": true,
-        "metadata": {
-          "display": "time",
-          "compact": "false"
-        }
-      },
-      {
-        "id": "6b410115-6875-4f6d-bd6d-07afe0a131e7",
-        "type": "flex-separator"
-      },
-      {
-        "id": "54437968-fba2-4c1a-840f-a86792a2d020",
-        "type": "weekly-usage",
-        "rawValue": false
-      },
-      {
-        "id": "5d524c41-fbd7-40ee-ab22-11600a50d0f6",
-        "type": "separator"
-      },
-      {
-        "id": "45525798-8fe0-46db-9fb5-352562cf41d6",
-        "type": "weekly-reset-timer",
+        "id": "model",
+        "type": "model",
         "rawValue": true
       }
     ]

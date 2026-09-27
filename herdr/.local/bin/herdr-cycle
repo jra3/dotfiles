@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Cycle herdr focus forward or backward within one scope.
+
+Usage: herdr-cycle <agent|workspace> <prev|next>
+
+WHY THIS SCRIPT EXISTS: herdr has no next/previous at any level. Every scope
+exposes exactly `list` and `focus` over the socket API -- verified against
+`herdr agent --help` and `herdr workspace --help`. But `list` marks the current
+item with `focused: true`, so cycling is list, find focused, step, focus. That
+is the whole script, and it is identical for both scopes.
+
+ORDERING. Agents carry no `number` field, and the order `list` returns is the
+server's, which `ui.agent_panel_sort = "priority"` can reorder as agents change
+state. Cycling through an order that reshuffles under you is disorienting -- the
+same keypress lands somewhere different depending on who happens to be blocked.
+So this sorts agents spatially by (workspace_id, pane_id) instead: stable across
+state changes, at the cost of not matching the sidebar's visual order. Workspaces
+do carry `number`, and that is already the order shown, so they use it.
+
+Wraps at both ends. With nothing focused (or nothing to focus), focuses the
+first item rather than failing -- the key should always do something.
+"""
+
+import json
+import subprocess
+import sys
+
+SCOPES = {
+    # scope: (list key in result, id field, sort key)
+    "agent": ("agents", "pane_id", lambda a: (a.get("workspace_id", ""), a.get("pane_id", ""))),
+    "workspace": ("workspaces", "workspace_id", lambda w: w.get("number", 0)),
+}
+
+
+def herdr(*args):
+    """Run a herdr CLI command, returning parsed JSON for `list` calls."""
+    proc = subprocess.run(
+        ["herdr", *args], capture_output=True, text=True, check=False
+    )
+    if proc.returncode != 0:
+        sys.exit(f"herdr {' '.join(args)} failed: {proc.stderr.strip()}")
+    return proc.stdout
+
+
+def main():
+    if len(sys.argv) != 3 or sys.argv[1] not in SCOPES or sys.argv[2] not in ("prev", "next"):
+        sys.exit(__doc__.strip().splitlines()[2])
+
+    scope, direction = sys.argv[1], sys.argv[2]
+    key, id_field, sort_key = SCOPES[scope]
+
+    items = json.loads(herdr(scope, "list"))["result"][key]
+    if not items:
+        return
+    items.sort(key=sort_key)
+
+    step = 1 if direction == "next" else -1
+    current = next((i for i, it in enumerate(items) if it.get("focused")), None)
+    target = items[0] if current is None else items[(current + step) % len(items)]
+
+    herdr(scope, "focus", target[id_field])
+
+
+if __name__ == "__main__":
+    main()

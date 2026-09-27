@@ -2,7 +2,7 @@
 
 Claude Code's status line. `claude/.claude/settings.json` sets
 `statusLine.command` to `npx -y ccstatusline@latest`; this package supplies the
-layout that command reads, plus the one custom segment it shells out to.
+layout that command reads, plus the custom segments it shells out to.
 
 ```
 stow ccstatusline
@@ -10,14 +10,28 @@ stow ccstatusline
 
 ## Layout
 
-Two rows (ccstatusline's middle row is intentionally empty):
+One row:
 
-| Row | Segments |
-|---|---|
-| top | context % remaining · **PR widget** · git worktree · git branch |
-| bottom | session usage · reset timer · ⟨flex⟩ · weekly usage · weekly reset timer |
+| Segments |
+|---|
+| context % remaining · **repo** · **worktree or branch** · **PR widget** · model |
 
-`colorLevel: 3` (truecolor) — fine in Ghostty.
+`repo` and `worktree or branch` are two small scripts in `.local/bin`:
+
+- `cc-repo` prints the repo's name: the basename of the *primary* checkout,
+  so a `ga` worktree at `.dotfiles--honk` still says `.dotfiles`. Outside git
+  it falls back to the basename of the cwd Claude Code passes on stdin.
+- `cc-git-loc` prints where you are in that repo. In a linked worktree it is
+  the worktree, **yellow**, with the `<repo>--` prefix `ga` adds stripped
+  (`.dotfiles--honk` → `honk`). In the primary checkout it is the branch,
+  **magenta**. Git's own internal worktree name is not used because it is
+  mangled (`.dotfiles--honk` registers as `-dotfiles--honk`).
+
+So the honk worktree renders `.dotfiles | honk` in yellow, and the primary
+clone on main renders `.dotfiles | main` in magenta.
+
+Session and weekly usage used to sit on a second row. Dropped 2026-09-10: the
+Omarchy shell bar shows the same limits, so the row was a duplicate.
 
 ## The PR widget
 

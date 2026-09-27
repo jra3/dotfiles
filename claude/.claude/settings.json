@@ -77,7 +77,8 @@
       "Bash(aws *)",
       "Bash(tmux *)",
       "Bash(hyprctl *)",
-      "Bash(ghostty *)",
+      "Bash(kitty *)",
+      "Bash(kitten *)",
       "Bash(for *)",
       "WebSearch",
       "WebFetch",
@@ -123,8 +124,7 @@
       "Bash(poetry *)",
       "Bash(direnv *)",
       "Bash(ssh-keygen *)",
-      "Bash(lsusb *)",
-      "Read(//home/jallen/.config/**)"
+      "Bash(lsusb *)"
     ],
     "deny": [
       "AskUserQuestion"
@@ -155,7 +155,6 @@
   "theme": "dark",
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
-  "voiceEnabled": true,
   "autoMode": {
     "environment": [
       "### Org-wide",
@@ -183,5 +182,6 @@
       "**Org-specific CLIs**: None configured — routine personal-stack tools observed: stow, hyprctl, omarchy, omarchy-launch-webapp, voxtype, herdr, tailscale, systemctl, udisksctl, pacman (all scoped to this machine/repo's own tooling)",
       "routine under jra3/ prefix on github.com (this repo and its own PRs/issues)"
     ]
-  }
+  },
+  "voiceEnabled": true
 }

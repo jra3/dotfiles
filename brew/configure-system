@@ -1,0 +1,102 @@
+#!/bin/bash
+# Post-install configuration for macOS (counterpart to pacman/configure-system).
+# Safe to re-run (idempotent).
+#
+# Scope note: the Arch script does a lot that has no macOS analogue — binding
+# sshd to the tailnet, systemd user units, UPower/hibernate policy, xdg-mime
+# browser defaults, pacman hooks. Those are deliberately absent here rather than
+# poorly emulated. System-preference tweaks live in the `macos` stow package
+# (`macos-defaults`), which this script does not call — run it yourself when you
+# want to reset system prefs, since it restarts Dock/Finder.
+
+set -euo pipefail
+
+if [ "$(uname -s)" != "Darwin" ]; then
+    echo "This script is macOS-only. On Arch, run pacman/configure-system." >&2
+    exit 1
+fi
+
+echo "Configuring system..."
+
+# --- TMPDIR ---
+# zsh/.zshenv exports TMPDIR="$HOME/tmp" unconditionally. macOS otherwise hands
+# out a per-user dir under /var/folders, so without this every tool that honours
+# TMPDIR writes into a path that does not exist.
+echo "Ensuring TMPDIR..."
+install -d -m 700 "$HOME/tmp"
+echo "  ~/tmp present."
+
+# --- SSH client control sockets ---
+# config.shared enables multiplexing with `ControlPath ~/.ssh/sockets/cm-%C`.
+# ssh won't create the directory itself, so every connection fails until it exists.
+echo "Ensuring SSH control-socket dir..."
+install -d -m 700 "$HOME/.ssh/sockets"
+echo "  ~/.ssh/sockets present."
+
+# --- SSH: include the shared config ---
+# ssh_config is first-match-wins, so config.shared has to be Included at the
+# BOTTOM to let host-local entries above it win. A fresh macOS machine has no
+# ~/.ssh/config at all, so create one if needed.
+echo "Wiring ~/.ssh/config -> config.shared..."
+ssh_config="$HOME/.ssh/config"
+include_line="Include ~/.ssh/config.shared"
+if [ ! -f "$ssh_config" ]; then
+    install -m 600 /dev/null "$ssh_config"
+    printf '%s\n' \
+        '# Host-local SSH config. Entries here win over the shared config below' \
+        '# (ssh_config is first-match-wins), so add per-host overrides ABOVE the' \
+        '# Include line.' \
+        '' \
+        "$include_line" \
+        > "$ssh_config"
+    echo "  Created $ssh_config with the shared include."
+elif grep -qF "$include_line" "$ssh_config"; then
+    echo "  Already includes config.shared."
+else
+    printf '\n%s\n' "$include_line" >> "$ssh_config"
+    echo "  Appended the shared include to $ssh_config."
+fi
+
+# --- git-worktree-runner ---
+# The gtr/ stow package is only a wrapper; it execs the real binary out of
+# ~/.local/share/git-worktree-runner and errors out until that clone exists.
+# .zshrc aliases `gtr` and binds ^Xg to fgtr, so both break without it.
+echo "Configuring git-worktree-runner..."
+gtr_dir="$HOME/.local/share/git-worktree-runner"
+if [ -x "$gtr_dir/bin/git-gtr" ]; then
+    echo "  Already installed at $gtr_dir."
+elif git clone --quiet https://github.com/coderabbitai/git-worktree-runner.git "$gtr_dir" 2>/dev/null; then
+    echo "  Cloned into $gtr_dir."
+else
+    echo "  Could not clone git-worktree-runner (needs network); skipping."
+fi
+
+# --- gh extensions ---
+# The lazygit package's custom commands are all `gh stack ...`, so without this
+# extension every one of those keybindings fails. Needs gh >= 2.90.
+echo "Configuring gh extensions..."
+if command -v gh >/dev/null 2>&1; then
+    if gh extension list 2>/dev/null | grep -q 'github/gh-stack'; then
+        echo "  gh-stack already installed."
+    elif gh extension install github/gh-stack >/dev/null 2>&1; then
+        echo "  installed gh-stack."
+    else
+        echo "  could not install gh-stack (needs network and gh >= 2.90); skipping."
+    fi
+else
+    echo "  gh not installed; skipping."
+fi
+
+# --- Tailscale ---
+# The macOS app is a cask, not a daemon we enable; there is no `tailscale set
+# --operator` equivalent. Just surface whether the CLI is reachable, since
+# ssh/config.shared canonicalizes bare hostnames into the tailnet.
+echo "Checking Tailscale..."
+ts_cli="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+if command -v tailscale &>/dev/null || [ -x "$ts_cli" ]; then
+    echo "  Tailscale present. Sign in via the menu-bar app if not connected."
+else
+    echo "  Tailscale not installed; ssh/config.shared tailnet shortcuts won't resolve."
+fi
+
+echo "Done!"
