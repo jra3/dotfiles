@@ -5,6 +5,7 @@ bats
 bats-assert
 bats-support
 bear
+blender
 bpf
 claude-code
 cmake
