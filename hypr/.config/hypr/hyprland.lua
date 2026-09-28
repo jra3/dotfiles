@@ -3,8 +3,28 @@
 -- Omarchy's bootstrap keeps path setup out of this user config.
 dofile((os.getenv("OMARCHY_PATH") or "/usr/share/omarchy") .. "/default/hypr/bootstrap.lua")
 
+-- Bitwarden's extension popups (passkey unlock, the WebAuthn PIN prompt) must
+-- keep the size Helium asks for. Omarchy tags them floating-window, which forces
+-- 875x600, and Helium does not re-lay the page out after that resize: the first
+-- frame fills only part of the window, and after the next mouse move the PIN
+-- dialog is drawn clipped and misplaced. Resizing by hand breaks it the same way.
+-- A later rule cannot take the size back -- neither removing the tag nor an
+-- overriding size rule worked (2026-09-27) -- so exempt the class from Omarchy's
+-- size rule as it is registered.
+local bitwarden_popup = "chrome-nngceckbapebfimnlniiiahkandclblb-Default"
+local window_rule = hl.window_rule
+hl.window_rule = function(spec)
+  local match = spec.match or {}
+  if match.tag == "floating-window" and spec.size and not match.class then
+    match.class = "negative:" .. bitwarden_popup
+  end
+  return window_rule(spec)
+end
+
 -- Load Omarchy defaults.
 require("default.hypr.omarchy")
+
+hl.window_rule = window_rule
 
 -- Personal overrides, loaded after Omarchy's defaults so package updates can
 -- improve the defaults without rewriting these files.
