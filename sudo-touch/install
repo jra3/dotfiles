@@ -1,0 +1,120 @@
+#!/bin/bash
+# Touch-gated sudo: every escalation needs a FIDO2 touch, and the desktop says
+# what the touch is for before the key blinks. Idempotent; re-run after edits
+# to the hook or the plugin to reinstall them.
+#
+# Two halves. The root half (hook, PAM lines, sudoers, tmpfiles) is installed
+# with sudo. The user half is the Omarchy shell plugin in plugin/, copied into
+# ~/.config/omarchy/plugins: user-owned, so PAM never executes it.
+#
+# Run from a real terminal: the first sudo needs the password, registration
+# needs a touch. Keep a root shell open in another terminal (sudo -i) until
+# the tests at the end pass. A bad /etc/pam.d/sudo locks you out of sudo.
+
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+authfile=/etc/fido2/fido2
+hook=/usr/local/bin/sudo-escalation-notify
+u2f="auth       sufficient   pam_u2f.so cue authfile=$authfile"
+notify="auth       optional     pam_exec.so seteuid quiet $hook"
+
+sudo -v
+sudo pacman -S --needed --noconfirm pam-u2f
+
+# Root-owned and not writable by the user: the hook runs as root on every sudo.
+sudo install -m 0755 -o root -g root "$here/sudo-escalation-notify" "$hook"
+# The notify-send popup helper the plugin replaced.
+sudo rm -f /usr/local/bin/sudo-escalation-show
+systemctl --user stop 'sudo-escalation-*.service' 2>/dev/null || true
+
+# The plugin can only watch a directory that exists and that it can list.
+# tmpfiles makes it at boot; the hook remakes it if it is gone. A directory
+# left 0711 by the old hook is fixed here rather than at the next sudo.
+printf 'd /run/sudo-escalation 0755 root root -\n' |
+  sudo tee /etc/tmpfiles.d/sudo-escalation.conf >/dev/null
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/sudo-escalation.conf
+
+# pam_u2f binds a credential to pam://<hostname>, so every machine registers
+# its own. Another machine's line will not verify here.
+if ! sudo test -s "$authfile"; then
+  fido2-token -L | grep -q . || { echo "No FIDO2 device found." >&2; exit 1; }
+  sudo install -d -m 0755 -o root -g root /etc/fido2
+  echo "Touch the key when it blinks..."
+  cred=$(pamu2fcfg)
+  [[ -n $cred ]] || { echo "Registration failed." >&2; exit 1; }
+  printf '%s\n' "$cred" | sudo tee "$authfile" >/dev/null
+  sudo chmod 0644 "$authfile"
+fi
+
+# No cached sudo: without this, one touch leaves five minutes of silent root
+# for anything else running as the user.
+tmp=$(mktemp)
+echo 'Defaults timestamp_timeout=0' > "$tmp"
+sudo visudo -cqf "$tmp"
+sudo install -m 0440 -o root -g root "$tmp" /etc/sudoers.d/10-touch-gated
+rm -f "$tmp"
+
+# sudo: the notify hook first, so the popup is up before the key blinks. Each
+# line is checked on its own: a machine that already ran
+# omarchy-setup-security-fido2 has pam_u2f but no hook.
+if ! grep -q "^session.*$hook" /etc/pam.d/sudo || ! grep -q pam_u2f.so /etc/pam.d/sudo; then
+  [[ -e /etc/pam.d/sudo.pre-touch ]] ||
+    sudo cp -a /etc/pam.d/sudo /etc/pam.d/sudo.pre-touch
+fi
+if ! grep -q pam_u2f.so /etc/pam.d/sudo; then
+  sudo sed -i "1a $u2f" /etc/pam.d/sudo
+fi
+if ! grep -q "^auth.*$hook" /etc/pam.d/sudo; then
+  # Insert above the first pam_u2f line, wherever it sits.
+  sudo sed -i "0,/pam_u2f\.so/{/pam_u2f\.so/i $notify
+}" /etc/pam.d/sudo
+fi
+
+# The same hook in the session phase closes the popup once the touch lands.
+if ! grep -q "^session.*$hook" /etc/pam.d/sudo; then
+  echo "session    optional     pam_exec.so seteuid quiet $hook" |
+    sudo tee -a /etc/pam.d/sudo >/dev/null
+fi
+
+# polkit: copy the packaged stack and prepend, instead of what
+# omarchy-setup-security-fido2 does when /etc/pam.d/polkit-1 is missing: it
+# writes a bare pam_unix stack that shadows /usr/lib/pam.d/polkit-1 and drops
+# system-auth, faillock included (omarchy #9873).
+if [[ ! -f /etc/pam.d/polkit-1 ]]; then
+  sudo install -m 0644 -o root -g root /usr/lib/pam.d/polkit-1 /etc/pam.d/polkit-1
+fi
+if ! grep -q pam_u2f.so /etc/pam.d/polkit-1; then
+  sudo sed -i "1a $u2f" /etc/pam.d/polkit-1
+fi
+
+# The dialog: an Omarchy shell service plugin. Copied, not symlinked, because
+# the plugin validator refuses symlinks inside a plugin folder. The service is
+# keepLoaded, so a changed copy only takes effect after a shell restart.
+plugin_id=jra3.sudo-escalation
+plugin_dir=$HOME/.config/omarchy/plugins/$plugin_id
+if ! diff -rq "$here/plugin" "$plugin_dir" >/dev/null 2>&1; then
+  omarchy-plugin-validate "$here/plugin"
+  mkdir -p "$plugin_dir"
+  cp "$here"/plugin/* "$plugin_dir/"
+  plugin_changed=1
+fi
+omarchy-shell shell rescanPlugins >/dev/null
+if ! omarchy-shell shell listPlugins | jq -e --arg id "$plugin_id" 'any(.[]; .id == $id and .enabled)' >/dev/null; then
+  omarchy-plugin-enable "$plugin_id"
+  plugin_changed=1
+fi
+if [[ ${plugin_changed:-0} == 1 ]]; then
+  omarchy-restart-shell
+fi
+
+echo
+echo "--- /etc/pam.d/sudo"; cat /etc/pam.d/sudo
+echo "--- /etc/pam.d/polkit-1"; cat /etc/pam.d/polkit-1
+cat <<'EOF'
+
+Test from this terminal, root shell still open elsewhere:
+  sudo -k; sudo true     dialog, then a touch, no password
+  sudo true              touch again: nothing cached
+  pkexec true            touch through polkit
+  omarchy-shell jra3.sudo-escalation status    what the dialog holds
+EOF

@@ -1,0 +1,204 @@
+#!/bin/bash
+# pam_exec hook, first in /etc/pam.d/sudo's auth stack, ahead of pam_u2f.
+# A touch proves someone is present, not what they are approving. This
+# records what sudo was asked to run before the key starts blinking, so the
+# dialog on the desktop can say what the touch is for.
+#
+# Runs as root. Installed root:root 0755 in /usr/local/bin: a copy the user
+# can write would let any process running as the user, an agent included,
+# rewrite it and get root on the next sudo.
+#
+# The hook only writes files. The auth phase drops a JSON record into
+# /run/sudo-escalation/, the session phase drops an .approved marker beside
+# it once the touch has landed. The Omarchy shell plugin (plugin/) watches
+# the directory and draws the dialog; root starts nothing in the user's
+# session. Records are root-owned and 0640 to the user's group: the dialog
+# and the agent both run as the user, and a file the user could write could
+# be swapped for something harmless while the dialog is up.
+#
+# Wired as `optional`, so it fails open: with no shell running the touch
+# prompt still happens, with nothing on screen. See A-303.
+
+set -u
+PATH=/usr/bin
+umask 077
+
+# Unprivileged dry run, for testing without PAM. Writes to the user's own
+# runtime dir, which the plugin also watches and labels as a test record:
+#   SUDO_ESCALATION_TEST_PID=<pid> PAM_TYPE=auth PAM_RUSER=$USER sudo-escalation-notify
+# then PAM_TYPE=open_session to play the touch landing. With
+# SUDO_ESCALATION_TEST_CMDLINE=<file> the argv is read from that file
+# (NUL-separated, like /proc/<pid>/cmdline) instead of the test pid's.
+test_pid=""
+((EUID)) && test_pid=${SUDO_ESCALATION_TEST_PID:-}
+
+user=${PAM_RUSER:-}
+[[ -n $user ]] || exit 0
+uid=$(id -u -- "$user") || exit 0
+gid=$(id -g -- "$user") || exit 0
+
+# pam_exec forks us from the process running the PAM stack, which for sudo is
+# the sudo front end itself, so its argv is the command being escalated.
+pid=${test_pid:-$PPID}
+
+dir=/run/sudo-escalation
+if [[ -n $test_pid ]]; then
+  dir=/run/user/$uid/sudo-escalation-test
+  install -d -m 0700 "$dir"
+else
+  # Listable by everyone so the plugin can watch it; the records inside are
+  # 0640, so the listing is the only thing another user learns.
+  install -d -m 0755 -o root -g root "$dir"
+fi
+
+case ${PAM_TYPE:-} in
+  auth) ;;
+  # sudo opens its session in the same process right after auth succeeds,
+  # so the touch has landed: mark the record approved.
+  open_session)
+    latest=""
+    for f in "$dir"/*-"$pid".json; do [[ -e $f ]] && latest=$f; done
+    [[ -n $latest ]] || exit 0
+    marker=${latest%.json}.approved
+    : > "$marker"
+    [[ -n $test_pid ]] || chown "root:$gid" "$marker"
+    chmod 0640 "$marker"
+    exit 0 ;;
+  *) exit 0 ;;
+esac
+
+cmdline=/proc/$pid/cmdline
+[[ -n $test_pid && -n ${SUDO_ESCALATION_TEST_CMDLINE:-} ]] && cmdline=$SUDO_ESCALATION_TEST_CMDLINE
+mapfile -d '' -t argv < "$cmdline" || exit 0
+((${#argv[@]})) || exit 0
+cwd=$(readlink "/proc/$pid/cwd")
+
+# Who asked: the sudo process's ancestors, nearest last, up to the session.
+chain=()
+p=$(ps -o ppid= -p "$pid" | tr -d ' ')
+for _ in 1 2 3 4 5 6; do
+  [[ -n $p && $p != 0 && $p != 1 ]] || break
+  comm=$(< "/proc/$p/comm") || break
+  case $comm in systemd|uwsm*|Hyprland|start-hyprland|login|sshd*) break ;; esac
+  chain=("$comm" "${chain[@]}")
+  p=$(ps -o ppid= -p "$p" | tr -d ' ')
+done
+
+tty=${PAM_TTY:-}
+[[ $tty == /dev/* ]] || tty=""
+
+# sudo's own option parsing, enough to find the command word. Options that
+# take a value are skipped with it; -- ends the options. A combined short
+# cluster like -Hu is walked letter by letter, the way sudo's getopt does.
+kind=command   # command | shell | edit | list | validate | none
+login=0        # -i: the target's login shell, not the caller's $SHELL
+target=""
+rest=()
+i=1
+n=${#argv[@]}
+valued=ughprtTUCDR   # short options that take a value
+while ((i < n)); do
+  a=${argv[i]}
+  case $a in
+    --) ((i++)); break ;;
+    --user=*) target=${a#*=}; ((i++)) ;;
+    --user) target=${argv[i+1]:-}; ((i += 2)) ;;
+    --login) kind=shell; login=1; ((i++)) ;;
+    --shell) kind=shell; ((i++)) ;;
+    --edit) kind=edit; ((i++)) ;;
+    --list) kind=list; ((i++)) ;;
+    --validate) kind=validate; ((i++)) ;;
+    --group|--host|--prompt|--role|--type|--command-timeout|--other-user|--close-from|--chdir|--chroot) ((i += 2)) ;;
+    --*) ((i++)) ;;
+    -?*)
+      letters=${a#-}
+      while [[ -n $letters ]]; do
+        c=${letters:0:1}; letters=${letters:1}
+        case $c in
+          i) kind=shell; login=1 ;;
+          s) kind=shell ;;
+          e) kind=edit ;;
+          l) kind=list ;;
+          v) kind=validate ;;
+          [$valued])
+            if [[ -n $letters ]]; then val=$letters; letters=""
+            else ((i++)); val=${argv[i]:-}; fi
+            [[ $c == u ]] && target=$val ;;
+        esac
+      done
+      ((i++)) ;;
+    *) break ;;
+  esac
+done
+rest=("${argv[@]:i}")
+[[ $kind == command && ${#rest[@]} -eq 0 ]] && kind=none
+[[ $kind == list && ${#rest[@]} -gt 0 ]] && kind=command   # sudo -l cmd: a query, not a run
+target=${target:-root}
+
+# The executable sudo would actually run, resolved the way sudo does it:
+# through secure_path, never the caller's $PATH. Read from sudoers as root.
+default_path=/usr/local/sbin:/usr/local/bin:/usr/bin
+secure_path=$(grep -rhs -o 'secure_path *= *"\?[^",]*' /etc/sudoers /etc/sudoers.d 2>/dev/null | tail -n 1)
+secure_path=${secure_path#*=}
+secure_path=${secure_path# }
+secure_path=${secure_path#\"}
+secure_path=${secure_path//\\:/:}
+secure_path=${secure_path:-$default_path}
+
+exe=""
+case $kind in
+  command)
+    word=${rest[0]}
+    if [[ $word == */* ]]; then
+      exe=$(readlink -f -- "$word" 2>/dev/null || printf '%s' "$word")
+    else
+      exe=$(PATH=$secure_path type -P -- "$word" 2>/dev/null) || exe=""
+    fi ;;
+  shell)
+    # -i runs the target's login shell; -s runs the caller's $SHELL, which
+    # sudo takes from the environment of the sudo process itself.
+    if ((login)); then
+      exe=$(getent passwd "$target" | cut -d: -f7)
+    else
+      exe=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^SHELL=//p' | head -n 1)
+      [[ -n $exe ]] || exe=$(getent passwd "$user" | cut -d: -f7)
+    fi ;;
+  edit)
+    exe=sudoedit ;;
+esac
+
+# Everything goes through jq, which escapes control characters, so a \r or
+# an escape sequence in an argument cannot repaint the dialog. The plugin
+# renders them visibly.
+to_json_array() { jq -cn '$ARGS.positional' --args -- "$@"; }
+argv_json=$(to_json_array "${argv[@]}")
+rest_json=$(to_json_array "${rest[@]}")
+from_json=$(to_json_array "${chain[@]}")
+
+find "$dir" -type f -mmin +1440 -delete 2>/dev/null
+stamp=$(date +%s)
+file=$dir/$stamp-$pid.json
+tmp=$file.tmp
+jq -cn \
+  --argjson time "$stamp" \
+  --argjson pid "$pid" \
+  --arg user "$user" \
+  --arg tty "$tty" \
+  --arg cwd "$cwd" \
+  --argjson from "$from_json" \
+  --argjson argv "$argv_json" \
+  --arg kind "$kind" \
+  --arg target "$target" \
+  --arg exe "$exe" \
+  --argjson rest "$rest_json" \
+  --arg secure_path "$secure_path" \
+  '{v: 1, time: $time, pid: $pid, user: $user, tty: $tty, cwd: $cwd,
+    from: $from, argv: $argv,
+    command: {kind: $kind, target: $target, exe: $exe, args: $rest,
+              secure_path: $secure_path}}' > "$tmp" || { rm -f "$tmp"; exit 0; }
+[[ -n $test_pid ]] || chown "root:$gid" "$tmp"
+chmod 0640 "$tmp"
+# The plugin sees the file appear whole, never half-written.
+mv -f "$tmp" "$file"
+
+exit 0

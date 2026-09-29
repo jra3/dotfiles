@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "jra3.sudo-escalation",
+  "name": "Sudo escalation",
+  "version": "1.0.0",
+  "author": "John Allen",
+  "description": "Shows what a touch-gated sudo is about to run, centred and persistent until sudo resolves, with a Deny button.",
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "SudoEscalation.qml"
+  }
+}

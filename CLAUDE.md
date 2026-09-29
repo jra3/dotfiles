@@ -211,6 +211,14 @@ This documents the default software stack configured in Omarchy:
 **Stow packages** - Each directory is independent and can be deployed separately:
 - `zsh/` - Shell configuration (XDG-compliant)
 - `git/` - Git config, global ignore patterns, SSH commit signing (`allowed_signers` + `setup-git-signing`)
+- `sudo-touch/` - Touch-gated sudo: pam_u2f on every escalation plus an
+  Omarchy shell plugin that shows what sudo is about to run, centred and
+  persistent until the sudo resolves, with a Deny button. **Not stowed**: run
+  `sudo-touch/install` from a terminal with a root shell open elsewhere. The
+  root hook is copied to `/usr/local/bin`, the plugin to
+  `~/.config/omarchy/plugins/jra3.sudo-escalation/` (copied, not linked: the
+  plugin validator refuses symlinks; keepLoaded, so edits need
+  `omarchy-restart-shell`). See `sudo-touch/README.md`.
 - `gtk/` - GTK bookmarks (the Nautilus sidebar, and every GTK file chooser),
   plus `setup-inbox` — which creates `~/jra3/inbox` and sets its icon. Stow it
   `--no-folding`: GTK writes into `~/.config/gtk-3.0/`. The bookmark is
