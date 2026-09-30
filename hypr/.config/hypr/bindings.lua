@@ -94,6 +94,15 @@ end
 o.bind("SUPER + SHIFT + E", "Emacs", o.launch("env GDK_BACKEND=wayland emacs"))
 o.bind("SUPER + SHIFT + ALT + K", "Chess", { webapp = "https://chess.com/home", focus = true })
 
+-- MakeID L1 label printer. Only one machine has the printer and the code, so
+-- the bind exists only where the script does.
+local label_prompt = os.getenv("HOME") .. "/jra3/mini-labels/omarchy/label-prompt"
+local label_prompt_file = io.open(label_prompt, "r")
+if label_prompt_file then
+  label_prompt_file:close()
+  o.bind("SUPER + SHIFT + L", "Print label", label_prompt)
+end
+
 --------------------------------------------------------------------------------
 -- Scratchpads
 --------------------------------------------------------------------------------
@@ -148,7 +157,6 @@ scratchpad("SUPER + SHIFT + C", "Calendar", "calendar", "chrome-calendar.google.
 scratchpad("SUPER + SHIFT + M", "Email", "mail", "chrome-mail.google.com", o.launch_webapp("https://mail.google.com"))
 scratchpad("SUPER + SHIFT + Y", "YouTube", "youtube", "chrome-youtube.com", o.launch_webapp("https://youtube.com/"))
 scratchpad("SUPER + SHIFT + K", "Chessly", "chessly", "chrome-chessly.com", o.launch_webapp("https://chessly.com/home"))
-scratchpad("SUPER + SHIFT + L", "Linear", "linear", "chrome-linear.app", o.launch_webapp("https://linear.app"))
 scratchpad("SUPER + SHIFT + N", "Notion", "notion", "chrome-app.notion.com", o.launch_webapp("https://app.notion.com/p/antimetal/"))
 scratchpad("SUPER + SHIFT + S", "Slack", "slack", "chrome-app.slack.com", o.launch_webapp("https://app.slack.com/client/T04MQQ4C0LU/D0936HPFMQT"))
 
