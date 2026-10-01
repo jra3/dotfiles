@@ -57,6 +57,10 @@ Item {
   readonly property bool dialogVisible: current !== null
   readonly property int waiting: Math.max(0, pending.length - 1)
   readonly property real remaining: current ? touchTimeout - (now - current.record.time) : 0
+  // While the key blinks the dialog is modal. Once the window closes sudo
+  // may be asking for a password in another window (an askpass dialog under
+  // sudo -A): the scrim goes and clicks outside the card pass through to it.
+  readonly property bool touchWindowOpen: !!current && !current.outcome && remaining > 0
 
   function readFile(path) {
     reader.path = path
@@ -127,17 +131,30 @@ Item {
 
   // The user may signal their own sudo (real uid), and SIGTERM ends the
   // touch wait within a few seconds; SIGINT is deferred until it times out.
+  // A sudo -A waiting on its askpass helper sits on SIGTERM until the helper
+  // exits, so the helper and its children go too, and whatever is still
+  // alive after 3s gets SIGKILL. Descendants that are already root (the
+  // command itself, if the touch beat the click) refuse the signal.
+  readonly property string denyScript: `
+    tree() { for c in $(pgrep -P "$1"); do tree "$c"; done; echo "$1"; }
+    pids=$(tree "$1")
+    kill -TERM $pids 2>/dev/null
+    for _ in 1 2 3 4 5 6; do kill -0 "$1" 2>/dev/null || exit 0; sleep 0.5; done
+    kill -KILL $(tree "$1") 2>/dev/null
+  `
   function deny(entry) {
     if (!entry || entry.outcome || entry.denying) return
     entry.denying = true
-    Quickshell.execDetached(["kill", "-TERM", String(entry.record.pid)])
-    pending = pending.slice()
+    Quickshell.execDetached(["sh", "-c", denyScript, "sudo-escalation-deny", String(entry.record.pid)])
+    // The click is the answer: close now and let the kill finish behind it.
+    settle(entry, "denied")
   }
 
   function lingerFor(entry) {
     // A sudo already gone when its record was first seen (a shell restart
     // picking up recent history) was never a live request: no receipt.
     if (entry.outcome === "ended" && entry.settledAt - entry.ingestedAt < 2000) return 0
+    if (entry.outcome === "denied") return 0
     return entry.outcome === "approved" ? approvedLinger : endedLinger
   }
 
@@ -289,13 +306,19 @@ Item {
       // may fall back to a password prompt there.
       WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
       exclusionMode: ExclusionMode.Ignore
+      mask: root.touchWindowOpen ? fullRegion : cardRegion
+
+      property Region fullRegion: Region { width: panel.width; height: panel.height }
+      property Region cardRegion: Region { item: card }
 
       Rectangle {
         anchors.fill: parent
         color: root.scrim
+        opacity: root.touchWindowOpen ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 200 } }
       }
 
-      MouseArea { anchors.fill: parent }
+      MouseArea { anchors.fill: parent; enabled: root.touchWindowOpen }
 
       BorderSurface {
         id: card

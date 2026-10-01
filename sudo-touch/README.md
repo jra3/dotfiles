@@ -32,11 +32,15 @@ resolves, and polls the sudo front end's pid with `kill -0`. It lasts:
 - `sh -c` payloads are laid out one command per line; control characters and
   bidi overrides are drawn as symbols, never interpreted
 - more than one sudo at once queues, with a count and a touches-today tally
+- after the 30s touch window the scrim drops and only the card takes clicks,
+  so a password fallback (the askpass dialog under `sudo -A`) is reachable
 
 Deny sends SIGTERM to the sudo front end. The user may signal it (sudo keeps
 the caller's real uid) and SIGTERM ends the touch wait in about three seconds.
 SIGINT does not: sudo defers it until pam_u2f's own wait ends, measured at
-29s. An agent running as the user can deny its own sudo this way, and nothing
+29s. A `sudo -A` waiting on its askpass helper ignores SIGTERM until the
+helper exits, so Deny signals sudo's descendants too and follows up with
+SIGKILL after 3s. The dialog closes on the click, not when the kill lands. An agent running as the user can deny its own sudo this way, and nothing
 else, so the plugin being user-writable costs nothing.
 
 ## Dry run without PAM
