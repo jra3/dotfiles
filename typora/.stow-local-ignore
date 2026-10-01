@@ -1,0 +1,8 @@
+# Stow's built-in ignores no longer apply once this file exists, so the
+# relevant ones are repeated here.
+\.git
+\.gitignore
+^/README.*
+
+# Root-side files, installed by pacman/configure-system, never into $HOME.
+^/system

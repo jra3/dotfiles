@@ -1,0 +1,972 @@
+/*
+ * Tokyo Night for Typora — tuned for writing blog posts.
+ *
+ * Palette is Omarchy's tokyo-night (colors.toml) plus the canonical Tokyo
+ * Night syntax accents (#7dcfff, #73daca, #89ddff, #2ac3de, #ff9e64).
+ *
+ * Layout knobs live in the first :root block. Change them and restart Typora
+ * (or toggle themes) to see the result.
+ */
+
+@import "night/mermaid.dark.css";
+
+/* ---------------------------------------------------------------- knobs */
+
+:root {
+    --prose-font: "CaskaydiaMono Nerd Font", monospace;
+    --heading-font: "CaskaydiaMono Nerd Font", monospace;
+    --monospace: "CaskaydiaMono Nerd Font", monospace;
+
+    --base-size: 18px;
+    --line-height: 1.75;
+    --content-width: 70ch;   /* measure of the writing column */
+    --block-gap: 1.25rem;    /* space between paragraphs, lists, fences */
+}
+
+/* -------------------------------------------------------------- palette */
+
+:root {
+    --tn-bg: #1a1b26;
+    --tn-bg-dark: #16161e;
+    --tn-bg-darker: #0e0e14;
+    --tn-bg-light: #24283b;
+    --tn-bg-highlight: #292e42;
+    --tn-border: #2f3549;
+    --tn-muted: #414868;
+    --tn-comment: #565f89;
+    --tn-fg-dark: #737aa2;
+    --tn-fg: #a9b1d6;
+    --tn-fg-bright: #c0caf5;
+
+    --tn-blue: #7aa2f7;
+    --tn-cyan: #7dcfff;
+    --tn-blue-light: #89ddff;
+    --tn-teal: #73daca;
+    --tn-aqua: #2ac3de;
+    --tn-magenta: #bb9af7;
+    --tn-purple: #9d7cd8;
+    --tn-green: #9ece6a;
+    --tn-yellow: #e0af68;
+    --tn-orange: #ff9e64;
+    --tn-red: #f7768e;
+
+    /* Typora's own variables */
+    --bg-color: var(--tn-bg);
+    --text-color: var(--tn-fg);
+    --side-bar-bg-color: var(--tn-bg-dark);
+    --control-text-color: var(--tn-fg-dark);
+    --control-text-hover-color: var(--tn-fg-bright);
+    --primary-color: var(--tn-blue);
+    --primary-btn-border-color: var(--tn-blue);
+    --select-text-bg-color: var(--tn-bg-highlight);
+    --select-text-font-color: var(--tn-fg-bright);
+    --item-hover-bg-color: var(--tn-bg-highlight);
+    --item-hover-text-color: var(--tn-fg-bright);
+    --active-file-bg-color: var(--tn-bg-highlight);
+    --active-file-text-color: var(--tn-fg-bright);
+    --active-file-border-color: var(--tn-blue);
+    --window-border: 1px solid var(--tn-border);
+    --rawblock-edit-panel-bd: var(--tn-bg-light);
+    --search-select-bg-color: var(--tn-blue);
+    --search-select-text-color: var(--tn-bg);
+    --md-char-color: var(--tn-comment);
+    --meta-content-color: var(--tn-comment);
+    --node-fill: var(--tn-bg-light);
+}
+
+/* ----------------------------------------------------------------- base */
+
+html {
+    font-size: var(--base-size);
+    -webkit-font-smoothing: antialiased;
+}
+
+html,
+body {
+    background: var(--bg-color);
+    color: var(--text-color);
+    line-height: var(--line-height);
+    fill: currentColor;
+}
+
+html,
+body,
+button,
+input,
+select,
+textarea,
+div.code-tooltip-content {
+    font-family: var(--prose-font);
+    color: var(--text-color);
+    border-color: transparent;
+}
+
+#write {
+    max-width: var(--content-width);
+    padding-top: 4rem;
+    padding-bottom: 8rem;
+    font-variant-ligatures: common-ligatures;
+}
+
+::selection,
+.in-text-selection {
+    background: var(--tn-bg-highlight);
+    color: var(--tn-fg-bright);
+}
+
+/* Not a bare `pre`: CodeMirror renders every code line as pre.CodeMirror-line. */
+#write p,
+#write ul,
+#write ol,
+#write dl,
+#write table,
+#write pre.md-fences,
+#write blockquote,
+#write figure {
+    margin-top: 0;
+    margin-bottom: var(--block-gap);
+}
+
+strong, b {
+    color: var(--tn-fg-bright);
+    font-weight: 700;
+}
+
+em, i {
+    color: var(--tn-fg-bright);
+    font-style: italic;
+}
+
+del, s {
+    color: var(--tn-comment);
+}
+
+a {
+    color: var(--tn-blue);
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--tn-blue) 35%, transparent);
+    transition: border-color .15s, color .15s;
+}
+
+a:hover {
+    color: var(--tn-cyan);
+    border-bottom-color: var(--tn-cyan);
+}
+
+mark {
+    background: color-mix(in srgb, var(--tn-yellow) 25%, transparent);
+    color: var(--tn-yellow);
+    border-radius: 3px;
+    padding: 0 .15em;
+}
+
+mark .md-meta {
+    color: var(--tn-yellow);
+}
+
+hr {
+    height: 0;
+    border: 0;
+    border-top: 1px dashed var(--tn-muted);
+    margin: 3rem 0 !important;
+    overflow: visible;
+}
+
+/* ------------------------------------------------------------- headings */
+
+#write h1,
+#write h2,
+#write h3,
+#write h4,
+#write h5,
+#write h6 {
+    font-family: var(--heading-font);
+    font-weight: 700;
+    line-height: 1.3;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+#write h1 {
+    font-size: 2rem;
+    color: var(--tn-fg-bright);
+    margin-top: 1rem;
+    padding-bottom: .75rem;
+    border-bottom: 2px solid var(--tn-blue);
+}
+
+#write h2 {
+    font-size: 1.5rem;
+    color: var(--tn-blue);
+}
+
+#write h3 {
+    font-size: 1.25rem;
+    color: var(--tn-magenta);
+}
+
+#write h4 {
+    font-size: 1.1rem;
+    color: var(--tn-cyan);
+}
+
+#write h5 {
+    font-size: 1rem;
+    color: var(--tn-teal);
+}
+
+#write h6 {
+    font-size: 1rem;
+    color: var(--tn-fg-dark);
+    font-weight: 400;
+    font-style: italic;
+}
+
+/* Markdown hashes shown in the left margin while editing a heading. */
+@media (min-width: 900px) {
+    #write h2.md-focus::before,
+    #write h3.md-focus::before,
+    #write h4.md-focus::before,
+    #write h5.md-focus::before,
+    #write h6.md-focus::before {
+        position: absolute;
+        right: calc(100% + .75rem);
+        top: 0;
+        font-family: var(--monospace);
+        font-size: .8rem;
+        font-weight: 400;
+        line-height: inherit;
+        color: var(--tn-comment);
+        border: 0;
+    }
+    #write h2.md-focus::before { content: "h2"; }
+    #write h3.md-focus::before { content: "h3"; }
+    #write h4.md-focus::before { content: "h4"; }
+    #write h5.md-focus::before { content: "h5"; }
+    #write h6.md-focus::before { content: "h6"; }
+}
+
+.md-header-span .md-attr,
+h1.md-focus .md-attr,
+h2.md-focus .md-attr,
+h3.md-focus .md-attr,
+h4.md-focus .md-attr,
+h5.md-focus .md-attr,
+h6.md-focus .md-attr {
+    color: var(--tn-comment);
+    display: inline;
+}
+
+/* ------------------------------------------------------- markdown chars */
+
+/* The syntax Typora reveals around the cursor: **, _, `, [](), etc. */
+.md-meta,
+.md-before,
+.md-after,
+.md-content,
+.md-image > .md-meta {
+    color: var(--tn-comment);
+    font-family: var(--monospace);
+}
+
+.md-expand .md-meta,
+.md-expand.md-image > .md-meta {
+    color: var(--tn-fg-dark);
+}
+
+/* ---------------------------------------------------------- front matter */
+
+/* Typora renders front matter as one run of plain text. Per-token colors come
+   from user-scripts/frontmatter-highlight.js via the ::highlight(fm-*) rules
+   below; without the script the block is plain --tn-fg. */
+#write pre.md-meta-block {
+    position: relative;
+    font-family: var(--monospace);
+    font-size: .85rem;
+    line-height: 1.6;
+    color: var(--tn-fg);
+    background: var(--tn-bg-dark);
+    border: 1px solid var(--tn-border);
+    border-left: 3px solid var(--tn-magenta);
+    border-radius: 6px;
+    padding: 1.75rem 1.25rem .9rem;
+    margin: 0 0 2.5rem;
+}
+
+#write pre.md-meta-block::after {
+    content: "front matter";
+    position: absolute;
+    top: .4rem;
+    left: 1.25rem;
+    font-size: .7rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--tn-magenta);
+    opacity: .8;
+    pointer-events: none;
+    user-select: none;
+}
+
+#write pre.md-meta-block.md-focus {
+    border-color: var(--tn-muted);
+    border-left-color: var(--tn-magenta);
+}
+
+#write pre.md-meta-block:empty::before {
+    color: var(--tn-comment);
+}
+
+::highlight(fm-key)     { color: var(--tn-blue); }
+::highlight(fm-punct)   { color: var(--tn-blue-light); }
+::highlight(fm-string)  { color: var(--tn-green); }
+::highlight(fm-literal) { color: var(--tn-orange); }
+::highlight(fm-number)  { color: var(--tn-orange); }
+::highlight(fm-url)     { color: var(--tn-cyan); }
+::highlight(fm-comment) { color: var(--tn-comment); }
+
+/* ---------------------------------------------------------- inline code */
+
+#write code,
+#write tt,
+#write var,
+kbd {
+    font-family: var(--monospace);
+    font-size: .9em;
+}
+
+#write code,
+#write tt {
+    color: var(--tn-cyan);
+    background: var(--tn-bg-light);
+    border-radius: 4px;
+    padding: .1em .35em;
+}
+
+/* Inline code inside a link keeps the link color. */
+#write a code {
+    color: inherit;
+}
+
+kbd {
+    color: var(--tn-fg-bright);
+    background: var(--tn-bg-light);
+    border: 1px solid var(--tn-muted);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    box-shadow: none;
+    padding: .05em .45em;
+}
+
+/* ---------------------------------------------------------- code blocks */
+
+#write pre.md-fences {
+    font-family: var(--monospace);
+    font-size: .875rem;
+    line-height: 1.6;
+    color: var(--tn-fg);
+    background: var(--tn-bg-dark);
+    border: 1px solid var(--tn-border);
+    border-radius: 6px;
+    padding: .9rem 1.1rem;
+}
+
+#write pre.md-fences.md-focus {
+    border-color: var(--tn-muted);
+}
+
+/* Language label, top right. Hidden while the fence is focused, where
+   Typora shows its own language input in the same spot. */
+#write pre.md-fences[lang]:not([lang=""]):not(.md-focus)::before {
+    content: attr(lang);
+    position: absolute;
+    top: .3rem;
+    right: .7rem;
+    font-size: .7rem;
+    letter-spacing: .05em;
+    color: var(--tn-comment);
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* CodeMirror places the cursor by measuring characters; ligatures like != and
+   -> make it land mid-glyph. */
+#write .CodeMirror,
+#typora-source .CodeMirror {
+    font-variant-ligatures: none;
+}
+
+.CodeMirror-gutters {
+    background: var(--tn-bg-dark);
+    border-right: 1px solid var(--tn-border);
+}
+
+.CodeMirror-linenumber {
+    color: var(--tn-muted);
+}
+
+.CodeMirror div.CodeMirror-cursor {
+    border-left: 2px solid var(--tn-fg-bright);
+}
+
+.CodeMirror-selected,
+.CodeMirror-selectedtext,
+.CodeMirror-focused .CodeMirror-selected {
+    background: var(--tn-bg-highlight) !important;
+}
+
+.cm-s-inner .CodeMirror-activeline-background {
+    background: transparent;
+}
+
+.cm-s-inner .cm-keyword       { color: var(--tn-magenta); }
+.cm-s-inner .cm-def           { color: var(--tn-blue); }
+.cm-s-inner .cm-variable      { color: var(--tn-fg-bright); }
+.cm-s-inner .cm-variable-2    { color: var(--tn-cyan); }
+.cm-s-inner .cm-variable-3,
+.cm-s-inner .cm-type          { color: var(--tn-aqua); }
+.cm-s-inner .cm-property      { color: var(--tn-teal); }
+.cm-s-inner .cm-operator      { color: var(--tn-blue-light); }
+.cm-s-inner .cm-string        { color: var(--tn-green); }
+.cm-s-inner .cm-string-2      { color: var(--tn-teal); }
+.cm-s-inner .cm-number        { color: var(--tn-orange); }
+.cm-s-inner .cm-atom          { color: var(--tn-orange); }
+.cm-s-inner .cm-builtin       { color: var(--tn-aqua); }
+.cm-s-inner .cm-qualifier     { color: var(--tn-yellow); }
+.cm-s-inner .cm-meta          { color: var(--tn-blue-light); }
+.cm-s-inner .cm-tag           { color: var(--tn-red); }
+.cm-s-inner .cm-attribute     { color: var(--tn-magenta); }
+.cm-s-inner .cm-bracket       { color: var(--tn-fg-dark); }
+.cm-s-inner .cm-header        { color: var(--tn-blue); font-weight: 700; }
+.cm-s-inner .cm-quote         { color: var(--tn-fg-dark); font-style: italic; }
+.cm-s-inner .cm-link          { color: var(--tn-blue); }
+.cm-s-inner .cm-url           { color: var(--tn-cyan); }
+.cm-s-inner .cm-hr            { color: var(--tn-muted); }
+.cm-s-inner .cm-positive      { color: var(--tn-green); }
+.cm-s-inner .cm-negative      { color: var(--tn-red); }
+.cm-s-inner .cm-error         { color: var(--tn-red); }
+
+.cm-s-inner .cm-comment,
+.cm-s-inner.cm-comment {
+    color: var(--tn-comment);
+    font-style: italic;
+}
+
+/* ----------------------------------------------------------- blockquote */
+
+blockquote {
+    color: var(--tn-fg-dark);
+    border-left: 3px solid var(--tn-muted);
+    padding: .1rem 0 .1rem 1.25rem;
+    margin-left: 0;
+    font-style: italic;
+}
+
+blockquote strong,
+blockquote em {
+    color: var(--tn-fg);
+}
+
+/* GitHub-style alerts: > [!NOTE] etc. */
+.md-alert {
+    font-style: normal;
+    background: var(--tn-bg-dark);
+    border-radius: 0 6px 6px 0;
+    padding: .75rem 1.25rem;
+}
+
+.md-alert.md-alert-note      { border-left-color: var(--tn-blue); }
+.md-alert.md-alert-tip       { border-left-color: var(--tn-green); }
+.md-alert.md-alert-important { border-left-color: var(--tn-magenta); }
+.md-alert.md-alert-warning   { border-left-color: var(--tn-yellow); }
+.md-alert.md-alert-caution   { border-left-color: var(--tn-red); }
+
+.md-alert-text-note          { color: var(--tn-blue); }
+.md-alert-text-tip           { color: var(--tn-green); }
+.md-alert-text-important     { color: var(--tn-magenta); }
+.md-alert-text-warning       { color: var(--tn-yellow); }
+.md-alert-text-caution       { color: var(--tn-red); }
+
+/* ---------------------------------------------------------------- lists */
+
+#write ul,
+#write ol {
+    padding-left: 1.75rem;
+}
+
+#write li {
+    margin: .25rem 0;
+}
+
+#write li::marker {
+    color: var(--tn-blue);
+}
+
+#write ol > li::marker {
+    font-family: var(--monospace);
+    color: var(--tn-comment);
+}
+
+.task-list {
+    padding-left: 0;
+}
+
+.md-task-list-item > input {
+    -webkit-appearance: none;
+    appearance: none;
+    width: .95rem;
+    height: .95rem;
+    margin-top: .45em;
+    margin-left: -1.5em;
+    border: 1.5px solid var(--tn-muted);
+    border-radius: 3px;
+    background: transparent;
+}
+
+.md-task-list-item > input:checked,
+.md-task-list-item > input[checked] {
+    background: var(--tn-green);
+    border-color: var(--tn-green);
+}
+
+.md-task-list-item > input:checked::after,
+.md-task-list-item > input[checked]::after {
+    content: "";
+    position: absolute;
+    left: .27rem;
+    top: .08rem;
+    width: .25rem;
+    height: .5rem;
+    border: solid var(--tn-bg);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.task-list-done,
+.md-task-list-item > input:checked ~ p {
+    color: var(--tn-comment);
+    text-decoration: line-through;
+}
+
+/* --------------------------------------------------------------- tables */
+
+#write table {
+    font-size: .925rem;
+    border-collapse: collapse;
+}
+
+#write table th {
+    color: var(--tn-fg-bright);
+    background: var(--tn-bg-light);
+    font-weight: 700;
+}
+
+#write table th,
+#write table td {
+    border: 1px solid var(--tn-border);
+    padding: .4rem .75rem;
+}
+
+#write table tr:nth-child(even) td {
+    background: color-mix(in srgb, var(--tn-bg-dark) 60%, transparent);
+}
+
+.ty-table-edit {
+    background: var(--tn-bg-dark);
+    border-top: 1px solid var(--tn-border);
+}
+
+/* ---------------------------------------------------------- footnotes */
+
+sup.md-footnote {
+    background: transparent;
+    color: var(--tn-magenta);
+    font-family: var(--monospace);
+}
+
+.footnotes,
+.footnotes-area {
+    color: var(--tn-fg-dark);
+    font-size: .875rem;
+}
+
+.footnotes-area hr {
+    margin: 2rem 0 1rem !important;
+}
+
+/* ------------------------------------------- html, comments, math, toc */
+
+/* <!-- comments --> and other raw HTML. */
+.md-comment {
+    color: var(--tn-comment);
+    opacity: 1;
+    font-style: italic;
+}
+
+.md-html-inline .md-meta,
+.md-rawblock-tooltip {
+    color: var(--tn-red);
+}
+
+.md-inline-math script,
+.md-inline-math svg,
+.md-math-block svg {
+    color: var(--tn-fg-bright);
+}
+
+.md-mathjax-midline {
+    background: var(--tn-bg-light);
+    border-bottom: none;
+}
+
+.md-toc {
+    background: var(--tn-bg-dark);
+    border-radius: 6px;
+    padding: .5rem 1rem;
+}
+
+.md-toc-item {
+    color: var(--tn-blue);
+}
+
+/* --------------------------------------------------------------- images */
+
+#write img {
+    border-radius: 6px;
+}
+
+/* ----------------------------------------------------------- focus mode */
+
+.on-focus-mode .md-end-block:not(.md-focus):not(.md-focus-container) * {
+    color: var(--tn-muted) !important;
+}
+
+.on-focus-mode li[cid]:not(.md-focus-container) {
+    color: var(--tn-muted);
+}
+
+.on-focus-mode .md-focus,
+.on-focus-mode .md-focus-container {
+    color: var(--tn-fg-bright);
+}
+
+.on-focus-mode .md-fences.md-focus .CodeMirror-code > *:not(.CodeMirror-activeline) *,
+.on-focus-mode .CodeMirror.cm-s-inner:not(.CodeMirror-focused) * {
+    color: var(--tn-muted) !important;
+}
+
+/* ---------------------------------------------------------- source mode */
+
+#typora-source {
+    font-family: var(--monospace);
+}
+
+#typora-source .CodeMirror-lines {
+    max-width: var(--content-width);
+}
+
+.cm-s-typora-default .cm-header {
+    color: var(--tn-blue);
+}
+
+.cm-s-typora-default .cm-property {
+    color: var(--tn-teal);
+}
+
+.cm-s-typora-default .cm-strong {
+    color: var(--tn-fg-bright);
+}
+
+.cm-s-typora-default .cm-em {
+    color: var(--tn-fg-bright);
+}
+
+.cm-s-typora-default .cm-comment,
+.cm-s-typora-default .cm-code {
+    color: var(--tn-cyan);
+}
+
+.cm-s-typora-default .cm-string,
+.cm-s-typora-default .cm-url {
+    color: var(--tn-green);
+}
+
+.cm-s-typora-default .cm-link {
+    color: var(--tn-blue);
+}
+
+.cm-s-typora-default .cm-atom,
+.cm-s-typora-default .cm-number {
+    color: var(--tn-orange);
+    font-style: normal;
+}
+
+.cm-s-typora-default .cm-quote {
+    color: var(--tn-fg-dark);
+    font-style: italic;
+}
+
+.cm-s-typora-default .cm-tag {
+    color: var(--tn-red);
+}
+
+.cm-s-typora-default .cm-variable-2,
+.cm-s-typora-default .cm-variable-1 {
+    color: var(--tn-fg);
+}
+
+.cm-s-typora-default .cm-meta,
+.cm-s-typora-default .cm-hr {
+    color: var(--tn-comment);
+}
+
+.cm-s-typora-default .CodeMirror-activeline-background {
+    background: var(--tn-bg-light);
+}
+
+.CodeMirror.cm-s-typora-default div.CodeMirror-cursor {
+    border-left: 2px solid var(--tn-fg-bright);
+}
+
+/* ----------------------------------------------------------- app chrome */
+
+#typora-sidebar,
+.sidebar-content,
+.file-list-item {
+    background: var(--side-bar-bg-color);
+}
+
+#typora-sidebar {
+    border-right: 1px solid var(--tn-border);
+    box-shadow: none;
+}
+
+.sidebar-tabs {
+    border-bottom: 0;
+}
+
+.outline-item:hover {
+    background: var(--tn-bg-highlight);
+    border-color: var(--tn-bg-highlight);
+    color: var(--tn-fg-bright);
+}
+
+.outline-item-active > .outline-item .outline-label,
+.active-tab-files #info-panel-tab-file,
+.active-tab-outline #info-panel-tab-outline {
+    color: var(--tn-blue);
+}
+
+.file-library-node.active > .file-node-background,
+.file-list-item.active {
+    background: var(--active-file-bg-color);
+}
+
+.file-library-node.active > .file-node-content,
+.file-list-item.active {
+    color: var(--active-file-text-color);
+}
+
+.file-list-item {
+    border-bottom: none;
+}
+
+footer.ty-footer {
+    border-color: var(--tn-border);
+}
+
+.sidebar-footer-item:hover,
+.footer-item:hover,
+#footer-word-count:hover,
+.ty-show-word-count #footer-word-count,
+.typora-sourceview-on #toggle-sourceview-btn,
+#toggle-sourceview-btn:hover {
+    background: var(--tn-bg-highlight);
+    color: var(--tn-fg-bright);
+}
+
+#top-titlebar,
+#top-titlebar * {
+    color: var(--tn-fg-dark);
+}
+
+.context-menu,
+.dropdown-menu,
+#spell-check-panel,
+#footer-word-count-info,
+#sidebar-files-menu,
+#toc-dropmenu,
+.auto-suggest-container,
+#typora-quick-open,
+.popover,
+.md-table-resize-popover,
+#write div.md-toc-tooltip {
+    background: var(--tn-bg-dark);
+    color: var(--tn-fg);
+    border: 1px solid var(--tn-border);
+}
+
+.popover.bottom > .arrow::after {
+    border-bottom-color: var(--tn-bg-dark);
+}
+
+.dropdown-menu > li > a,
+.context-menu .dropdown-menu > li > a {
+    color: var(--tn-fg);
+}
+
+.dropdown-menu > li > a:hover,
+.dropdown-menu > li > a:focus,
+.dropdown-menu .btn:hover,
+.md-toc .btn:hover {
+    background: var(--tn-bg-highlight);
+    color: var(--tn-fg-bright);
+}
+
+.dropdown-menu .divider,
+.context-menu.dropdown-menu .divider {
+    background-color: var(--tn-border);
+    opacity: 1;
+}
+
+#typora-quick-open input {
+    background: var(--tn-bg-dark);
+    border: 0;
+    border-bottom: 1px solid var(--tn-border);
+}
+
+.typora-quick-open-item {
+    background: inherit;
+    color: inherit;
+}
+
+.typora-quick-open-item.active,
+.typora-quick-open-item:hover {
+    background: var(--tn-bg-highlight);
+    color: var(--tn-fg-bright);
+}
+
+#md-searchpanel {
+    border-bottom: 1px solid var(--tn-border);
+}
+
+#md-searchpanel input {
+    color: var(--tn-fg-bright);
+}
+
+.md-search-hit {
+    background: color-mix(in srgb, var(--tn-yellow) 35%, transparent);
+    color: var(--tn-fg-bright);
+}
+
+.md-search-hit * {
+    color: var(--tn-fg-bright);
+}
+
+.md-search-select {
+    background: var(--tn-orange);
+    color: var(--tn-bg);
+}
+
+.modal-content,
+.megamenu-content,
+.megamenu-opened header {
+    background: var(--bg-color);
+    border: 0;
+}
+
+.modal-content input {
+    background: var(--tn-bg-dark);
+    color: var(--tn-fg-bright);
+}
+
+.modal-backdrop.in {
+    opacity: .7;
+    background: var(--tn-bg-darker);
+}
+
+.modal-header,
+.modal-footer {
+    border: 0;
+}
+
+.btn,
+.btn-default {
+    background: transparent;
+    color: var(--tn-fg);
+}
+
+.btn-default:hover,
+.btn-default:focus,
+.btn-default.active,
+.open > .dropdown-toggle.btn-default {
+    background: var(--tn-bg-highlight);
+    color: var(--tn-fg-bright);
+    border-color: var(--tn-muted);
+}
+
+.btn-primary {
+    background: var(--tn-blue);
+    border-color: var(--tn-blue);
+    color: var(--tn-bg);
+}
+
+.megamenu-menu-panel h1,
+.megamenu-menu-panel h2,
+.long-btn {
+    color: inherit;
+}
+
+.megamenu-menu-panel .dropdown-menu > li > a {
+    background: var(--tn-bg-dark);
+}
+
+#recent-file-panel tbody tr:nth-child(2n-1) {
+    background: transparent !important;
+}
+
+.ty-editor-toolbar {
+    background: var(--tn-bg-dark);
+    border: 1px solid var(--tn-border);
+    --text-color: var(--tn-fg);
+}
+
+#ty-tooltip,
+div.code-tooltip,
+.md-hover-tip .md-arrow::after {
+    background: var(--tn-bg-darker);
+    color: var(--tn-fg);
+}
+
+.ty-preferences .nav-group-item.active,
+.export-item.active,
+.export-items-list-control,
+.export-detail {
+    background: var(--tn-bg-highlight);
+}
+
+.ty-preferences input[type="search"] {
+    background: var(--tn-bg-dark);
+    border-color: var(--tn-border);
+    color: var(--tn-fg-bright);
+}
+
+::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--tn-muted) 60%, transparent);
+}
+
+::-webkit-scrollbar-thumb:active {
+    background: var(--tn-muted);
+}
+
+.typora-node::-webkit-scrollbar {
+    width: 6px;
+}
+
+/* ---------------------------------------------------------------- print */
+
+@media print {
+    html, body {
+        background: var(--tn-bg);
+    }
+}

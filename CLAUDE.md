@@ -363,6 +363,15 @@ This documents the default software stack configured in Omarchy:
   `omarchy-agent-usage-update` only iterates collectors inside
   `$OMARCHY_PATH/bin`, so a user collector can never join its loop. Reads the
   same key as `claude-zai`. See `zai/README.md`
+- `typora/` - Typora `tokyo-night` theme plus user scripts (front matter
+  syntax highlighting, theme live reload). Stow `--no-folding`. Typora has no
+  script hook, so `system/typora-inject-user-scripts` adds one `<script>` tag to
+  the root-owned `/usr/share/typora/resources/window.html`, and a pacman hook
+  re-runs it after each `typora` upgrade. Both are **copied** to `/usr/local/bin`
+  and `/etc/pacman.d/hooks` by hand, not linked (a root hook must not execute a
+  repo file). `.stow-local-ignore` keeps `system/` out of `$HOME`. Theme edits
+  apply live; a full quit (`Ctrl+Q`) is needed only after editing a script. See
+  `typora/README.md`
 
 **XDG compliance** - Configs use XDG Base Directory paths:
 - Config files go in `<package>/.config/<app>/`

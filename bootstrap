@@ -27,7 +27,7 @@ PACKAGES_COMMON=(
 # Need systemd, Hyprland/Wayland, XDG .desktop files, or Arch-only hardware.
 PACKAGES_LINUX=(
     hypr emacs power obsidian webapps bambu-studio google-chrome
-    slack tether voxtype qmk captive-browser scripts
+    slack tether voxtype qmk captive-browser scripts typora
 )
 
 # macOS system preferences.
@@ -105,8 +105,12 @@ for pkg in "${PACKAGES[@]}"; do
     # symlink into the repo, and a host can no longer drop a local-only key file
     # in beside the committed ones — which is the per-host subsetting that
     # build-authorized-keys exists to allow.
+    #
+    # typora ships into ~/.config/Typora/themes/. Folded on a fresh machine, the
+    # whole ~/.config/Typora (caches, session state, Typora's stock themes) would
+    # be written into the repo.
     flags=("${STOW_FLAGS[@]}" "${EXTRA_IGNORES[@]+"${EXTRA_IGNORES[@]}"}")
-    case "$pkg" in emacs|ssh) flags+=(--no-folding) ;; esac
+    case "$pkg" in emacs|ssh|typora) flags+=(--no-folding) ;; esac
 
     echo "  stow: $pkg"
     if ! stow "${flags[@]}" "$pkg" 2>&1 | sed 's/^/      /'; then

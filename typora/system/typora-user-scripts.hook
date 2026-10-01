@@ -1,0 +1,12 @@
+# Re-add our user-script tag to Typora's window.html after the typora package
+# replaces it. See typora/README.md.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = typora
+
+[Action]
+Description = Injecting user scripts into Typora...
+When = PostTransaction
+Exec = /usr/local/bin/typora-inject-user-scripts

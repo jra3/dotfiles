@@ -1,0 +1,44 @@
+#!/bin/bash
+# Add a <script> tag for our user-script loader (user-scripts/init.js) to
+# Typora's window.html.
+#
+# Typora has no user-script hook, and window.html is owned by the typora package,
+# so every upgrade replaces it. The pacman hook typora-user-scripts.hook re-runs
+# this after each one. Idempotent: does nothing if the tag is already there.
+#
+# The tag loads from typora://app/userData/, which Typora maps to the running
+# user's ~/.config/Typora, so this root-owned file names no home directory.
+# Without the stowed script the request just 404s and Typora runs as stock.
+#
+# Installed to /usr/local/bin by pacman/configure-system. It is a root-owned
+# copy on purpose: pacman hooks run as root, and executing a file the user can
+# edit would be a free privilege escalation.
+
+set -euo pipefail
+
+html=/usr/share/typora/resources/window.html
+marker='<!-- jra3:user-scripts -->'
+tag="$marker<script src=\"typora://app/userData/user-scripts/init.js\" defer></script>"
+
+if [ ! -f "$html" ]; then
+    echo "typora-inject-user-scripts: $html not found; is typora installed?" >&2
+    exit 0
+fi
+
+if grep -qF "$marker" "$html"; then
+    exit 0
+fi
+
+if ! grep -q '</body>' "$html"; then
+    echo "typora-inject-user-scripts: no </body> in $html; layout changed, not patching." >&2
+    exit 1
+fi
+
+tmp=$(mktemp "$html.XXXXXX")
+trap 'rm -f "$tmp"' EXIT
+sed "s#</body>#$tag</body>#" "$html" >"$tmp"
+chmod --reference="$html" "$tmp"
+chown --reference="$html" "$tmp"
+mv "$tmp" "$html"
+trap - EXIT
+echo "typora-inject-user-scripts: patched $html"
