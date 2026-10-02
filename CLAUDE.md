@@ -78,6 +78,37 @@ could only hold one scale. There is no longer a symlink there to clobber, so the
 is free to write it. See `hypr/README.md` for what the shared version knew — including
 why a hardcoded mode on `eDP-1` segfaults Hyprland at startup.
 
+### `omarchy-refresh-*` overwrites configs *through* the symlink
+
+`omarchy-refresh-config <path>` copies a shipped default from `$OMARCHY_PATH/config`
+over `~/.config/<path>`, saving your version as `<file>.bak.<epoch>` first.
+`omarchy-refresh-hyprland` does it to seven files in one go (`.luarc.json`,
+`autostart`, `bindings`, `input`, `looknfeel`, `hyprland`, `monitors`). Ten sibling
+commands do the same for herdr, tmux, shell, chromium, applications, limine, pacman,
+sddm, plymouth and hyprsunset.
+
+**This is worse than the `sed -i` case above, because nothing in `~/.config` looks
+wrong afterwards.** `cp -f` follows a symlink and writes to its target, so the link
+survives and `ls -l` still reports a healthy stow symlink. The Omarchy default lands
+*in the repo*. `git status` in `~/.dotfiles` is the only thing that reveals it, and
+the `ls -l` check prescribed above will not.
+
+Nothing runs these on its own. The only caller is the menu, Update > Config >
+Hyprland, so an unattended `omarchy-update` will not do this to you. A curious click
+will.
+
+Seen on cupcake 2026-09-19: all five stowed `hypr/*.lua` files came back as Omarchy's
+all-commented stock versions. `input.lua` lost `kb_options_by_host`, so Caps stopped
+being Ctrl and Alt/Super un-swapped, and `bindings.lua` lost 256 lines.
+`git checkout -- hypr/` restored everything, the `.bak` copies being byte-identical
+to `HEAD`.
+
+Check the host-local files first, because they have no repo to restore from. The same
+run reset `~/.config/hypr/monitors.lua` from `scale = 1.6` to `"auto"`, and its `.bak`
+copy was the only record of the real value. It also left a new
+`~/.config/hypr/.luarc.json` behind (luals stub paths and the `hl`/`o` globals, for
+editing the Lua configs). That one is worth keeping, and stays host-local.
+
 ### `omarchy-emacs-setup` moves `~/.emacs.d` aside — say no
 
 The personal Emacs config is a literate `config.org` in `~/.emacs.d`, its own repo
