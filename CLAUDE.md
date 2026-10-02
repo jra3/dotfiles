@@ -13,7 +13,8 @@ Most packages are shared. `./bootstrap` knows which are Linux-only (systemd
 units, `.desktop` files, Hyprland) and which are macOS-only, and stows only what
 applies — run `./bootstrap --list` to see the split for the current machine.
 **When adding a package, add it to one of the three lists at the top of
-`bootstrap`**, or it will never be deployed.
+`bootstrap`**, or it will never be deployed. `HOST_SKIP` there drops
+hardware-specific packages per machine (paperweight: no `power`, no `qmk`).
 
 Platform-specific tooling lives in two non-stowed directories that mirror each
 other: `pacman/` (`install-packages`, `configure-system`, package lists) and
@@ -349,14 +350,6 @@ This documents the default software stack configured in Omarchy:
   `/usr/share/applications/` file that an upgrade would otherwise restore — the
   three `emacs*` stubs leave `emacs.desktop` as the sole Emacs launcher entry
 - `qmk/` - Optional: host side of a Framework 16 ANSI keymap — the `qmk-mic-led-sync.py` daemon syncing mic/DND/voxtype/pomodoro state over raw HID, and `qmk-flash.py` for reflashing. The firmware half is a separate repo, `jra3/qmk_firmware` branch `fw16-john` at `~/jra3/qmk_firmware`; see `qmk/README.md`
-- `tether/` - **TODO: broken by Omarchy 4.** `waybar-iphone-tether` writes waybar JSON,
-  and waybar no longer exists. Needs either an existing Omarchy shell plugin for
-  USB tethering or a Quickshell one written against
-  `$OMARCHY_PATH/shell/plugins/bar/indicators/` (see `Dictation.qml` for the shape:
-  a `BarIndicator` polling a script that streams bar-friendly JSON). The script
-  itself still detects the tether correctly — only the presentation layer is gone.
-  See `tether/README.md`. The `.network` file and `usbmuxd` are handled by
-  `pacman/configure-system` + `packages-arch.txt`
 - `zai/` - z.ai's GLM Coding Plan as a fourth tab in Omarchy's agents panel.
   `omarchy-agent-usage-zai` prints the record contract the panel reads and a
   systemd user timer writes it every 5 minutes — the packaged

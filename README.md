@@ -52,8 +52,9 @@ lists live at the top of the script.
 - **Shared** — `zsh git tmux starship ripgrep sqlite gh ghostty claude
   ccstatusline lazygit gtr bitwarden herdr ssh`
 - **Linux only** — `hypr emacs power obsidian webapps bambu-studio
-  google-chrome slack tether voxtype qmk captive-browser scripts`. These need
-  systemd units, `.desktop` files, or Hyprland/Wayland.
+  slack voxtype qmk scripts typora`. These need systemd units, `.desktop`
+  files, or Hyprland/Wayland. `HOST_SKIP` drops hardware-specific ones per
+  machine (paperweight skips `power` and `qmk`).
 - **macOS only** — `macos` (system preferences via `defaults`).
 
 `pacman/` and `brew/` are tooling, not dotfiles, and are never stowed — they

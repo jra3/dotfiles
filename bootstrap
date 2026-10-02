@@ -26,9 +26,15 @@ PACKAGES_COMMON=(
 
 # Need systemd, Hyprland/Wayland, XDG .desktop files, or Arch-only hardware.
 PACKAGES_LINUX=(
-    hypr emacs power obsidian webapps bambu-studio google-chrome
-    slack tether voxtype qmk captive-browser scripts typora
+    hypr emacs power obsidian webapps bambu-studio
+    slack voxtype qmk scripts typora
 )
+
+# Per-host opt-outs, for hardware a machine doesn't have.
+case "${HOSTNAME%%.*}" in
+    paperweight) HOST_SKIP=(power qmk) ;;  # desktop: no battery, no Framework 16
+    *)           HOST_SKIP=() ;;
+esac
 
 # macOS system preferences.
 PACKAGES_MACOS=(
@@ -76,6 +82,15 @@ case "$(uname -s)" in
         exit 1
         ;;
 esac
+
+if [ ${#HOST_SKIP[@]} -gt 0 ]; then
+    kept=()
+    for pkg in "${PACKAGES[@]}"; do
+        [[ " ${HOST_SKIP[*]} " == *" $pkg "* ]] || kept+=("$pkg")
+    done
+    PACKAGES=("${kept[@]}")
+    SKIPPED+=("${HOST_SKIP[@]}")
+fi
 
 if [ "$LIST_ONLY" = 1 ]; then
     echo "Platform: $PLATFORM"
@@ -126,7 +141,7 @@ if [ ${#failed[@]} -gt 0 ]; then
     exit 1
 fi
 
-echo "Stowed ${#PACKAGES[@]} package(s). Skipped (wrong platform): ${SKIPPED[*]}"
+echo "Stowed ${#PACKAGES[@]} package(s). Skipped (platform/host): ${SKIPPED[*]}"
 echo ""
 if [ "$DRY_RUN" = 0 ]; then
     if [ "$PLATFORM" = macos ]; then
