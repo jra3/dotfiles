@@ -419,6 +419,8 @@ zd() {
   fi
 }
 
+# Host-local overrides. Deliberately not in the repo (gitignored): a regular
+# file in ~ on each machine.
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # Aliases are an interactive-shell convenience. Non-interactive shells — Claude

@@ -23,3 +23,8 @@ __pycache__/
 # extension dir at load time. It lands here rather than in ~/.local/share/
 # because the helium package must be stowed FOLDED -- see helium/README.md.
 helium/.local/share/chromium-extensions/*/_metadata/
+
+# Host-local shell overrides: always a regular file in ~, never stowed.
+# .zhsrc.local covers the common typo.
+zsh/.zshrc.local
+zsh/.zhsrc.local
