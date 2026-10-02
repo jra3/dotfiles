@@ -1,0 +1,29 @@
+#!/bin/bash
+# Open every userscript in this directory in Helium, so Tampermonkey offers to
+# install it. Scripts are served from the public repo on GitHub, not the local
+# checkout: their @updateURL points there, and installing from the same URL keeps
+# Tampermonkey's update check and the install source identical.
+#
+#   tampermonkey/install            # all *.user.js
+#   tampermonkey/install foo.user.js
+#
+# Push first. A script that exists only locally 404s.
+
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+raw="https://raw.githubusercontent.com/jra3/dotfiles/main/tampermonkey"
+
+shopt -s nullglob
+scripts=("$@")
+[ ${#scripts[@]} -eq 0 ] && scripts=(*.user.js)
+if [ ${#scripts[@]} -eq 0 ]; then
+    echo "No *.user.js files in $(pwd)." >&2
+    exit 1
+fi
+
+for s in "${scripts[@]}"; do
+    s="$(basename "$s")"
+    echo "Opening $s"
+    helium-browser "$raw/$s" >/dev/null 2>&1 &
+done

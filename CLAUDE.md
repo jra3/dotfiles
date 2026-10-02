@@ -138,6 +138,7 @@ Helium profile on the machine:
 |---|---|
 | floccus — bookmark sync | `fnaicdffflnofjppbagibeoednhnbjhg` |
 | Fluff Busting Purity — Facebook feed cleanup | `nmkinhboiljjkhaknpaeaicmdjhagpep` |
+| Tampermonkey — userscripts, kept in `tampermonkey/` | `dhdgffkkebhmkfjojejmpbldmpobfkfo` |
 
 **That `a+rw` does not always survive.** On 2026-09-14 the directory was found
 `root:root 755` holding only `color.json`, with no `extensions.json` at all and
@@ -335,6 +336,12 @@ This documents the default software stack configured in Omarchy:
   `SUPER + SHIFT + SLASH` **unbind** stays in `bindings.lua`: without it Omarchy's
   own 1Password binding revives on the now-dead key
 - `ssh/` - Shared SSH config (`config.shared`, included last so host-local `~/.ssh/config` wins), the ssh-agent loader, and the committed **public** halves of the YubiKey resident auth keys in `.ssh/authorized_keys.d/` — one file per machine, assembled into a host-local `~/.ssh/authorized_keys` by `build-authorized-keys`. Private credentials never leave their YubiKey; see `yubikey-ssh.md`
+- `tampermonkey/` - Userscripts for the policy-installed Tampermonkey (not stowed).
+  Each `*.user.js` installs from, and auto-updates from, its public
+  `raw.githubusercontent.com` URL, so **bump `@version` on every edit** or no
+  other machine picks it up. `tampermonkey/install` opens them all in Helium. The
+  per-profile "Allow User Scripts" toggle has to be flipped by hand. See
+  `tampermonkey/README.md`
 - `pacman/` - Arch package lists and `configure-system` for post-install setup (not stowed)
 - `brew/` - macOS `Brewfile`, `install-packages`, and `configure-system` (not stowed)
 - `macos/` - macOS system preferences (`macos-defaults`); macOS-only stow package
