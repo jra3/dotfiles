@@ -248,7 +248,8 @@ fi
 # pin keeps working; re-run this script after a Helium upgrade to refresh it.
 #
 # Policy installs the extension and nothing else. Per-extension *settings* are
-# still per-machine setup: floccus's sync account, F.B. Purity's options panel.
+# still per-machine setup: floccus's sync account, F.B. Purity's options panel,
+# Tampermonkey's "Allow User Scripts" toggle and its scripts (tampermonkey/install).
 if command -v helium-browser &>/dev/null; then
     echo "Configuring Helium extension policy..."
     policy_dir="/etc/chromium/policies/managed"
@@ -262,6 +263,7 @@ if command -v helium-browser &>/dev/null; then
     helium_extensions=(
         "fnaicdffflnofjppbagibeoednhnbjhg|floccus -- bookmark sync"
         "nmkinhboiljjkhaknpaeaicmdjhagpep|Fluff Busting Purity -- Facebook feed cleanup"
+        "dhdgffkkebhmkfjojejmpbldmpobfkfo|Tampermonkey -- userscripts (scripts live in tampermonkey/)"
     )
 
     if [ ! -d "$policy_dir" ]; then
@@ -350,40 +352,6 @@ if systemctl --user cat battery-sentinel.timer &>/dev/null; then
     echo "  battery-sentinel.timer enabled."
 else
     echo "  battery-sentinel.timer not stowed; run 'stow power' and re-run."
-fi
-
-# --- iPhone USB tethering (systemd-networkd) ---
-# The iPhone's `ipheth` driver creates an Ethernet-class interface when Personal
-# Hotspot is on and the phone is plugged in. DHCP it, with a route metric between
-# real Ethernet (100) and Wi-Fi (600) so a tethered phone becomes the default
-# route (e.g. on the bus) but still yields to a wired connection. IPv4 only:
-# iPhone tether IPv6 is flaky and can stall connections. Extra drivers are listed
-# so the same file also covers Android (RNDIS/NCM) if ever needed.
-# Requires the `usbmuxd` package (in packages-arch.txt); its udev rule autostarts
-# the daemon on plug-in, and pairing ("Trust This Computer") happens on first use.
-# NOTE the 15- prefix: systemd-networkd applies only the FIRST matching .network
-# file in lexical order. The iPhone tether often appears as `eth0`, which the
-# stock 20-ethernet.network (Name=eth*) also matches — so this file must sort
-# before it to win, otherwise it's silently shadowed.
-echo "Configuring iPhone USB tethering..."
-if systemctl is-active --quiet systemd-networkd || systemctl is-enabled --quiet systemd-networkd; then
-    sudo rm -f /etc/systemd/network/25-usb-tether.network  # retired earlier name
-    printf '%s\n' \
-        '[Match]' \
-        'Driver=ipheth rndis_host cdc_ncm cdc_ether' \
-        '' \
-        '[Network]' \
-        'DHCP=ipv4' \
-        '' \
-        '[DHCPv4]' \
-        'RouteMetric=200' \
-        | sudo tee /etc/systemd/network/15-usb-tether.network >/dev/null
-    sudo systemctl reload-or-restart systemd-networkd
-    echo "  Installed /etc/systemd/network/15-usb-tether.network"
-else
-    # NetworkManager (or another manager) auto-connects a USB tether as a new
-    # Ethernet device — no .network file needed. Skip so we don't drop a dead file.
-    echo "  systemd-networkd not in use; skipping (NetworkManager tethers natively)."
 fi
 
 # --- gh extensions ---

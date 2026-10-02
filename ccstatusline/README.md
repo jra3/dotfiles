@@ -67,8 +67,8 @@ checkouts and would otherwise serve each other's stale PR numbers.
   pointing `commandPath` at bare `hostname` and at `/usr/bin/hostname` — both
   render identically. The only requirement is that `~/.local/bin` is on `PATH`,
   which `zsh/.zshrc` sets and uwsm's env preloader exports into the Hyprland
-  session — the same mechanism the bare `.desktop` `Exec=` lines in the
-  `google-chrome` and `slack` packages already depend on.
+  session — the same mechanism the bare `.desktop` `Exec=` line in the
+  `slack` package already depends on.
 - **Directory folding is wanted here** — the opposite of the `emacs` package.
   `~/.config/ccstatusline` becomes a symlink to this package's directory, so when
   ccstatusline's own config TUI rewrites `settings.json` the write lands in the

@@ -41,7 +41,6 @@ tailscale
 tmux
 ttf-cascadia-mono-nerd
 udiskie
-usbmuxd
 voxtype-bin
 yq
 yubikey-manager
