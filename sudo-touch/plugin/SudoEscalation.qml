@@ -21,10 +21,10 @@ import "SudoModel.js" as Model
 Item {
   id: root
 
+  // The only directory read. Root-owned 0755, so only the PAM hook can put
+  // a record here: nothing running as the user, an agent included, can make
+  // this plugin draw a dialog.
   readonly property string recordDir: "/run/sudo-escalation"
-  // The hook's unprivileged dry run writes here. Anything from this
-  // directory is drawn with a warning: the user, and so an agent, can write it.
-  readonly property string testDir: Quickshell.env("XDG_RUNTIME_DIR") + "/sudo-escalation-test"
 
   // libfido2's wait for a touch, measured at 29s on pam_u2f 1.3 / YubiKey 5.
   property int touchTimeout: 30
@@ -50,7 +50,6 @@ Item {
   property string approvedDay: ""
   property real now: Date.now() / 1000
   property bool recordDirReady: false
-  property bool testDirReady: false
 
   readonly property var current: pending.length ? pending[0] : null
   readonly property var desc: current ? current.desc : null
@@ -67,7 +66,7 @@ Item {
     return reader.text()
   }
 
-  function ingest(model, dirPath, isTest) {
+  function ingest(model, dirPath) {
     var approved = {}
     var records = []
     var present = {}
@@ -92,7 +91,7 @@ Item {
       var parsed = Model.parseRecord(readFile(rec.key))
       if (!parsed) { console.warn("sudo-escalation: unreadable record " + rec.key); continue }
       var entry = {
-        key: rec.key, base: rec.base, dir: dirPath, test: isTest,
+        key: rec.key, base: rec.base, dir: dirPath,
         record: parsed, desc: Model.describe(parsed),
         outcome: "", settledAt: 0, denying: false, watcher: null, ingestedAt: Date.now()
       }
@@ -182,7 +181,6 @@ Item {
     if (entry.outcome === "denied") return "denied"
     if (entry.outcome === "ended") return "sudo ended with no touch"
     if (entry.denying) return "denying…"
-    if (entry.test) return "test record: no sudo is waiting and no key is blinking"
     var left = Math.ceil(remaining)
     if (left > 0) return "the key is blinking · " + left + "s"
     return "touch window closed · sudo may be asking for a password"
@@ -229,35 +227,27 @@ Item {
       var out = []
       for (var i = 0; i < root.pending.length; i++) {
         var e = root.pending[i]
-        out.push({ pid: e.record.pid, headline: e.desc.headline, outcome: e.outcome, denying: e.denying, test: e.test, watcherRunning: e.watcher ? e.watcher.running : null })
+        out.push({ pid: e.record.pid, headline: e.desc.headline, outcome: e.outcome, denying: e.denying, watcherRunning: e.watcher ? e.watcher.running : null })
       }
-      return JSON.stringify({ pending: out, approvedToday: root.approvedToday, recordDirReady: root.recordDirReady, testDirReady: root.testDirReady })
+      return JSON.stringify({ pending: out, approvedToday: root.approvedToday, recordDirReady: root.recordDirReady })
     }
   }
 
-  // The directories may not exist yet: /run/sudo-escalation is created by
-  // the first sudo after boot unless tmpfiles.d made it, and the test dir by
-  // the first dry run. A folder model on a missing directory never wakes, so
-  // probe until each exists before pointing a model at it.
+  // The directory may not exist yet: /run/sudo-escalation is created by the
+  // first sudo after boot unless tmpfiles.d made it. A folder model on a
+  // missing directory never wakes, so probe until it exists before pointing
+  // the model at it.
   Process {
     id: recordDirProbe
     command: ["test", "-d", root.recordDir]
     onExited: function(code) { if (code === 0) root.recordDirReady = true }
   }
-  Process {
-    id: testDirProbe
-    command: ["test", "-d", root.testDir]
-    onExited: function(code) { if (code === 0) root.testDirReady = true }
-  }
   Timer {
     interval: 10000
     repeat: true
     triggeredOnStart: true
-    running: !root.recordDirReady || !root.testDirReady
-    onTriggered: {
-      if (!root.recordDirReady && !recordDirProbe.running) recordDirProbe.running = true
-      if (!root.testDirReady && !testDirProbe.running) testDirProbe.running = true
-    }
+    running: !root.recordDirReady
+    onTriggered: if (!recordDirProbe.running) recordDirProbe.running = true
   }
 
   FolderListModel {
@@ -267,17 +257,7 @@ Item {
     showDirs: false
     showDotAndDotDot: false
     sortField: FolderListModel.Name
-    onStatusChanged: if (status === FolderListModel.Ready && root.recordDirReady) root.ingest(recordModel, root.recordDir, false)
-  }
-
-  FolderListModel {
-    id: testModel
-    folder: root.testDirReady ? "file://" + root.testDir : ""
-    nameFilters: ["*.json", "*.approved"]
-    showDirs: false
-    showDotAndDotDot: false
-    sortField: FolderListModel.Name
-    onStatusChanged: if (status === FolderListModel.Ready && root.testDirReady) root.ingest(testModel, root.testDir, true)
+    onStatusChanged: if (status === FolderListModel.Ready && root.recordDirReady) root.ingest(recordModel, root.recordDir)
   }
 
   Timer {
@@ -481,10 +461,8 @@ Item {
           Text {
             textFormat: Text.PlainText
             text: !root.current ? ""
-              : root.current.test
-                ? "TEST RECORD from " + root.testDir + ", which the user can write"
-                : "record written by root from sudo's own argv · pid " + root.current.record.pid + " · " + Model.clock(root.current.record.time)
-            color: root.current && root.current.test ? root.urgent : root.muted
+              : "record written by root from sudo's own argv · pid " + root.current.record.pid + " · " + Model.clock(root.current.record.time)
+            color: root.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
             wrapMode: Text.Wrap

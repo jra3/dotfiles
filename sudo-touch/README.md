@@ -23,12 +23,16 @@ Records are root-owned, 0640 to the user's group, in a 0755 directory: the
 dialog and the agent both run as the user, and a record the user could write
 could be swapped for something harmless while the dialog is up.
 
-The plugin is a `service` with `keepLoaded`. It watches the directory with a
-`FolderListModel`, keeps a centred dialog on every screen until the sudo
-resolves, and polls the sudo front end's pid with `kill -0`. It lasts:
+The plugin is a `service` with `keepLoaded`. It watches that one directory,
+and nothing else, with a `FolderListModel`: only root can create a record
+there, so nothing running as the user can make the plugin draw a dialog. It
+keeps a centred dialog on every screen until the sudo resolves, and polls
+the sudo front end's pid with `kill -0`. It lasts:
 
 - approved (marker appears): 1.5s, then gone
-- denied or ended with no touch (pid gone): 3s
+- denied: closes on the click
+- ended with no touch (pid gone): 3s, or at once if the sudo was already gone
+  when the plugin first saw its record
 - `sh -c` payloads are laid out one command per line; control characters and
   bidi overrides are drawn as symbols, never interpreted
 - more than one sudo at once queues, with a count and a touches-today tally
@@ -40,25 +44,28 @@ the caller's real uid) and SIGTERM ends the touch wait in about three seconds.
 SIGINT does not: sudo defers it until pam_u2f's own wait ends, measured at
 29s. A `sudo -A` waiting on its askpass helper ignores SIGTERM until the
 helper exits, so Deny signals sudo's descendants too and follows up with
-SIGKILL after 3s. The dialog closes on the click, not when the kill lands. An agent running as the user can deny its own sudo this way, and nothing
-else, so the plugin being user-writable costs nothing.
+SIGKILL after 3s. The dialog closes on the click, not when the kill lands. An agent running as the user can deny its own sudo this way, which is
+harmless.
 
-## Dry run without PAM
+What being user-writable does cost: the plugin draws the dialog, and the
+agent runs as the same user. It cannot forge a record, but it could edit the
+plugin and restart the shell, or open a lookalike window of its own, and show
+something harmless over a real sudo. The record is root's word; the dialog is
+only as trustworthy as the user's session.
+
+## Testing
+
+There is no unprivileged dry run. An earlier version had one: the hook wrote
+records into `$XDG_RUNTIME_DIR/sudo-escalation-test/` when run as the user,
+and the plugin watched that directory too. That let any process running as
+the user, an agent included, put a sudo dialog on screen, so it is gone.
 
 ```
-bash -c 'exec -a sudo tail -f /dev/null' & fake=$!
-printf '%s\0' sudo sh -c 'apt update && rm -rf /x' > /tmp/cmdline
-SUDO_ESCALATION_TEST_PID=$fake SUDO_ESCALATION_TEST_CMDLINE=/tmp/cmdline \
-  PAM_TYPE=auth PAM_RUSER=$USER sudo-escalation-notify        # dialog up
-SUDO_ESCALATION_TEST_PID=$fake PAM_TYPE=open_session PAM_RUSER=$USER \
-  sudo-escalation-notify                                       # approved
-kill $fake                                                     # or: ended
-omarchy-shell jra3.sudo-escalation status                     # what it holds
+sudo true                                      # dialog, touch, approved
+sudo sh -c 'true && echo two'                  # one command per line
+omarchy-shell jra3.sudo-escalation status     # what the dialog holds
+node plugin/SudoModel.test.js                  # parsing and layout
 ```
-
-Test records go to `$XDG_RUNTIME_DIR/sudo-escalation-test/`, which the plugin
-also watches and labels as user-writable in red. `node plugin/SudoModel.test.js`
-covers the parsing and layout.
 
 ## Gotchas that cost time
 

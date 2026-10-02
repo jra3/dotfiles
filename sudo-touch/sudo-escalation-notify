@@ -23,33 +23,22 @@ set -u
 PATH=/usr/bin
 umask 077
 
-# Unprivileged dry run, for testing without PAM. Writes to the user's own
-# runtime dir, which the plugin also watches and labels as a test record:
-#   SUDO_ESCALATION_TEST_PID=<pid> PAM_TYPE=auth PAM_RUSER=$USER sudo-escalation-notify
-# then PAM_TYPE=open_session to play the touch landing. With
-# SUDO_ESCALATION_TEST_CMDLINE=<file> the argv is read from that file
-# (NUL-separated, like /proc/<pid>/cmdline) instead of the test pid's.
-test_pid=""
-((EUID)) && test_pid=${SUDO_ESCALATION_TEST_PID:-}
+# Root only, from PAM. There is deliberately no unprivileged dry run: the
+# dialog is drawn only for a record root wrote. To test, run `sudo true`.
+((EUID == 0)) || exit 0
 
 user=${PAM_RUSER:-}
 [[ -n $user ]] || exit 0
-uid=$(id -u -- "$user") || exit 0
 gid=$(id -g -- "$user") || exit 0
 
 # pam_exec forks us from the process running the PAM stack, which for sudo is
 # the sudo front end itself, so its argv is the command being escalated.
-pid=${test_pid:-$PPID}
+pid=$PPID
 
+# Listable by everyone so the plugin can watch it; the records inside are
+# 0640, so the listing is the only thing another user learns.
 dir=/run/sudo-escalation
-if [[ -n $test_pid ]]; then
-  dir=/run/user/$uid/sudo-escalation-test
-  install -d -m 0700 "$dir"
-else
-  # Listable by everyone so the plugin can watch it; the records inside are
-  # 0640, so the listing is the only thing another user learns.
-  install -d -m 0755 -o root -g root "$dir"
-fi
+install -d -m 0755 -o root -g root "$dir"
 
 case ${PAM_TYPE:-} in
   auth) ;;
@@ -61,15 +50,13 @@ case ${PAM_TYPE:-} in
     [[ -n $latest ]] || exit 0
     marker=${latest%.json}.approved
     : > "$marker"
-    [[ -n $test_pid ]] || chown "root:$gid" "$marker"
+    chown "root:$gid" "$marker"
     chmod 0640 "$marker"
     exit 0 ;;
   *) exit 0 ;;
 esac
 
-cmdline=/proc/$pid/cmdline
-[[ -n $test_pid && -n ${SUDO_ESCALATION_TEST_CMDLINE:-} ]] && cmdline=$SUDO_ESCALATION_TEST_CMDLINE
-mapfile -d '' -t argv < "$cmdline" || exit 0
+mapfile -d '' -t argv < "/proc/$pid/cmdline" || exit 0
 ((${#argv[@]})) || exit 0
 cwd=$(readlink "/proc/$pid/cwd")
 
@@ -196,7 +183,7 @@ jq -cn \
     from: $from, argv: $argv,
     command: {kind: $kind, target: $target, exe: $exe, args: $rest,
               secure_path: $secure_path}}' > "$tmp" || { rm -f "$tmp"; exit 0; }
-[[ -n $test_pid ]] || chown "root:$gid" "$tmp"
+chown "root:$gid" "$tmp"
 chmod 0640 "$tmp"
 # The plugin sees the file appear whole, never half-written.
 mv -f "$tmp" "$file"
