@@ -41,15 +41,21 @@ those controls in DIPs. Fonts smaller than the layout only add padding. Hence
 the rule in the script:
 
 ```
-GDK_SCALE     = round(monitor scale)          # Omarchy's own convention
+GDK_SCALE     = floor(monitor scale)
 GDK_DPI_SCALE = min(1, monitor scale / GDK_SCALE)
 ```
 
 | Monitor scale | Host | `GDK_SCALE` | `GDK_DPI_SCALE` | Result |
 |---|---|---|---|---|
-| 1.25 | cupcake | 1 | 1 | sharp, everything 80% of the rest of the desktop |
-| 1.6 | chonky, paperweight | 2 | 0.8 | sharp, layout 125%, text at true size (not yet tried there) |
+| 1.25 | — | 1 | 1 | sharp, everything 80% of the rest of the desktop |
+| 1.6 | cupcake, chonky, paperweight | 1 | 1 | sharp, everything 62.5% of the rest of the desktop |
 | 2 | — | 2 | 1 | sharp, exact |
+
+**Why round down, not to nearest.** Until 2026-10-01 this was `round()`,
+Omarchy's convention for the session-wide value, with `GDK_DPI_SCALE` pulling
+fonts back to the true size. At 1.6 that gave `GDK_SCALE=2 GDK_DPI_SCALE=0.8`:
+sharp, but the layout drawn at 125% of everything else. Tried on cupcake at 1.6
+and it was too zoomed in; small beats oversized.
 
 **The `.desktop` file is shared, monitors are not.** The `Exec` line was
 hand-tuned three times (`1/1.25`, none, `2/0.85`) — each right for the machine
@@ -63,7 +69,7 @@ into systemd/dbus once, at Hyprland startup (`autostart.lua`). Change
 the next login — cupcake's `monitors.lua` said 1 while every app launched from
 the shell still got 2. The script asks `hyprctl monitors` instead.
 
-## The alternative, if 80% is too small on a 1.25 host
+## The alternative, if 62.5% or 80% is too small
 
 Set `xwayland = { force_zero_scaling = false }` in `hyprland.lua`. XWayland then
 renders at 1× and Hyprland upscales it by the monitor scale: right size, but

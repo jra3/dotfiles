@@ -11,9 +11,9 @@ setup() {
 }
 
 # _gdk_scales: monitor scale -> "GDK_SCALE GDK_DPI_SCALE". GDK_SCALE is the
-# nearest whole number (it sizes the layout and GTK ignores fractions);
-# GDK_DPI_SCALE brings fonts back down to the real scale and never exceeds 1,
-# because fonts larger than the layout planned for truncate labels.
+# scale rounded down (it sizes the layout, GTK ignores fractions, and rounding
+# 1.6 up to 2 made Bambu too big); GDK_DPI_SCALE never exceeds 1, because fonts
+# larger than the layout planned for truncate labels.
 @test "gdk_scales: 1.0 is plain 1x" {
   run _gdk_scales 1
   assert_output "1 1"
@@ -24,14 +24,19 @@ setup() {
   assert_output "1 1"
 }
 
-@test "gdk_scales: 1.5 rounds up; fonts shrink to 0.75" {
+@test "gdk_scales: 1.5 rounds down to 1x" {
   run _gdk_scales 1.5
-  assert_output "2 0.75"
+  assert_output "1 1"
 }
 
-@test "gdk_scales: 1.6 (LG SDQHD) is 2x with fonts at 0.8" {
+@test "gdk_scales: 1.6 rounds down to 1x, not up to 2x" {
   run _gdk_scales 1.6
-  assert_output "2 0.8"
+  assert_output "1 1"
+}
+
+@test "gdk_scales: 2.5 rounds down to 2x" {
+  run _gdk_scales 2.5
+  assert_output "2 1"
 }
 
 @test "gdk_scales: 2.0 is plain 2x" {
@@ -69,5 +74,5 @@ setup() {
   hyprctl() { echo '[{"focused":true,"scale":1.6}]'; }
   run main --print
   assert_success
-  assert_output "GDK_SCALE=2 GDK_DPI_SCALE=0.8"
+  assert_output "GDK_SCALE=1 GDK_DPI_SCALE=1"
 }

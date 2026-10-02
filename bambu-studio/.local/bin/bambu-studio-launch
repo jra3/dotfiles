@@ -19,14 +19,15 @@ _monitor_scale() {
 # $1 = monitor scale. Prints "<GDK_SCALE> <GDK_DPI_SCALE>".
 #
 # GDK_SCALE is integer-only and sizes the whole layout, so it is the monitor
-# scale rounded to the nearest whole number — Omarchy's own convention for the
-# session-wide value. GDK_DPI_SCALE is fractional but moves fonts alone, and
-# fonts wider than the layout planned for get ellipsised, so it only ever
-# shrinks fonts back down to the monitor's real scale, never past the layout.
+# scale rounded *down*: at 1.6, rounding up to 2 drew Bambu at 125% of the rest
+# of the desktop, which was too big; 1 (62.5%) was the preferred trade.
+# GDK_DPI_SCALE is fractional but moves fonts alone, and fonts wider than the
+# layout planned for get ellipsised, so it is capped at 1 — which, with
+# GDK_SCALE rounded down, it only falls below for monitor scales under 1.
 _gdk_scales() {
   awk -v s="$1" 'BEGIN {
     s += 0;           if (s <= 0) s = 1
-    g = int(s + 0.5); if (g < 1) g = 1
+    g = int(s);       if (g < 1) g = 1
     d = s / g;        if (d > 1) d = 1
     printf "%d %.4g\n", g, d
   }'
