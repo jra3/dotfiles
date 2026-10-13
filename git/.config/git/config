@@ -35,14 +35,14 @@
     mnemonicPrefix = true    # More intuitive refs in diff output
 [commit]
     verbose = true           # Include diff comment in commit message template
-    gpgsign = true           # GTD-38: on, to measure what reaches main. `-c commit.gpgsign=false` to skip.
+    gpgsign = false          # GTD-38: off; the security-key signing setup is broken. Flip to true to re-enable.
 [column]
     ui = auto                # Output in columns when possible
 [branch]
     sort = -committerdate    # Sort branches by most recent commit first
 [tag]
     sort = -version:refname  # Sort version numbers as you would expect
-    gpgsign = true           # Sign annotated tags too
+    gpgsign = false          # Sign annotated tags too (off with commit signing)
 [rerere]
     enabled = true           # Record and reuse conflict resolutions
     autoupdate = true        # Apply stored conflict resolutions automatically
