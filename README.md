@@ -50,8 +50,8 @@ stow --no-folding kitty
 lists live at the top of the script.
 
 - **Shared** — `zsh git tmux starship ripgrep sqlite gh claude
-  ccstatusline lazygit gtr bitwarden herdr ssh`
-- **Linux only** — `hypr emacs power webapps bambu-studio
+  ccstatusline lazygit bitwarden herdr ssh`
+- **Linux only** — `hypr power webapps bambu-studio
   slack voxtype qmk scripts typora t3`. These need systemd units, `.desktop`
   files, or Hyprland/Wayland. `HOST_SKIP` drops hardware-specific ones per
   machine (paperweight skips `power` and `qmk`).

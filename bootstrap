@@ -21,12 +21,12 @@ cd "$DOTFILES_DIR"
 # Work on both Arch and macOS.
 PACKAGES_COMMON=(
     zsh readline git tmux starship ripgrep sqlite gh
-    claude ccstatusline lazygit gtr bitwarden herdr ssh
+    claude ccstatusline lazygit bitwarden herdr ssh
 )
 
 # Need systemd, Hyprland/Wayland, XDG .desktop files, or Arch-only hardware.
 PACKAGES_LINUX=(
-    hypr emacs power webapps bambu-studio
+    hypr power webapps bambu-studio
     slack voxtype qmk scripts typora t3
 )
 
@@ -112,10 +112,6 @@ for pkg in "${PACKAGES[@]}"; do
         continue
     fi
 
-    # The emacs package ships a systemd drop-in directory. Plain stow FOLDS it
-    # into a symlink, and systemd silently ignores drop-ins inside a symlinked
-    # drop-in dir — see the long note in pacman/configure-system.
-    #
     # ssh ships ~/.ssh/authorized_keys.d/. Folded, that whole directory becomes a
     # symlink into the repo, and a host can no longer drop a local-only key file
     # in beside the committed ones — which is the per-host subsetting that
@@ -125,7 +121,7 @@ for pkg in "${PACKAGES[@]}"; do
     # whole ~/.config/Typora (caches, session state, Typora's stock themes) would
     # be written into the repo.
     flags=("${STOW_FLAGS[@]}" "${EXTRA_IGNORES[@]+"${EXTRA_IGNORES[@]}"}")
-    case "$pkg" in emacs|ssh|typora) flags+=(--no-folding) ;; esac
+    case "$pkg" in ssh|typora) flags+=(--no-folding) ;; esac
 
     echo "  stow: $pkg"
     if ! stow "${flags[@]}" "$pkg" 2>&1 | sed 's/^/      /'; then
