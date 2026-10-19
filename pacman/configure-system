@@ -412,6 +412,19 @@ else
     echo "  helium.desktop not found (install helium-browser-bin); skipping."
 fi
 
+# --- t3-thread links ---
+# T3 Code's in-app thread links (t3-thread://v1/<threadId>, which the T3
+# dispatcher also writes into GTD comments) open in the T3 Code web app through
+# t3-thread-open (t3 package). Like the browser above, this writes the
+# host-local ~/.config/mimeapps.list.
+echo "Configuring t3-thread links..."
+if [ -f "$HOME/.local/share/applications/t3-thread.desktop" ]; then
+    xdg-mime default t3-thread.desktop x-scheme-handler/t3-thread
+    echo "  t3-thread:// opens with t3-thread-open."
+else
+    echo "  t3-thread.desktop not found (stow the t3 package); skipping."
+fi
+
 # --- Inbox folder ---
 # ~/jra3/inbox exists on every machine. The sidebar bookmark that points at it is
 # stowed (gtk package); its icon is gvfs metadata, which is per-machine and binary,

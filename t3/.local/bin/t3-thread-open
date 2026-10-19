@@ -1,0 +1,17 @@
+#!/bin/bash
+# Opens a t3-thread://v1/<threadId> link (T3 Code's in-app thread link, which
+# the T3 dispatcher also writes into GTD comments) as that thread's page on
+# paperweight's T3 server, in a web-app window. On paperweight itself it uses
+# the local origin the T3 Code web app (webapps/) already loads, so the window
+# shares its session; elsewhere it goes over the tailnet. The environment id
+# is paperweight's T3 server's own (t3_environment_read).
+set -euo pipefail
+env_id=81166083-496e-403d-a08f-d33f7a3c21cf
+link=${1:?usage: t3-thread-open t3-thread://v1/<threadId>}
+id=${link#t3-thread://v1/}
+if [[ $id == "$link" || -z $id ]]; then
+  notify-send "t3-thread-open" "Not a t3-thread link: $link" 2>/dev/null || true
+  exit 1
+fi
+if [[ $(hostname) == paperweight ]]; then origin=http://127.0.0.1:3773; else origin=https://paperweight.corgi-hammerhead.ts.net; fi
+exec omarchy-launch-webapp "$origin/$env_id/$id"

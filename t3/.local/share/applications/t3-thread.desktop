@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=T3 thread link
+Comment=Opens t3-thread:// links in the T3 Code web app
+Exec=t3-thread-open %u
+NoDisplay=true
+MimeType=x-scheme-handler/t3-thread;
