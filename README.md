@@ -49,10 +49,10 @@ stow --no-folding kitty
 `bootstrap` sorts every package into one of three buckets. The authoritative
 lists live at the top of the script.
 
-- **Shared** — `zsh git tmux starship ripgrep sqlite gh ghostty claude
+- **Shared** — `zsh git tmux starship ripgrep sqlite gh claude
   ccstatusline lazygit gtr bitwarden herdr ssh`
-- **Linux only** — `hypr emacs power obsidian webapps bambu-studio
-  slack voxtype qmk scripts typora`. These need systemd units, `.desktop`
+- **Linux only** — `hypr emacs power webapps bambu-studio
+  slack voxtype qmk scripts typora t3`. These need systemd units, `.desktop`
   files, or Hyprland/Wayland. `HOST_SKIP` drops hardware-specific ones per
   machine (paperweight skips `power` and `qmk`).
 - **macOS only** — `macos` (system preferences via `defaults`).

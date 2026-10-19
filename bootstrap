@@ -20,13 +20,13 @@ cd "$DOTFILES_DIR"
 
 # Work on both Arch and macOS.
 PACKAGES_COMMON=(
-    zsh readline git tmux starship ripgrep sqlite gh ghostty
+    zsh readline git tmux starship ripgrep sqlite gh
     claude ccstatusline lazygit gtr bitwarden herdr ssh
 )
 
 # Need systemd, Hyprland/Wayland, XDG .desktop files, or Arch-only hardware.
 PACKAGES_LINUX=(
-    hypr emacs power obsidian webapps bambu-studio
+    hypr emacs power webapps bambu-studio
     slack voxtype qmk scripts typora t3
 )
 

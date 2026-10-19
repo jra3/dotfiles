@@ -56,13 +56,11 @@ brew "starship"      # starship/ stow package
 brew "bitwarden-cli" # bitwarden/get-signature calls `bw`
 
 # --- Applications ---
-cask "ghostty"       # ghostty/ stow package
 cask "claude"
 cask "docker-desktop"   # renamed upstream from "docker"; the old name reinstalls a duplicate
 cask "visual-studio-code"
 cask "discord"
 cask "syncthing-app"    # renamed upstream from "syncthing"
-cask "obsidian"         # matches the obsidian/ stow package
 cask "google-chrome"    # matches the google-chrome/ stow package
 # ssh/config.shared canonicalizes bare hostnames into the tailnet, so the
 # `ssh am-jallen` shortcuts need this. Renamed upstream from "tailscale".
@@ -74,7 +72,7 @@ cask "slack"            # the slack/ stow package routes slack:// to the browser
                         # Linux, where there is no desktop client; on macOS the
                         # native app is installed and handles its own scheme.
 
-# --- Fonts (CaskaydiaMono matches the Ghostty config's font-family) ---
+# --- Fonts (CaskaydiaMono matches the kitty config's font-family) ---
 cask "font-caskaydia-mono-nerd-font"
 cask "font-jetbrains-mono"
 cask "font-fira-code"
