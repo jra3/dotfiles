@@ -1,0 +1,16 @@
+[Unit]
+Description=T3 Code server (mise npm:t3)
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+ExecStart=/usr/bin/mise x -- %h/.local/bin/t3-server
+KillMode=mixed
+OOMPolicy=continue
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
