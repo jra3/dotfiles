@@ -1,0 +1,26 @@
+# Global tools shared by every machine. Stowed from ~/.dotfiles/mise.
+#
+# This is a conf.d file rather than ~/.config/mise/config.toml on purpose:
+# `mise use -g` rewrites config.toml in place, and ~/.local/bin/claude runs it
+# on every launch. A stowed config.toml would be rewritten through its symlink
+# into the repo. config.toml stays host-local; mise reads both, and config.toml
+# WINS on any key both set -- so a stale key left there silently overrides this
+# file (`mise config ls` and `mise settings get <key>` show the effective value).
+#
+# Claude Code, Codex and gh come from here, not pacman or brew: a second copy
+# from the system package manager would sit behind mise's shims on PATH,
+# unused, drifting.
+
+[tools]
+claude = "latest"
+codex = "latest"
+gh = "latest"
+node = "26.5.0"
+
+[settings]
+# Idiomatic version files (.nvmrc, .python-version) are opt-in per tool; with
+# python left out, a repo still pinned for pyenv silently gets the global python.
+idiomatic_version_file_enable_tools = ["node", "python"]
+
+[settings.upgrade]
+auto_prune = false

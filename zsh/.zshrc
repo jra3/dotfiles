@@ -380,12 +380,11 @@ path=($HOME/bin $HOME/.local/bin $HOME/go/bin /usr/local/bin $path)
 # mise reads .python-version too, but only because we asked it to. Recent mise
 # made idiomatic version files (.python-version, .nvmrc, .ruby-version) opt-in
 # per tool, defaulting to none -- so a repo still pinned for pyenv resolved to
-# the GLOBAL python and said nothing. Verified and re-enabled 2026-08-26:
-#
-#   mise settings add idiomatic_version_file_enable_tools python
-#
-# That lives in ~/.config/mise/config.toml, which is NOT stow-managed, so a new
-# machine needs the command re-run. What does NOT carry over from pyenv is
+# the GLOBAL python and said nothing. Re-enabled 2026-08-26 with
+# `mise settings add`, which wrote it into the host-local
+# ~/.config/mise/config.toml -- and it had silently dropped out again by
+# 2026-10-19. It now lives in the stowed mise/.config/mise/conf.d/tools.toml,
+# alongside the global tools. What does NOT carry over from pyenv is
 # pyenv's *named, central* envs (`pyenv virtualenv 3.11 scratch`); mise's venvs
 # are project-local. Use `uv venv` for a throwaway that isn't tied to a dir.
 #

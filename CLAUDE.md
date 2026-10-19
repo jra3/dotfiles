@@ -229,9 +229,9 @@ This documents the default software stack configured in Omarchy:
 | Browser | **Helium** | Web browser. Its flags file and the `youtube-no-shorts` extension are the `helium/` package |
 | Files | **Nautilus** | GNOME Files, the `inode/directory` default. Sidebar shortcuts are `gtk/.config/gtk-3.0/bookmarks` |
 | Editor | **Emacs** | Text editor. No daemon: `emacs` is aliased to `emacs -nw` in the shell, `SUPER+SHIFT+E` opens a GUI frame |
-| AI | **Claude Code** | AI-powered coding assistant |
+| AI | **Claude Code** | AI-powered coding assistant. Installed by **mise**, not pacman or brew (see `mise/`) |
 | VCS | **Git** | Version control with custom aliases |
-| GitHub | **gh** | GitHub CLI with `gh prs` for PR listing |
+| GitHub | **gh** | GitHub CLI with `gh prs` for PR listing. From mise on Arch |
 | Search | **ripgrep** | Fast recursive grep |
 | Worktrees | **Omarchy `ga`/`gd`** | Shell fns from `$OMARCHY_PATH/default/bash/fns/worktrees`, sourced in `.zshrc`. `ga <branch>` creates `../<repo>--<branch>` and cds in; `gd` removes the current one. Replaced `gtr` on 2026-08-24 |
 | Database | **SQLite** | Database with custom config |
@@ -321,6 +321,14 @@ This documents the default software stack configured in Omarchy:
   state into your dotfiles. Currently ships `unslop`. Codex reads skills from both
   `~/.codex/skills` and the cross-agent `~/.agents/skills`; confirm what it actually
   loaded with `codex debug prompt-input | grep -o '[^"]*<skill-name>[^"]*'`
+- `mise/` - Global mise tools and settings: `claude`, `codex`, `gh`, `node`, and
+  the idiomatic-version-file opt-ins. Shipped as `~/.config/mise/conf.d/tools.toml`,
+  **not** `config.toml`, which stays host-local: `mise use -g` rewrites
+  `config.toml` in place, and `~/.local/bin/claude` runs it on every launch. Stow
+  it `--no-folding` (bootstrap does) so `~/.config/mise` stays a real directory.
+  `configure-system` runs `mise install`. Do not add `claude-code` or `github-cli`
+  back to the pacman list, or the `claude` cask to the Brewfile: the copy lands
+  behind mise's shims on PATH and is never run
 - `ccstatusline/` - Claude Code status line: the `ccstatusline` layout plus the `cc-pr-widget` PR/CI segment it shells out to; see `ccstatusline/README.md`
 - `slack/` - `slack://` deep-link handler that opens links in the browser (no desktop Slack app); see `slack/README.md`
 - `bambu-studio/` - BambuStudio launcher. `bambu-studio-launch` picks `GDK_SCALE` /

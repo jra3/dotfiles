@@ -56,7 +56,6 @@ brew "starship"      # starship/ stow package
 brew "bitwarden-cli" # bitwarden/get-signature calls `bw`
 
 # --- Applications ---
-cask "claude"
 cask "docker-desktop"   # renamed upstream from "docker"; the old name reinstalls a duplicate
 cask "visual-studio-code"
 cask "discord"

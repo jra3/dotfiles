@@ -7,14 +7,12 @@ bats-support
 bear
 blender
 bpf
-claude-code
 cmake
 direnv
 efibootmgr
 emacs-wayland
 fwupd
 git-delta
-github-cli
 glow
 go
 herdr

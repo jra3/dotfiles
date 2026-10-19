@@ -71,6 +71,21 @@ else
     echo "  Could not clone git-worktree-runner (needs network); skipping."
 fi
 
+# --- mise tools ---
+# Claude Code, Codex, gh and node come from mise (the `mise` stow package's
+# conf.d/tools.toml), not the system package manager. Install them before the
+# gh extension step below, which needs gh on PATH.
+echo "Installing mise tools..."
+if command -v mise >/dev/null 2>&1; then
+    if mise install --yes >/dev/null 2>&1; then
+        echo "  mise tools installed."
+    else
+        echo "  mise install failed (needs network, and 'stow mise' first); skipping."
+    fi
+else
+    echo "  mise not installed; skipping."
+fi
+
 # --- gh extensions ---
 # The lazygit package's custom commands are all `gh stack ...`, so without this
 # extension every one of those keybindings fails. Needs gh >= 2.90.

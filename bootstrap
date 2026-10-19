@@ -21,7 +21,7 @@ cd "$DOTFILES_DIR"
 # Work on both Arch and macOS.
 PACKAGES_COMMON=(
     zsh readline git tmux starship ripgrep sqlite gh
-    claude ccstatusline lazygit bitwarden herdr ssh
+    claude ccstatusline lazygit bitwarden herdr ssh mise
 )
 
 # Need systemd, Hyprland/Wayland, XDG .desktop files, or Arch-only hardware.
@@ -120,8 +120,12 @@ for pkg in "${PACKAGES[@]}"; do
     # typora ships into ~/.config/Typora/themes/. Folded on a fresh machine, the
     # whole ~/.config/Typora (caches, session state, Typora's stock themes) would
     # be written into the repo.
+    #
+    # mise ships ~/.config/mise/conf.d/. Folded, ~/.config/mise itself becomes a
+    # symlink and `mise use -g` (run by ~/.local/bin/claude on every launch)
+    # writes the host-local config.toml into the repo.
     flags=("${STOW_FLAGS[@]}" "${EXTRA_IGNORES[@]+"${EXTRA_IGNORES[@]}"}")
-    case "$pkg" in ssh|typora) flags+=(--no-folding) ;; esac
+    case "$pkg" in ssh|typora|mise) flags+=(--no-folding) ;; esac
 
     echo "  stow: $pkg"
     if ! stow "${flags[@]}" "$pkg" 2>&1 | sed 's/^/      /'; then
