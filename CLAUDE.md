@@ -403,7 +403,7 @@ This documents the default software stack configured in Omarchy:
 Run the `configure-system` for the current platform. Both are idempotent and safe to re-run.
 
 - **Arch:** `pacman/configure-system` — system services (Tailscale operator, Emacs daemon, sshd on the tailnet, power policy, pacman hooks).
-- **macOS:** `brew/configure-system` — `~/tmp` (for the `TMPDIR` set in `.zshenv`), `~/.ssh/sockets`, the `~/.ssh/config` → `config.shared` include, the `git-worktree-runner` clone that `gtr` wraps, and the `gh-stack` extension.
+- **macOS:** `brew/configure-system` — `~/tmp` (for the `TMPDIR` set in `.zshenv`), `~/.ssh/sockets`, the `~/.ssh/config` → `config.shared` include, the global mise tools, and the `gh-stack` extension.
 
 The macOS script deliberately does *not* emulate the Arch-only half (systemd units, sshd binding, UPower, xdg-mime). System preference tweaks live separately in `macos-defaults`, which is not called automatically because it restarts Dock and Finder.
 

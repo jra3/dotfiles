@@ -57,20 +57,6 @@ else
     echo "  Appended the shared include to $ssh_config."
 fi
 
-# --- git-worktree-runner ---
-# The gtr/ stow package is only a wrapper; it execs the real binary out of
-# ~/.local/share/git-worktree-runner and errors out until that clone exists.
-# .zshrc aliases `gtr` and binds ^Xg to fgtr, so both break without it.
-echo "Configuring git-worktree-runner..."
-gtr_dir="$HOME/.local/share/git-worktree-runner"
-if [ -x "$gtr_dir/bin/git-gtr" ]; then
-    echo "  Already installed at $gtr_dir."
-elif git clone --quiet https://github.com/coderabbitai/git-worktree-runner.git "$gtr_dir" 2>/dev/null; then
-    echo "  Cloned into $gtr_dir."
-else
-    echo "  Could not clone git-worktree-runner (needs network); skipping."
-fi
-
 # --- mise tools ---
 # Claude Code, Codex, gh and node come from mise (the `mise` stow package's
 # conf.d/tools.toml), not the system package manager. Install them before the
