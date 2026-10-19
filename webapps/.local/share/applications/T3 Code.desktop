@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=T3 Code
+Comment=T3 Code
+Exec=omarchy-launch-webapp "http://127.0.0.1:3773"
+Terminal=false
+Type=Application
+Icon=t3-code
+StartupNotify=true
