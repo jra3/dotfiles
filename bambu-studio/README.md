@@ -42,13 +42,15 @@ the rule in the script:
 
 ```
 GDK_SCALE     = floor(monitor scale)
+                — or ceil, if the monitor's short side / ceil >= 1080 px
 GDK_DPI_SCALE = min(1, monitor scale / GDK_SCALE)
 ```
 
 | Monitor scale | Host | `GDK_SCALE` | `GDK_DPI_SCALE` | Result |
 |---|---|---|---|---|
 | 1.25 | — | 1 | 1 | sharp, everything 80% of the rest of the desktop |
-| 1.6 | cupcake, chonky, paperweight | 1 | 1 | sharp, everything 62.5% of the rest of the desktop |
+| 1.6 | cupcake, chonky, paperweight laptop panels | 1 | 1 | sharp, everything 62.5% of the rest of the desktop |
+| 1.6 | LG DualUp, 2560×2880 | 2 | 0.8 | sharp, layout 125%, fonts true size |
 | 2 | — | 2 | 1 | sharp, exact |
 
 **Why round down, not to nearest.** Until 2026-10-01 this was `round()`,
@@ -56,6 +58,12 @@ Omarchy's convention for the session-wide value, with `GDK_DPI_SCALE` pulling
 fonts back to the true size. At 1.6 that gave `GDK_SCALE=2 GDK_DPI_SCALE=0.8`:
 sharp, but the layout drawn at 125% of everything else. Tried on cupcake at 1.6
 and it was too zoomed in; small beats oversized.
+
+**Except on a big monitor.** On the DualUp (2560×2880 at 1.6) the 62.5% version
+was unreadably small, and 2× still leaves a 1280×1440 workspace. So when the
+monitor's short side at the rounded-up scale is ≥ 1080 px
+(`BIG_MONITOR_MIN_SIDE`), it rounds up instead (2026-10-15). A laptop panel at
+1.6 (2880×1920 → 960) stays rounded down.
 
 **The `.desktop` file is shared, monitors are not.** The `Exec` line was
 hand-tuned three times (`1/1.25`, none, `2/0.85`) — each right for the machine

@@ -7,27 +7,44 @@
 
 BAMBU_STUDIO=/usr/bin/bambu-studio
 
-# Scale of the focused Hyprland monitor (the first one if none is focused).
-# 1 when not under Hyprland or when hyprctl/jq are missing.
+# "<scale> <width> <height>" of the focused Hyprland monitor (the first one if
+# none is focused), size in physical px. "1 0 0" when not under Hyprland or when
+# hyprctl/jq are missing.
+_monitor() {
+  local m
+  m=$(hyprctl monitors -j 2>/dev/null \
+    | jq -r '([.[] | select(.focused)] + .)[0] | "\(.scale // 1) \(.width // 0) \(.height // 0)"' 2>/dev/null)
+  echo "${m:-1 0 0}"
+}
+
+# Scale of the focused monitor alone.
 _monitor_scale() {
-  local scale
-  scale=$(hyprctl monitors -j 2>/dev/null \
-    | jq -r '([.[] | select(.focused)] + .)[0].scale // 1' 2>/dev/null)
+  local scale _
+  read -r scale _ <<<"$(_monitor)"
   echo "${scale:-1}"
 }
 
-# $1 = monitor scale. Prints "<GDK_SCALE> <GDK_DPI_SCALE>".
+# Rounding up is allowed when the monitor's short side, in GDK_SCALE units,
+# is at least this many px.
+BIG_MONITOR_MIN_SIDE=1080
+
+# $1 = monitor scale, $2 $3 = monitor size in physical px (optional).
+# Prints "<GDK_SCALE> <GDK_DPI_SCALE>".
 #
-# GDK_SCALE is integer-only and sizes the whole layout, so it is the monitor
-# scale rounded *down*: at 1.6, rounding up to 2 drew Bambu at 125% of the rest
-# of the desktop, which was too big; 1 (62.5%) was the preferred trade.
+# GDK_SCALE is integer-only and sizes the whole layout. By default it is the
+# monitor scale rounded *down*: on a laptop at 1.6, rounding up to 2 drew Bambu
+# at 125% of the rest of the desktop and too big for the panel; 1 (62.5%) was
+# the preferred trade. On a big monitor (the 2560x2880 DualUp) 62.5% is too
+# small and 2x still leaves 1280x1440 to work in, so there it rounds up and
+# GDK_DPI_SCALE pulls the fonts back to the true size.
 # GDK_DPI_SCALE is fractional but moves fonts alone, and fonts wider than the
-# layout planned for get ellipsised, so it is capped at 1 — which, with
-# GDK_SCALE rounded down, it only falls below for monitor scales under 1.
+# layout planned for get ellipsised, so it is capped at 1.
 _gdk_scales() {
-  awk -v s="$1" 'BEGIN {
+  awk -v s="$1" -v w="${2:-0}" -v h="${3:-0}" -v min_side="$BIG_MONITOR_MIN_SIDE" 'BEGIN {
     s += 0;           if (s <= 0) s = 1
     g = int(s);       if (g < 1) g = 1
+    up = g + 1;       side = (w + 0 < h + 0) ? w + 0 : h + 0
+    if (s > g && side / up >= min_side) g = up
     d = s / g;        if (d > 1) d = 1
     printf "%d %.4g\n", g, d
   }'
@@ -35,7 +52,7 @@ _gdk_scales() {
 
 main() {
   local gdk_scale gdk_dpi_scale
-  read -r gdk_scale gdk_dpi_scale < <(_gdk_scales "$(_monitor_scale)")
+  read -r gdk_scale gdk_dpi_scale < <(_gdk_scales $(_monitor))
   if [[ "${1:-}" == "--print" ]]; then
     printf 'GDK_SCALE=%s GDK_DPI_SCALE=%s\n' "$gdk_scale" "$gdk_dpi_scale"
     return 0
