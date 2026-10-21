@@ -1,0 +1,263 @@
+#!/usr/bin/python3
+"""Rank CLIProxyAPI accounts so the one whose weekly quota resets soonest is used first.
+
+CLIProxyAPI routes each request to the highest-priority account that is not in
+cooldown. This gives every Claude account (and with --provider codex, every Codex
+account) a distinct priority, from
+the quota watermarks the proxy records off upstream responses:
+
+  1. live weekly window, not exhausted   soonest reset first: that quota is
+                                         lost soonest if left unused
+  2. no live data                        never used, or the window has rolled
+                                         over since the last response. Using
+                                         it starts a fresh 7-day clock, so it
+                                         has the most time left of anyone
+  3. exhausted (any window rejected      whichever comes back first goes first
+     or at 100%, and not yet reset)
+
+Distinct priorities make routing fill-first whatever routing.strategy says:
+the top account takes everything until a 429 cools it down, then the next one
+does. Accounts that are disabled are left alone.
+
+The proxy only learns an account's quota when it serves a response, so an
+account parked at the bottom keeps its last watermark. That is why a reset
+time in the past is read as "full again", not as live data.
+
+Dry run by default; --apply writes the priorities.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+BASE_URL = os.environ.get("CLIPROXY_URL", "https://cliproxy.corgi-hammerhead.ts.net")
+KEY_FILE = "~/.config/cliproxy/key"
+TIMEOUT = 20
+SUPPORTED = ("claude", "codex")
+EXHAUSTED_AT = 0.99
+
+# Claude's account-wide windows. Model-scoped ones (7d_oi, 7d_sonnet, ...) are
+# left to the proxy's per-model cooldown: they block one model, not the account.
+CLAUDE_WINDOWS = {"5h": 300, "7d": 10080}
+
+
+class RankError(Exception):
+  pass
+
+
+@dataclass
+class Window:
+  minutes: int
+  reset_at: int
+  used: float
+  rejected: bool
+
+
+@dataclass
+class Account:
+  name: str
+  provider: str
+  email: str
+  priority: int | None
+  windows: list[Window] = field(default_factory=list)
+
+  def live(self, now: int) -> list[Window]:
+    return [w for w in self.windows if w.reset_at > now]
+
+  def blocked_until(self, now: int) -> int | None:
+    blocked = [w.reset_at for w in self.live(now) if w.rejected or w.used >= EXHAUSTED_AT]
+    return max(blocked) if blocked else None
+
+  def weekly_reset(self, now: int) -> int | None:
+    live = self.live(now)
+    return max(live, key=lambda w: w.minutes).reset_at if live else None
+
+
+def management_key() -> str:
+  key = os.environ.get("CLIPROXY_MANAGEMENT_KEY", "").strip()
+  if not key:
+    path = Path(KEY_FILE).expanduser()
+    if path.exists():
+      key = path.read_text().strip()
+  if not key:
+    raise RankError(f"No management key: put it in {KEY_FILE} or set CLIPROXY_MANAGEMENT_KEY.")
+  return key
+
+
+def call(method: str, path: str, key: str, body: dict[str, Any] | None = None) -> Any:
+  data = json.dumps(body).encode() if body is not None else None
+  request = urllib.request.Request(
+    f"{BASE_URL}/v0/management{path}",
+    data=data,
+    method=method,
+    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+  )
+  try:
+    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+      return json.load(response)
+  except urllib.error.HTTPError as error:
+    raise RankError(f"{method} {path}: HTTP {error.code} {error.read().decode(errors='replace')[:200]}") from error
+  except urllib.error.URLError as error:
+    raise RankError(f"{method} {path}: {error.reason}") from error
+
+
+def parse_time(value: str | None) -> float:
+  if not value:
+    return 0.0
+  # The proxy writes nanoseconds; fromisoformat stops at microseconds.
+  value = re.sub(r"(\.\d{6})\d+", r"\1", value).replace("Z", "+00:00")
+  try:
+    return dt.datetime.fromisoformat(value).timestamp()
+  except ValueError:
+    return 0.0
+
+
+def observations(entry: dict[str, Any]) -> list[dict[str, str]]:
+  """Every quota snapshot on an account, newest first, with lowercased header names.
+
+  Claude watermarks land under model_quotas, one snapshot per model, but the
+  5h/7d windows in each are account-wide, so the newest snapshot wins.
+  """
+  snapshots = [entry.get("quota") or {}, *(entry.get("model_quotas") or {}).values()]
+  snapshots = [s for s in snapshots if s.get("signals")]
+  snapshots.sort(key=lambda s: parse_time(s.get("observed_at")), reverse=True)
+  return [{k.lower(): v for k, v in s["signals"].items()} for s in snapshots]
+
+
+def number(value: Any, default: float = 0.0) -> float:
+  try:
+    return float(value)
+  except (TypeError, ValueError):
+    return default
+
+
+def claude_windows(snapshots: list[dict[str, str]]) -> list[Window]:
+  windows = []
+  for name, minutes in CLAUDE_WINDOWS.items():
+    prefix = f"anthropic-ratelimit-unified-{name}-"
+    signals = next((s for s in snapshots if prefix + "reset" in s), None)
+    if signals is None:
+      continue
+    windows.append(Window(
+      minutes=minutes,
+      reset_at=int(number(signals[prefix + "reset"])),
+      used=number(signals.get(prefix + "utilization")),
+      rejected=signals.get(prefix + "status") == "rejected",
+    ))
+  return windows
+
+
+def codex_windows(snapshots: list[dict[str, str]]) -> list[Window]:
+  windows = []
+  for slot in ("primary", "secondary"):
+    prefix = f"x-codex-{slot}-"
+    signals = next((s for s in snapshots if number(s.get(prefix + "window-minutes")) > 0), None)
+    if signals is None:
+      continue
+    used = number(signals.get(prefix + "used-percent")) / 100
+    windows.append(Window(
+      minutes=int(number(signals[prefix + "window-minutes"])),
+      reset_at=int(number(signals.get(prefix + "reset-at"))),
+      used=used,
+      rejected=signals.get("x-codex-limit-reached", "").lower() == "true" and used >= EXHAUSTED_AT,
+    ))
+  return windows
+
+
+def load_accounts(key: str) -> list[Account]:
+  accounts = []
+  for entry in call("GET", "/auth-files", key).get("files", []):
+    provider = entry.get("provider")
+    if provider not in SUPPORTED or entry.get("disabled") or entry.get("runtime_only"):
+      continue
+    snapshots = observations(entry)
+    priority = entry.get("priority")
+    accounts.append(Account(
+      name=entry["name"],
+      provider=provider,
+      email=entry.get("email") or entry.get("label") or entry["name"],
+      priority=int(priority) if priority is not None else None,
+      windows=claude_windows(snapshots) if provider == "claude" else codex_windows(snapshots),
+    ))
+  return accounts
+
+
+def rank(accounts: list[Account], now: int) -> list[tuple[Account, str]]:
+  """Accounts best-first, each with the reason it sits where it does."""
+  def key(account: Account) -> tuple[int, float, str]:
+    blocked = account.blocked_until(now)
+    if blocked is not None:
+      return (2, blocked, account.name)
+    weekly = account.weekly_reset(now)
+    if weekly is not None:
+      return (0, weekly, account.name)
+    return (1, 0, account.name)
+
+  ranked = []
+  for account in sorted(accounts, key=key):
+    tier, at, _ = key(account)
+    if tier == 0:
+      reason = f"resets {when(at, now)}, {used(account, now)}"
+    elif tier == 1:
+      reason = "no live quota data, treated as full"
+    else:
+      reason = f"exhausted until {when(at, now)}"
+    ranked.append((account, reason))
+  return ranked
+
+
+def used(account: Account, now: int) -> str:
+  return ", ".join(f"{label(w.minutes)} {w.used:.0%}" for w in sorted(account.live(now), key=lambda w: w.minutes))
+
+
+def label(minutes: int) -> str:
+  return f"{minutes // 1440}d" if minutes % 1440 == 0 else f"{minutes // 60}h"
+
+
+def when(timestamp: float, now: int) -> str:
+  hours = (timestamp - now) / 3600
+  local = dt.datetime.fromtimestamp(timestamp).strftime("%a %H:%M")
+  return f"{local} (in {hours / 24:.1f}d)" if hours >= 24 else f"{local} (in {hours:.1f}h)"
+
+
+def main() -> int:
+  parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+  parser.add_argument("--apply", action="store_true", help="write the priorities (default: dry run)")
+  parser.add_argument("--provider", action="append", choices=SUPPORTED,
+                      help="provider to rank, repeatable (default: claude)")
+  args = parser.parse_args()
+  providers = args.provider or ["claude"]
+
+  try:
+    key = management_key()
+    accounts = load_accounts(key)
+    now = int(dt.datetime.now().timestamp())
+    for provider in providers:
+      ranked = rank([a for a in accounts if a.provider == provider], now)
+      if not ranked:
+        continue
+      print(provider)
+      for index, (account, reason) in enumerate(ranked):
+        want = len(ranked) - index
+        change = "" if account.priority == want else f"  (was {account.priority})"
+        print(f"  {want:>3}  {account.email:<36} {reason}{change}")
+        if args.apply and account.priority != want:
+          call("PATCH", "/auth-files/fields", key, {"name": account.name, "priority": want})
+  except RankError as error:
+    print(f"cliproxy-rank: {error}", file=sys.stderr)
+    return 1
+  return 0
+
+
+if __name__ == "__main__":
+  sys.exit(main())

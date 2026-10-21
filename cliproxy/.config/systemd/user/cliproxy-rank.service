@@ -1,0 +1,7 @@
+[Unit]
+Description=Re-rank CLIProxyAPI accounts by soonest weekly quota reset
+ConditionPathExists=%h/.config/cliproxy/key
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/cliproxy-rank --apply

@@ -371,6 +371,13 @@ This documents the default software stack configured in Omarchy:
   `omarchy-agent-usage-update` only iterates collectors inside
   `$OMARCHY_PATH/bin`, so a user collector can never join its loop. Reads the
   same key as `claude-zai`. See `zai/README.md`
+- `cliproxy/` - `cliproxy-rank` and a 5-minute systemd user timer that
+  re-prioritise the Claude accounts on the CLIProxyAPI server
+  (`cliproxy.corgi-hammerhead.ts.net`) so the one whose weekly quota resets
+  soonest is used first. Distinct priorities make routing fill-first regardless
+  of `routing.strategy`. Reads the quota headers the proxy records, and writes
+  through the management API with the key in `~/.config/cliproxy/key`. The
+  service is skipped on hosts without that key. See `cliproxy/README.md`
 - `typora/` - Typora `tokyo-night` theme plus user scripts (front matter
   syntax highlighting, theme live reload). Stow `--no-folding`. Typora has no
   script hook, so `system/typora-inject-user-scripts` adds one `<script>` tag to
