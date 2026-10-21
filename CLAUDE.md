@@ -343,7 +343,7 @@ This documents the default software stack configured in Omarchy:
   launcher. `rbw` itself is fine; the picker can be rewritten against it later. The
   `SUPER + SHIFT + SLASH` **unbind** stays in `bindings.lua`: without it Omarchy's
   own 1Password binding revives on the now-dead key
-- `ssh/` - Shared SSH config (`config.shared`, included last so host-local `~/.ssh/config` wins), the ssh-agent loader, and the committed **public** halves of the YubiKey resident auth keys in `.ssh/authorized_keys.d/` — one file per machine, assembled into a host-local `~/.ssh/authorized_keys` by `build-authorized-keys`. Private credentials never leave their YubiKey; see `yubikey-ssh.md`
+- `ssh/` - Shared SSH config (`config.shared`, included last so host-local `~/.ssh/config` wins), the ssh-agent loader, and the committed **public** halves of the YubiKey resident auth keys in `.ssh/authorized_keys.d/` — one file per machine, assembled into a host-local `~/.ssh/authorized_keys` by `build-authorized-keys`. Private credentials never leave their YubiKey; see `yubikey-ssh.md`. `ssh-askpass-notify` (the `SSH_ASKPASS` for FIDO touch prompts) shows a 4s Omarchy OSD and drives the `ssh-touch` bar module in `.config/omarchy/bar/modules/`, which pulses until the touch lands. The module only appears once `{"id":"ssh-touch","type":"qml"}` is in the host-local `~/.config/omarchy/shell.json` bar layout
 - `tampermonkey/` - Userscripts for the policy-installed Tampermonkey (not stowed).
   Each `*.user.js` installs from, and auto-updates from, its public
   `raw.githubusercontent.com` URL, so **bump `@version` on every edit** or no

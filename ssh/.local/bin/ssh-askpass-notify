@@ -27,6 +27,32 @@ set -uo pipefail
 msg="${1:-SSH is requesting confirmation}"
 
 if [ "${SSH_ASKPASS_PROMPT:-}" = "none" ]; then
+    # On Omarchy: a 4s OSD for the "touch now" moment, plus the bar indicator
+    # (~/.config/omarchy/bar/modules/ssh-touch.qml), which pulses for as long
+    # as the touch is pending by watching $state. OpenSSH SIGTERMs the
+    # notifier once the touch lands or fails (notify_complete), so stay alive
+    # until then and clear both on that signal. `wait` on a background sleep,
+    # because bash defers traps until a foreground child exits. The 60s cap
+    # clears the indicator if ssh dies without signalling us.
+    if command -v omarchy-osd >/dev/null; then
+        state="${XDG_RUNTIME_DIR:-/run/user/$UID}/ssh-touch-pending"
+        started=$SECONDS
+        clear() {
+            echo 0 > "$state"
+            # Only close the OSD while it can still be ours; after 4s it may
+            # be a volume or brightness OSD.
+            (( SECONDS - started < 4 )) && omarchy-shell -q osd close
+            exit 0
+        }
+        trap clear TERM INT
+        echo 1 > "$state"
+        omarchy-osd -m 'Touch YubiKey' -d 4000 -i touch
+        sleep 60 &
+        wait
+        clear
+    fi
+    # Elsewhere, a notification. security-high is AdwaitaLegacy-only and
+    # renders as a missing-image checkerboard under the Omarchy shell.
     notify-send -u critical -a SSH -i security-high \
         "Touch your YubiKey" "$msg"
     exit 0

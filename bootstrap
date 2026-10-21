@@ -41,11 +41,11 @@ PACKAGES_MACOS=(
     macos
 )
 
-# On macOS these subtrees are inert — nothing reads systemd units or
-# environment.d — so skip them rather than symlinking dead directories into
-# ~/.config. Matched by basename; stow's built-in ignores (.git, README.*, ...)
-# still apply on top of these.
-MACOS_IGNORES=(--ignore='systemd' --ignore='environment\.d')
+# On macOS these subtrees are inert — nothing reads systemd units,
+# environment.d or Omarchy shell modules — so skip them rather than symlinking
+# dead directories into ~/.config. Matched by basename; stow's built-in
+# ignores (.git, README.*, ...) still apply on top of these.
+MACOS_IGNORES=(--ignore='systemd' --ignore='environment\.d' --ignore='omarchy')
 
 # --- Options ----------------------------------------------------------------
 
