@@ -280,22 +280,10 @@ fi
 # ----------------------------------------------------------------------------
 # claude-zai -- Claude Code against z.ai's Anthropic-compatible endpoint
 # ----------------------------------------------------------------------------
+# A separate Claude Code config dir. Everything -- base URL, apiKeyHelper,
+# models, CLAUDE.md, skills -- lives in the host-local ~/.claude-zai.
 
-claude-zai() {
-    local key=$HOME/.config/zai/anthropic-key
-    [[ -r $key ]] || { print -u2 "claude-zai: no readable key at $key"; return 1 }
-    local model=${CLAUDE_ZAI_MODEL:-glm-5.3-flash}
-    env -u ANTHROPIC_API_KEY \
-        ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic \
-        ANTHROPIC_AUTH_TOKEN="$(<$key)" \
-        ANTHROPIC_MODEL=$model \
-        ANTHROPIC_DEFAULT_HAIKU_MODEL=$model \
-        ANTHROPIC_DEFAULT_SONNET_MODEL=$model \
-        ANTHROPIC_DEFAULT_OPUS_MODEL=$model \
-        CLAUDE_CODE_MAX_CONTEXT_TOKENS=300000 \
-        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
-        claude --model $model "$@"
-}
+claude-zai() { CLAUDE_CONFIG_DIR=$HOME/.claude-zai claude "$@" }
 
 # ----------------------------------------------------------------------------
 # claude-qwen -- Claude Code against the local llama.cpp router
