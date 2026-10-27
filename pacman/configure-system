@@ -160,6 +160,27 @@ else
     echo "  ssh-agent not installed, skipping."
 fi
 
+# --- YubiKey: no USB autosuspend ---
+# The ccid package's 92_pcscd_ccid.rules sets power/control=auto on anything
+# with a smart-card interface, which includes the YubiKey's CCID. Once it has
+# autosuspended, the CTAPHID_INIT that wakes it comes back without the CBOR
+# capability, so libfido2 drops to U2F and the probe fails: ssh reports
+# "Confirm user presence" and then "device not found" without waiting for a
+# touch. `ssh -v` shows "check_sk_options: device is not fido2" then
+# "fido_dev_get_assert: FIDO_ERR_RX", and `fido2-token -I` reports caps
+# "nocbor". The key looks healthy again once something has woken it, which is
+# why a second ssh often works. Measured on paperweight 2026-10-27, after ccid
+# 1.8.4. The 93- prefix is what makes this rule run after ccid's.
+yubikey_rule=/etc/udev/rules.d/93-yubikey-no-autosuspend.rules
+yubikey_rule_body='# Installed by ~/.dotfiles/pacman/configure-system. See the comment there.
+SUBSYSTEM=="usb", ATTR{idVendor}=="1050", TEST=="power/control", ATTR{power/control}="on"'
+if ! [ "$(cat "$yubikey_rule" 2>/dev/null)" = "$yubikey_rule_body" ]; then
+    echo "Disabling USB autosuspend for YubiKeys..."
+    printf '%s\n' "$yubikey_rule_body" | sudo tee "$yubikey_rule" >/dev/null
+    sudo udevadm control --reload
+    sudo udevadm trigger --subsystem-match=usb --attr-match=idVendor=1050
+fi
+
 # --- Default browser (Helium) ---
 # Helium isn't in upstream's `omarchy default browser` menu, so we make the same
 # xdg calls it would. The package itself comes from packages-aur.txt via
