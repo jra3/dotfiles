@@ -26,7 +26,7 @@ PACKAGES_COMMON=(
 
 # Need systemd, Hyprland/Wayland, XDG .desktop files, or Arch-only hardware.
 PACKAGES_LINUX=(
-    hypr power webapps bambu-studio
+    hypr power webapps bambu-studio helium
     slack voxtype qmk scripts typora cliproxy
 )
 
