@@ -175,7 +175,8 @@ scratchpad(
 -- Dictation, pedal, and mouse thumb buttons
 --------------------------------------------------------------------------------
 
--- Hold to dictate, release to stop. Omarchy binds the same pair to F9.
+-- Hold to dictate, release to stop. Omarchy's own keys are Right Alt (hold)
+-- and Alt + Space; these add the mouse thumb button and the foot pedal.
 o.bind("mouse:275", "Start dictation", "voxtype record start")
 o.bind("mouse:275", "Stop dictation", "voxtype record stop", { release = true })
 
@@ -246,10 +247,3 @@ end
 o.bind("SUPER + CTRL + SHIFT + ALT + F12", "Mic mute toggle", "pactl set-source-mute @DEFAULT_SOURCE@ toggle")
 o.bind("SUPER + CTRL + SHIFT + ALT + 8", "Notification silencing", "omarchy-toggle-notification-silencing")
 o.bind("SUPER + CTRL + SHIFT + ALT + 9", "Voxtype toggle", "voxtype record toggle")
-
--- Dictation keys from before Alt + Space and Right Alt became the defaults.
--- Remove these lines to give the keys back to applications.
-if o.dictation_installed and o.dictation_installed() then
-  o.bind("SUPER + CTRL + X", "Toggle dictation", "omarchy-dictation toggle")
-  o.bind_hold("F9", "Start dictation (push-to-talk)", "omarchy-dictation start", "Stop dictation (push-to-talk)", "omarchy-dictation stop")
-end

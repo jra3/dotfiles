@@ -208,7 +208,10 @@ if command -v helium-browser &>/dev/null; then
     flags_file="$HOME/.config/helium-browser-flags.conf"
     if [ -f "$omarchy_cfg" ]; then
         install -d "$HOME/.config"
-        sed "s|~/|$HOME/|g" "$omarchy_cfg" > "$flags_file"
+        # Drop --password-store: Bitwarden is the password manager and the built-in
+        # one is disabled by policy (passwords.json below), so the flag would only
+        # move cookie encryption onto the keyring for nothing.
+        sed -e "s|~/|$HOME/|g" -e '/^--password-store=/d' "$omarchy_cfg" > "$flags_file"
 
         # Chromium keeps only the LAST occurrence of a repeated switch, so every
         # extension has to end up on one joined --load-extension list.
@@ -285,6 +288,7 @@ if command -v helium-browser &>/dev/null; then
         "fnaicdffflnofjppbagibeoednhnbjhg|floccus -- bookmark sync"
         "nmkinhboiljjkhaknpaeaicmdjhagpep|Fluff Busting Purity -- Facebook feed cleanup"
         "dhdgffkkebhmkfjojejmpbldmpobfkfo|Tampermonkey -- userscripts (scripts live in tampermonkey/)"
+        "nngceckbapebfimnlniiiahkandclblb|Bitwarden -- the only password manager (built-in one off, see passwords.json)"
     )
 
     if [ ! -d "$policy_dir" ]; then
@@ -308,6 +312,18 @@ if command -v helium-browser &>/dev/null; then
     else
         printf '%s\n' "$policy_json" | sudo tee "$policy_dir/extensions.json" >/dev/null
     fi
+    # Bitwarden is the only password store: turn off Helium's own save/fill
+    # prompts so the two never compete for the same login form.
+    passwords_json='{
+  "PasswordManagerEnabled": false
+}'
+    if [ -w "$policy_dir" ]; then
+        printf '%s\n' "$passwords_json" > "$policy_dir/passwords.json"
+    else
+        printf '%s\n' "$passwords_json" | sudo tee "$policy_dir/passwords.json" >/dev/null
+    fi
+    echo "  Built-in password manager disabled ($policy_dir/passwords.json)."
+
     for ext in "${helium_extensions[@]}"; do
         echo "  force-installed: ${ext#*|}"
     done
