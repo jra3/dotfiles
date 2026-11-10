@@ -7,8 +7,13 @@
 -- Not overridden on purpose:
 --   kb_layout    -- Omarchy derives it from /etc/vconsole.conf.
 
--- kb_options is a single string, not a list, so setting it REPLACES Omarchy's
--- "compose:caps,shift:both_capslock_cancel" rather than adding to it.
+-- kb_options: unlisted hosts keep Omarchy's default, "omarchy:shift_caps_compose"
+-- (4.5+): Caps Lock stays Caps Lock and Shift + Caps is Compose. The option is
+-- Omarchy's own, defined in /etc/xkb/symbols/omarchy. Until 2026-11-10 this file
+-- forced the pre-4.5 default, "compose:caps,shift:both_capslock_cancel", everywhere.
+--
+-- kb_options is a single string, not a list, so setting it for a host REPLACES
+-- Omarchy's value rather than adding to it.
 --
 -- COMPOSE AND CTRL BOTH WANT CAPS, AND THEY CANNOT SHARE IT.
 --
@@ -21,21 +26,13 @@
 --
 --   <CAPS> -> Control_L
 --
--- So each host picks one, and that is what splits the two strings below.
---
 -- A keyboard that puts Ctrl somewhere reachable in its own firmware (the Adv360
--- is ZMK, chonky's Framework 16 board is QMK) does not need ctrl:nocaps, which
--- leaves Caps free for Compose -- where Omarchy puts it by default, and where a
--- Compose key belongs on a board with no key to spare. A stock laptop board
--- needs Ctrl on Caps, and then Compose has to go somewhere else.
---
--- Real Caps Lock survives either way on both-Shifts-together
--- (shift:both_capslock_cancel), and the next lone Shift releases it, so a
--- misfire clears itself.
+-- is ZMK, chonky's Framework 16 board is QMK) does not need ctrl:nocaps, so it
+-- takes Omarchy's default. A stock laptop board needs Ctrl on Caps, and then
+-- Compose has to go somewhere else -- which is what the host table below is for.
 --
 -- ctrl:nocaps, not caps:ctrl_modifier -- the latter keeps the key identifying
 -- as Caps Lock and still able to latch, which is not what "Caps is Ctrl" means.
-local kb_options_default = "compose:caps,shift:both_capslock_cancel"
 
 -- cupcake, the Framework Laptop 12, is the one host with a stock board. Its
 -- bottom-left row, left to right, wants to be Fn, Ctrl, Alt, Cmd:
@@ -106,12 +103,13 @@ local function hostname()
   return name and name:match("^%s*(.-)%s*$")
 end
 
-local kb_options = kb_options_by_host[hostname()] or kb_options_default
+local kb_options = kb_options_by_host[hostname()]
+if kb_options then
+  hl.config({ input = { kb_options = kb_options } })
+end
 
 hl.config({
   input = {
-    kb_options = kb_options,
-
     -- Faster than Omarchy's 40; repeat_delay keeps Omarchy's 250.
     repeat_rate = 50,
 
