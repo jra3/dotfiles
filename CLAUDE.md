@@ -25,6 +25,12 @@ other: `pacman/` (`install-packages`, `configure-system`, package lists) and
 **This system runs Omarchy 4 ("Quattro")**: 4.0 since 2026-08-23, 4.5 since
 2026-11-08. See the section below: pre-4 habits actively mislead.
 
+**After an Omarchy upgrade, run `omarchy-restart-shell` (or log out).** Nothing
+restarts the running Quickshell, so it keeps the old shell code while Hyprland
+reloads the new bindings, and any binding that targets a new shell module silently
+does nothing. After 4.5, SUPER+SPACE and SUPER+ALT+SPACE were dead until the
+restart (`omarchy-shell omarchy.dock apps` answered `Target not found`).
+
 Omarchy's shipped configs and defaults come from the `omarchy-settings` package, not
 `omarchy`. To see what an upgrade changed in the files we shadow, extract two cached
 copies from `/var/cache/pacman/pkg/omarchy-settings-*.zst` and diff
