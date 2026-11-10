@@ -158,7 +158,7 @@ scratchpad("SUPER + SHIFT + M", "Email", "mail", "chrome-mail.google.com", o.lau
 scratchpad("SUPER + SHIFT + Y", "YouTube", "youtube", "chrome-youtube.com", o.launch_webapp("https://youtube.com/"))
 scratchpad("SUPER + SHIFT + K", "Chessly", "chessly", "chrome-chessly.com", o.launch_webapp("https://chessly.com/home"))
 scratchpad("SUPER + SHIFT + N", "Notion", "notion", "chrome-app.notion.com", o.launch_webapp("https://app.notion.com/p/antimetal/"))
-scratchpad("SUPER + SHIFT + S", "Slack", "slack", "chrome-app.slack.com", o.launch_webapp("https://app.slack.com/client/T04MQQ4C0LU/D0936HPFMQT"))
+scratchpad("SUPER + SHIFT + S", "Slack", "slack", "chrome-app.slack.com", o.launch_webapp("https://santoriai.slack.com/"))
 
 -- Apple Music runs under chromium, not Helium: it needs Widevine L1 for full
 -- playback. setsid keeps it off the compositor's process group.
