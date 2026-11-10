@@ -93,6 +93,7 @@ end
 -- GDK_BACKEND=wayland: the pgtk build picks X11 through XWayland otherwise.
 o.bind("SUPER + SHIFT + E", "Emacs", o.launch("env GDK_BACKEND=wayland emacs"))
 o.bind("SUPER + SHIFT + ALT + K", "Chess", { webapp = "https://chess.com/home", focus = true })
+o.bind("SUPER + SHIFT + SLASH", "Bitwarden vault", "omarchy-shell io.github.elevate08.qs-bitwarden-cli toggle")
 
 -- MakeID L1 label printer. Only one machine has the printer and the code, so
 -- the bind exists only where the script does.
@@ -245,3 +246,10 @@ end
 o.bind("SUPER + CTRL + SHIFT + ALT + F12", "Mic mute toggle", "pactl set-source-mute @DEFAULT_SOURCE@ toggle")
 o.bind("SUPER + CTRL + SHIFT + ALT + 8", "Notification silencing", "omarchy-toggle-notification-silencing")
 o.bind("SUPER + CTRL + SHIFT + ALT + 9", "Voxtype toggle", "voxtype record toggle")
+
+-- Dictation keys from before Alt + Space and Right Alt became the defaults.
+-- Remove these lines to give the keys back to applications.
+if o.dictation_installed and o.dictation_installed() then
+  o.bind("SUPER + CTRL + X", "Toggle dictation", "omarchy-dictation toggle")
+  o.bind_hold("F9", "Start dictation (push-to-talk)", "omarchy-dictation start", "Stop dictation (push-to-talk)", "omarchy-dictation stop")
+end
