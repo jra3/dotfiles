@@ -22,7 +22,13 @@ other: `pacman/` (`install-packages`, `configure-system`, package lists) and
 
 **Claude skill:** Use `/omarchy` for help with Hyprland config, keybindings, monitors, themes, input devices, or any `~/.config/hypr/` files. Omarchy 4 also ships its own skill at `$OMARCHY_PATH/default/agents/skills/omarchy/`, which tracks the current release — prefer it when the two disagree.
 
-**This system runs Omarchy 4 ("Quattro"), upgraded 2026-08-23.** See the section below: pre-4 habits actively mislead.
+**This system runs Omarchy 4 ("Quattro")**: 4.0 since 2026-08-23, 4.5 since
+2026-11-08. See the section below: pre-4 habits actively mislead.
+
+Omarchy's shipped configs and defaults come from the `omarchy-settings` package, not
+`omarchy`. To see what an upgrade changed in the files we shadow, extract two cached
+copies from `/var/cache/pacman/pkg/omarchy-settings-*.zst` and diff
+`usr/share/omarchy/config/`.
 
 ## Omarchy 4 (Quattro)
 
@@ -41,11 +47,19 @@ a `.conf` is read only when no `.lua` exists. Every Omarchy default under
 - Omarchy's `o.*` helpers: `$OMARCHY_PATH/default/hypr/helpers.lua`
 - Validate every change: `hyprctl reload && hyprctl configerrors`
 
-**Binding an already-bound key does not override it — both bindings fire.** Call
-`hl.unbind(...)` first. `hl.unbind` matches the modifier string *literally* while
-`o.bind` normalizes it, so `"SUPER + ALT + SHIFT + E"` will not unbind a key Omarchy
-registered as `"SUPER + SHIFT + ALT + E"`; you get two live bindings and no error.
-List what is actually bound with `omarchy menu keybindings --print`.
+**Binding an already-bound key does not override it — both bindings fire.** Use
+`o.rebind(...)` (Omarchy 4.5+, same arguments as `o.bind`), which unbinds first.
+The older pattern, `hl.unbind(...)` then `o.bind(...)`, still works, but
+`hl.unbind` matches the modifier string *literally* while `o.bind` normalizes it, so
+`"SUPER + ALT + SHIFT + E"` will not unbind a key Omarchy registered as
+`"SUPER + SHIFT + ALT + E"`; you get two live bindings and no error. List what is
+actually bound with `omarchy menu keybindings --print`, and find doubles with
+`hyprctl binds -j | jq -r '.[] | "\(.modmask) \(.key) \(.release)"' | sort | uniq -d`.
+Omarchy deliberately double-binds `ALT + TAB` and `ALT + SHIFT + TAB`.
+
+Dictation uses Omarchy's keys (Right Alt hold, `ALT + SPACE`) plus our mouse thumb
+button and foot pedal. The 4.5 migration appended legacy `SUPER + CTRL + X` and `F9`
+bindings to `bindings.lua`; they were removed 2026-11-10.
 
 **`hyprctl dispatch` takes a Lua dispatcher.** `hyprctl dispatch togglespecialworkspace foo`
 is a parse error; write `hyprctl dispatch 'hl.dsp.workspace.toggle_special("foo")'`.
@@ -67,10 +81,13 @@ stow and the repo stops being the source of truth. Seen during the Quattro upgra
 |---|---|
 | `~/.config/tmux/tmux.conf` | upgrade migration |
 | `~/.config/xdg-terminals.list` | terminal picker |
-| `~/.config/kitty/kitty.conf` | `omarchy display text size`, `omarchy font set` (never stowed: the file is host-local, shared bits live in `shared.conf` — see the `kitty/` entry. Same arrangement `~/.config/ghostty/config` had before ghostty was retired on 2026-09-08) |
+| `~/.config/kitty/kitty.conf` | `omarchy display text size`, `omarchy font set` (never stowed: the file is host-local, shared bits live in `shared.conf` — see the `kitty/` entry) |
+| `~/.config/hypr/bindings.lua`, `hyprland.lua` | found as regular files on paperweight 2026-11-10 (`hyprland.lua` since 10-12, `bindings.lua` since the 4.5 upgrade). Live content was the repo plus additions |
 
-After changing anything through an Omarchy menu, check the file with `ls -l` and
-`stow -R <package>` if it became a regular file.
+After changing anything through an Omarchy menu, and after every Omarchy upgrade,
+run `./bootstrap --dry-run`: a file that dropped out of stow shows up as a conflict.
+If the live copy holds changes worth keeping, `stow --adopt <package>` moves it into
+the repo and restores the link; review with `git diff`.
 
 `~/.config/hypr/monitors.lua` used to be on that list — the display menu
 (`omarchy-hyprland-monitor-scaling`) rewrites it. It was un-stowed on 2026-08-25 and is
@@ -139,6 +156,13 @@ Helium profile on the machine:
 | floccus — bookmark sync | `fnaicdffflnofjppbagibeoednhnbjhg` |
 | Fluff Busting Purity — Facebook feed cleanup | `nmkinhboiljjkhaknpaeaicmdjhagpep` |
 | Tampermonkey — userscripts, kept in `tampermonkey/` | `dhdgffkkebhmkfjojejmpbldmpobfkfo` |
+| Bitwarden — the only password manager | `nngceckbapebfimnlniiiahkandclblb` |
+
+**Bitwarden is Helium's only password store.** `configure-system` also writes
+`passwords.json` (`PasswordManagerEnabled: false`) so the built-in manager never
+offers to save or fill. It also strips Omarchy's `--password-store=gnome-libsecret`
+from the generated flags file: with the built-in manager off, that flag would only
+move cookie encryption onto the keyring.
 
 **That `a+rw` does not always survive.** On 2026-09-14 the directory was found
 `root:root 755` holding only `color.json`, with no `extensions.json` at all and
@@ -243,7 +267,7 @@ This documents the default software stack configured in Omarchy:
 
 **Stow packages** - Each directory is independent and can be deployed separately:
 - `zsh/` - Shell configuration (XDG-compliant)
-- `git/` - Git config, global ignore patterns, SSH commit signing (`allowed_signers` + `setup-git-signing`)
+- `git/` - Git config, global ignore patterns, SSH commit signing config (off by default; `allowed_signers` + `setup-git-signing`). Host-local git settings, e.g. `git maintenance register` repos, go in an unstowed `~/.gitconfig`: once it exists, `git config --global` writes land there instead of in the repo
 - `sudo-touch/` - Touch-gated sudo: pam_u2f on every escalation plus an
   Omarchy shell plugin that shows what sudo is about to run, centred and
   persistent until the sudo resolves, with a Deny button. **Not stowed**: run
@@ -340,9 +364,10 @@ This documents the default software stack configured in Omarchy:
 - `bitwarden/` - Bitwarden CLI helper: `get-signature` extracts a signature
   attachment from the vault to `/tmp`. `bw-pick` (walker-driven picker) was removed
   2026-09-13 — broken by Omarchy 4, which replaced `walker` with the Quickshell
-  launcher. `rbw` itself is fine; the picker can be rewritten against it later. The
-  `SUPER + SHIFT + SLASH` **unbind** stays in `bindings.lua`: without it Omarchy's
-  own 1Password binding revives on the now-dead key
+  launcher. Its replacement is the `io.github.elevate08.qs-bitwarden-cli` Omarchy
+  shell plugin (installed per machine under `~/.config/omarchy/plugins/`, not in
+  this repo), bound to `SUPER + SHIFT + SLASH` in `bindings.lua` after an unbind of
+  Omarchy's 1Password binding on the same key
 - `ssh/` - Shared SSH config (`config.shared`, included last so host-local `~/.ssh/config` wins), the ssh-agent loader, and the committed **public** halves of the YubiKey resident auth keys in `.ssh/authorized_keys.d/` — one file per machine, assembled into a host-local `~/.ssh/authorized_keys` by `build-authorized-keys`. Private credentials never leave their YubiKey; see `yubikey-ssh.md`. `ssh-askpass-notify` (the `SSH_ASKPASS` for FIDO touch prompts) shows a 4s Omarchy OSD and drives the `ssh-touch` bar module in `.config/omarchy/bar/modules/`, which pulses until the touch lands. The module only appears once `{"id":"ssh-touch","type":"qml"}` is in the host-local `~/.config/omarchy/shell.json` bar layout
 - `tampermonkey/` - Userscripts for the policy-installed Tampermonkey (not stowed).
   Each `*.user.js` installs from, and auto-updates from, its public
@@ -430,66 +455,26 @@ Version-manager shims (pyenv, mise) are prepended later in `.zshrc`, so they sti
 
 **Never hardcode `/opt/homebrew`.** That path is Apple Silicon only; Intel Macs use `/usr/local`. Use `$HOMEBREW_PREFIX` (exported by `shellenv`), as `darwin.zsh` does.
 
-**Ghostty has no OS conditionals**, but it registers Linux-only keys (`gtk-toolbar-style`, `async-backend`) as known fields on every platform, so they validate clean and are ignored on macOS. The config is deliberately *not* split. Check changes with `ghostty +validate-config --config-file=...`. Note Ghostty does **not** support trailing `#` comments — a comment after a value becomes part of the value.
-
 **Tailscale** installs from a `.pkg` requiring interactive `sudo`, so it aborts a non-interactive `brew bundle`. Install it on its own from a real terminal.
 
-## Git commit signing (per-machine YubiKey, on)
+## Git commit signing (off)
 
-**Signing is on** — `commit.gpgsign = true` in the `git/` package. Skip it for one
-commit with `git -c commit.gpgsign=false commit`.
+`commit.gpgsign = false` in the `git/` package (GTD-38), and we don't sign as a
+rule. Commits work on any machine with no YubiKey and no setup. Sign one by hand
+with `git commit -S`.
 
-It was off from 2026-08-02 (`aaf5553`) to 2026-08-21, because an `sk-` (FIDO2)
-key that wants a touch fails in any non-interactive context. **Whether it wants
-one is per-machine, and the four machines measured disagree:**
+The signing config stays in place for when it is wanted: `gpg.format=ssh`,
+`user.signingkey` → `~/.ssh/id_ed25519_sk_gitsign.pub`, and an `allowed_signers`
+file with one line per machine. `setup-git-signing` (in `git/.local/bin/`) creates
+a machine's resident `sk-ed25519` key on its own YubiKey, registers it in
+`allowed_signers`, and uploads it to GitHub. Idempotent.
 
-| Machine | gitsign flags | Signs unattended? | Measured |
-|---|---|---|---|
-| chonky | `0x21` | no, prompts `Confirm user presence` | 2026-07-28, `yubikey-ssh.md` |
-| paperweight | `0x20` | yes, `git commit -S` with stdin closed exits 0 and verifies `G` | 2026-08-21, GTD-38 |
-| cupcake | `0x20` | yes, same test | 2026-08-25, after a `-K` recovery + patch |
-| minimini | `0x21` | **no**, prompts | 2026-09-15 |
-
-`setup-git-signing` asks for no-touch/no-PIN, and paperweight's key kept it.
-chonky's did not, because a `-K` recovery hands back a `0x21` stub and silently
-reintroduces the touch. Read the flags byte on each machine; do not trust either
-this file or the key's provenance. `yubikey-ssh.md` has the decoding recipe.
-
-**A `0x21` stub is a one-command fix, not a reason to regenerate.**
-`ssh-keygen -p` sets FIDO options as well as passphrases, so a recovered key can
-be flipped back in place, without the token:
+Whether a key signs unattended depends on its flags byte: `0x20` signs silently,
+`0x21` prompts for a touch and hangs any agent or `git rebase --exec`. A
+`ssh-keygen -K` recovery hands back `0x21`. Flip it in place without regenerating:
 
 ```sh
 ssh-keygen -p -O no-touch-required -P "" -N "" -f ~/.ssh/id_ed25519_sk_gitsign
 ```
 
-This matters on a rebuild. Recovering with `ssh-keygen -K` keeps the machine's
-existing key — so its `allowed_signers` line and GitHub registration stay valid,
-and every commit it ever signed keeps verifying. Generating a fresh key instead
-discards all of that. cupcake was rebuilt this way on 2026-08-25.
-
-So: on a `0x20` machine, signing costs nothing and agents are fine. On a `0x21`
-machine, an unattended session hangs on every commit, and `git rebase --exec`
-stops mid-rebase and leaves you detached, which reads like lost commits. Fix the
-flags byte rather than turning signing off globally.
-
-Either way the token has to be in the port. A container, or a machine with the
-Nano pulled, fails at signing time.
-
-The per-machine key setup below applies to every machine that signs.
-Config is shared via the `git/` package (`gpg.format=ssh`, `user.signingkey` → a
-canonical key path), but **each machine has its own signing key on its own
-YubiKey**:
-
-1. On a new machine, run `setup-git-signing` (from `git/.local/bin/`, on `$PATH`).
-   It generates a resident no-touch/no-PIN `sk-ed25519` key at
-   `~/.ssh/id_ed25519_sk_gitsign`, registers it in `allowed_signers`, and uploads
-   it to GitHub as a signing key. Idempotent.
-2. Commit the updated `allowed_signers` so other machines can verify this one's
-   commits.
-
-`allowed_signers` accumulates one line per machine. Both identities
-(`github@porcnick.com` personal, `john@antimetal.com` work) share each key.
-Since `commit.gpgsign` is `true`, run `setup-git-signing` before committing on a
-new machine, or every `git commit` fails with no signing key. Until then, commit
-with `git -c commit.gpgsign=false commit`.
+`yubikey-ssh.md` has the decoding recipe and the per-machine history.

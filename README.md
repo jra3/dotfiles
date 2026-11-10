@@ -73,9 +73,6 @@ symlink dead directories into `~/.config`.
   ranked below `/usr/bin`.
 - **Tailscale** installs from a `.pkg` and needs an interactive `sudo`, so
   `brew bundle` aborts on it in a non-interactive run. Install it separately.
-- A few configs carry Linux-only keys that are simply inert here (Ghostty's
-  `gtk-toolbar-style` and `async-backend`, for instance) — they validate clean
-  on macOS, so the files are not split.
 
 ## Packages
 
