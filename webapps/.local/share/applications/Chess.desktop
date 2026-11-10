@@ -3,6 +3,7 @@ Version=1.0
 Name=Chess
 Comment=Chess.com
 Exec=omarchy-launch-webapp https://chess.com/home
+StartupWMClass=chrome-chess.com__home-Default
 Terminal=false
 Type=Application
 Icon=chess-webapp

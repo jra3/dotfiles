@@ -3,6 +3,7 @@ Version=1.0
 Name=Syncthing
 Comment=Syncthing
 Exec=omarchy-launch-webapp http://localhost:8384/
+StartupWMClass=chrome-localhost__-Default
 Terminal=false
 Type=Application
 Icon=syncthing-webapp

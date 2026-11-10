@@ -3,6 +3,7 @@ Version=1.0
 Name=Chessly
 Comment=Chessly
 Exec=omarchy-launch-webapp https://chessly.com/home
+StartupWMClass=chrome-chessly.com__home-Default
 Terminal=false
 Type=Application
 Icon=chessly-webapp
